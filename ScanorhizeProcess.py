@@ -31,27 +31,27 @@ NextStartDate=DatesSaved[0]
 NextStartseconds=DatesSaved[1]
 
 for CurrentScanner in listScannerconfigs:
-    Scanner = ReadScannerConfig(CurrentScanner)    
-    data="scanner file: "+CurrentScanner    
-    WriteTimeLogfile(data)    
-    
-    ScannerStartinS=DateToSeconds(Scanner.StartDate)    
+    Scanner = ReadScannerConfig(CurrentScanner)
+    data="scanner file: "+CurrentScanner
+    WriteTimeLogfile(data)
+
+    ScannerStartinS=DateToSeconds(Scanner.StartDate)
     CurrentDateinS=DateToSeconds(DateStart)
     data= "Scanner : "+Scanner.StartDate+" "+str(ScannerStartinS)+" Current : "+DateStart+" "+str(CurrentDateinS)+" NextStart : "+str(NextStartseconds[i_scan])
-    WriteTimeLogfile(data)    
-    
+    WriteTimeLogfile(data)
+
     if (CurrentDateinS>ScannerStartinS and CurrentDateinS>=NextStartseconds[i_scan]):
-        WriteTimeLogfile("Turn scanner"+str(i_scan+1)+" On")            
-           
+        WriteTimeLogfile("Turn scanner"+str(i_scan+1)+" On")
+
         #get image and post image               
         WriteTimeLogfile("Start image acquisition")
-        Scanner=scanAcq(Scanner,(i_scan),DateStart)    
+        Scanner=scanAcq(Scanner,(i_scan),DateStart)
         WriteScannerConfig(Scanner,CurrentScanner)
-        scanning=1        
+        scanning=1
         if(Scanner.error==0):
             WriteTimeLogfile("Image acquisition Ok")
             sleep(5)
-            FolderImage=CreateFolderImage(Scanner.Campaign, i_scan)        
+            FolderImage=CreateFolderImage(Scanner.Campaign, i_scan)
             copyerror=CopyImageToUSB(Scanner, FolderImage)
             if copyerror==0 :
                 WriteTimeLogfile("Image copied to USB")

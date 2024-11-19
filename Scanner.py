@@ -10,7 +10,7 @@ import os
 ConfigScannerPath = "ConfigFile/Scanner/"
 
 ResolutionList=["300","600","1200"]
-ColorList=["Color","Gray","Lineart"]
+ColorList=["Color","GRAY","Lineart"]
 
 class ScannerData :
     ScannerName=""
@@ -26,10 +26,10 @@ class ScannerData :
     token ="G2IGG0eedSxemoWkMeZ9p4v_I1UCvKYXkV5ObWc8ErYLNXiiPM_g5xE3qNsFMW5wLhq4YK1SmR4b19Vn66qLyA"
     UseServer=0;
     error=0;
-    Campaign ="CampaignName"    
+    Campaign ="CampaignName"
     StartDate="20200810T094500Z" #next start if UseServer=1
     PeriodeS="3600"#next start if UseServer=0
-    
+
 Scanner=ScannerData
 
 def updateScanParameters(Scanner) :
@@ -97,33 +97,33 @@ def scanAcq(Scanner,pin,date) :
     error=TurnPin_On(pin,40)
     if error!=0:
         Scanner.error=1
-        return Scanner    
+        return Scanner
     Displayfile="Log/Display.txt"
     command = "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage --mode="+Scanner.mode+" --resolution="+str(Scanner.resolution)+" -l "+str(Scanner.l)+" -t "+str(Scanner.t)+" -x "+str(Scanner.x)+" -y "+str(Scanner.y)+" --format=tiff >"+imagepathtiff+" | tee -a "+Displayfile
-    print(command) 
+    print(command)
     res=1
     i=0
     while res!=0 and i<2 :
         #print("i=",i)
         WriteTimeLogfile("StartScan :"+str(i))
         result = run(command, capture_output=True, universal_newlines=True, shell=True)
-        WriteTimeLogfile("code: "+str(result.returncode)+"stdout :"+str(result.stdout)+"stderr :"+str(result.stderr))        
+        WriteTimeLogfile("code: "+str(result.returncode)+"stdout :"+str(result.stdout)+"stderr :"+str(result.stderr))
         res=result.returncode
         if len(result.stderr)>2:
             res=12
         if "no SANE" in result.stderr or "Error"  in result.stderr or "failed" in result.stderr:
-            res=12          
+            res=12
         Scanner.error=res
         i+=1
         if res!=0:
             TurnPin_Off(pin)
             TurnPin_On(pin,40)
-             
+
     TurnPin_Off(pin)
-    if(Scanner.error>0):        
+    if(Scanner.error>0):
         WriteTimeLogfile("error acquisition: "+result.stdout+result.stderr)
-        return Scanner 
-    
+        return Scanner
+
     if Scanner.quality>90:
         Scanner.quality=90
     
@@ -173,7 +173,7 @@ def ScannerPreview(pin):
         WriteTimeLogfile("error acquisition: "+result.stdout+result.stderr)
     else:
         WriteTimeLogfile("Preview OK")
-    
+
     return image,res
 
 def listConfigScanner():
@@ -189,8 +189,8 @@ def listConfigScanner():
 def ReadScannerConfig(file):
     global Scanner
     fullpath=ConfigScannerPath+file
-    try:        
-        with open(fullpath, "r") as openfile:  
+    try:
+        with open(fullpath, "r") as openfile:
             data = json.load(openfile)
     except :
         WriteTimeLogfile("No file:",fullpath)
