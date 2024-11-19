@@ -1,9 +1,9 @@
 {
                "ScannerName": "Scanner3",
-               "mode": "COLOR",
+               "mode": "Color",
                "resolution": "300",
-               "LastImgTime": "2024-09-27T09:39:32Z",
-               "LastImgFile": "2.jpg",
+               "LastImgTime": "2024-11-18T16:00:32Z",
+               "LastImgFile": "/home/pi/Scanorhize/static/imagejp2000.jp2",
                "l": 0,
                "t": 0,
                "x": 216,
@@ -11,7 +11,7 @@
                "quality": 10,
                "token": "SwirO8kt5HyeBh3vh85sYcDbAqT_XmG9018LmrBWCvk1snH-lgPvGr-WMbBXCRXQRVbSrlWmzheE3f6FSuvxoQ",
                "UseServer": 0,
-               "Campaign": "Test2024",
-               "StartDate": "2024-09-27T08:46:00",
-               "PeriodeS": 60
+               "Campaign": "Test-Lide-400",
+               "StartDate": "2024-10-01T08:00:00Z",
+               "PeriodeS": 600
 }
