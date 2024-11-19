@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{%block title%}
+<!meta http-equiv="refresh" content={{vitesse}} />
+{%endblock%}
+{%block content%}
+
+<form action = "#" method = "post">
+<div class="row">
+       <div class="col-sm">
+              <div class="input-group mb-3">
+                     <div class="input-group-prepend">
+                     <span class="input-group-text">Scanner</span>
+                     </div>
+                     <input type="text" class="form-control" name="Scanner" placeholder={{scannerName}}>
+              </div>
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">              
+              <label class="input-group-text" for="inputGroupSelect01">Mode</label>
+              </div>              
+              <select class="custom-select" name="mode">
+                     <option selected>{{mode}}</option>
+                     <option value="1">{{mode1}}</option>
+                     <option value="2">{{mode2}}</option>
+                     <option value="3">{{mode3}}</option>
+              </select>		
+       </div>
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">
+              <label class="input-group-text" for="inputGroupSelect01">Resolution</label>
+              </div>
+              <select class="custom-select" name="resolution">
+                     <option selected>{{resolution}}</option>
+                     <option value="1">{{resolution1}}</option>
+                     <option value="2">{{resolution2}}</option>
+                     <option value="3">{{resolution3}}</option>
+              </select>
+       </div>  
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">
+              <span class="input-group-text">l(0..216.7mm)</span>
+              </div>
+              <input type="text" class="form-control" name="l" placeholder={{l}}>
+       </div>
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">
+              <span class="input-group-text">t(0..297.5mm)</span>
+              </div>
+              <input type="text" class="form-control" name="t" placeholder={{t}}>
+       </div>
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">
+              <span class="input-group-text">x(0..216.7mm)</span>
+              </div>
+              <input type="text" class="form-control" name="x" placeholder={{x}}>
+       </div>
+              <div class="input-group mb-3">
+                     <div class="input-group-prepend">
+                     <span class="input-group-text">y(0..297.5mm)</span>
+                     </div>
+                     <input type="text" class="form-control" name="y" placeholder={{y}}>
+              </div>
+       
+              <div class="input-group mb-3">
+                     <div class="input-group-prepend">
+                     <span class="input-group-text">Qualité Compression(0..100 no-loss)</span>
+                     </div>
+                     <input type="text" class="form-control" name="quality" placeholder={{quality}}>
+              </div>
+       </div>
+       <div class="col-sm">
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >Token</span>
+			</div>
+			<input type="text" class="form-control" name="token"placeholder={{token}}>
+       </div>
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">
+              <span class="input-group-text">UseServerConfig(0=No 1=Yes)</span>
+              </div>
+              <input type="text" class="form-control" name="UseServer" placeholder={{UseServer}}>
+       </div>
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >Campaign</span>
+			</div>
+			<input type="text" class="form-control" name="Campaign"placeholder={{Campaign}}>
+       </div>
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >StartDate (YYYY-MM-DDTHH:mm:ssZ)</span>
+			</div>
+			<input type="text" class="form-control" name="StartDate"placeholder={{StartDate}}>
+       </div>
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >PeriodeS</span>
+			</div>
+			<input type="text" class="form-control" name="PeriodeS"placeholder={{PeriodeS}}>
+       </div>
+       </div>
+</form> 
+<div class="col-sm">
+       <a href="/Scanner/GetConfig" class="btn btn-primary">Get server config</a>
+       <button type="submit" class="btn btn-primary">Submit</button> 
+       <a href="/Scanner/acqimg" class="btn btn-primary">IMAGE SCAN</a>
+       <p>Last image time : {{LastImgTime}}</p> 
+       <img src = " {{url_for('static', filename=imagename)}}"width="80%", alt="Take a scan"/>      
+       </div>       
+
+     
+                
+
+  
+
+{% endblock %}
+      
+   

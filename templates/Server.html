@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{%block content%}
+<div class="container">
+  <!-- Content here -->  
+	<form action = "#" method = "post">	
+		<H1>Paramètres carte SIM</H1>	
+		<div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >APN</span>
+			</div>
+			<input type="text" class="form-control" name="apn"placeholder={{apn}}>
+		</div>
+		<div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >User</span>
+			</div>
+			<input type="text" class="form-control" name="user"placeholder={{user}}>
+		</div>	
+		<div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" >Password</span>
+			</div>
+			<input type="password" class="form-control" name="password"placeholder={{password}}>
+		</div>
+		<div class="input-group mb-3">
+		<div class="input-group-prepend">
+			<button class="btn btn-outline-secondary" type="submit" id="button-addon1">Connexion</button>
+			</div>
+		<input type="text" class="form-control" placeholder="{{connexion}}" name="connexion" >
+		</div>	
+		<H1>Paramètres API</H1>
+		<div class="input-group mb-3">
+		<div class="input-group-prepend">
+			<button class="btn btn-outline-secondary" type="submit" id="button-addon1">Ping adresse</button>
+			</div>
+		<input type="text" class="form-control" placeholder="{{address}}" name="address" >
+		<input type="text" class="form-control" placeholder="{{ping}}" name="ping" >
+		</div>		
+	</form>             
+</div>        
+{%endblock%}

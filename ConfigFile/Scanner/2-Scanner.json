@@ -1,0 +1,17 @@
+{
+               "ScannerName": "Scanner2",
+               "mode": "COLOR",
+               "resolution": 300,
+               "LastImgTime": "2024-10-01T15:00:31Z",
+               "LastImgFile": "2.jpg",
+               "l": 0,
+               "t": 0,
+               "x": 216,
+               "y": 297,
+               "quality": 10,
+               "token": "4M7qxUP9MPLXgnceYn4dF9szEBkbRgNRWHgOmaWknbTVtx-BOR7FKI_FZX_YmbmvoT9nIgnB-W3Q-1o-OsIDXQ",
+               "UseServer": 0,
+               "Campaign": "Test1",
+               "StartDate": "2024-10-01T17:00:00Z",
+               "PeriodeS": 3600
+}

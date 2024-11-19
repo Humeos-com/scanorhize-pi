@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{%block content%}
+<div class="row">
+	<div class="col-sm">
+		<div class="row">
+			<div class="col-sm">
+				<p>Scanner 1</p>
+				<img src = " {{url_for('static', filename=imagename1)}}"width="100%", alt="No image for Scanner1"/>
+			</div>	
+			<div class="col-sm">
+				<p>Scanner 2</p>
+				<img src = " {{url_for('static', filename=imagename2)}}"width="100%", alt="No image for Scanner2"/>
+			</div>		
+			<div class="col-sm">
+				<p>Scanner 3</p>
+				<img src = " {{url_for('static', filename=imagename3)}}"width="100%", alt="No image for Scanner3"/>
+			</div>
+		</div>	
+	</div>
+	<div class="col-sm">
+	<form action = "#" method = "post">
+
+	<button type="submit" class="btn btn-primary">Stop Process</button>
+	</form>
+	<pre id="output"></pre>
+	<script>
+	var output = document.getElementById('output');
+
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', '{{ url_for('stream') }}');
+	xhr.send();
+
+	setInterval(function() {
+		output.textContent = xhr.responseText;
+	}, 2000);
+	</script>
+	</div>
+</div>
+
+
+	
+	
+
+
+       
+{%endblock%}
+
