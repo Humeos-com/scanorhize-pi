@@ -2,6 +2,9 @@
 ConfigFile/Scanner/NextStartDate.json
 .DS_Store
 Log/
+static/*.jp2
+static/image*
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
