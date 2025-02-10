@@ -4,6 +4,9 @@ ConfigFile/Scanner/NextStartDate.json
 Log/
 static/*.jp2
 static/image*
+*.code-workspace
+pyvenv.cfg
+.vscode
 
 
 # Byte-compiled / optimized / DLL files
