@@ -1,8 +1,20 @@
-# miscellious functions
-from Scanner import *
-import RPi.GPIO as GPIO
+"""
+    Renvoie l'état des ports USB
+"""
+# from Scanner import *
+from OSUtils import is_raspberry_pi
 
-# miscellious functions
+if is_raspberry_pi():
+    from RPi import GPIO
+else:
+    import sys
+    import fake_rpi
+    sys.modules['RPi'] = fake_rpi.RPi  # Mock RPi module
+    sys.modules['RPi.GPIO'] = fake_rpi.RPi.GPIO
+    sys.modules['smbus'] = fake_rpi.smbus
+    from RPi import GPIO
+
+# Miscellaneous functions
 
 Ch1Pin = 19 #Scanner1
 Ch2Pin = 26 #Scanner2
@@ -23,8 +35,11 @@ def InfoGPIO():
         for port in GPIOList:
             GPIO.setup(port[0], GPIO.OUT)
             print(f"  {port[1]}: {'off' if GPIO.input(port[0]) else 'on'}")
-    except Exception as e:
-        print(f"Exception {e}")
+    except RuntimeError as e:
+        print(f"RuntimeError: {e}")
+        return 1
+    except GPIO.Error as e:
+        print(f"GPIO Error: {e}")
         return 1
     return 0
 
@@ -40,10 +55,13 @@ def manageGPIO():
                 GPIO.setup(port[0], GPIO.OUT)
                 GPIO.output(port[0], not GPIO.input(port[0]))
                 print(f"  bascule {port[1]}")
-    except Exception as e:
-        print(f"Exception {e}")
-        return 2
-    return 1
+    except RuntimeError as e:
+        print(f"RuntimeError: {e}")
+        return 1
+    except GPIO.Error as e:
+        print(f"GPIO Error: {e}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
