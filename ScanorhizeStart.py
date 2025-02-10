@@ -1,9 +1,9 @@
-import datetime
-import subprocess
-from time import sleep
-from Miscellious import *
-from WittyPy import *
-from Server import *
+"""Lance le scanner et programme le prochain réveil"""
+
+from subprocess import call
+from WittyPy import SetNextStartDate
+from Miscellaneous import InitGPIO, TurnPin_On, ReadGPIOConfig, WriteTimeLogfile
+from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 
 WriteTimeLogfile("ScanorhizeStart.py")
 
@@ -13,7 +13,7 @@ if res!=0 :
 res=TurnPin_On(3,0)
 if res!=0 :
     WriteTimeLogfile("TurnPinOnError")
-    
+
 config=ReadGPIOConfig()
 
 #connexion réseau en parralèle pour optimiser le temps
@@ -23,10 +23,10 @@ config=ReadGPIOConfig()
     #res=pingAPI("www.google.com")
     #if res==0:
      #   cmd="sudo ifconfig wlan0 down"
-      #  WriteTimeLogfile(cmd)    
+      #  WriteTimeLogfile(cmd)
        # subprocess.call(cmd,shell=True)
         #cmd="sudo ifconfig wlan0 up"
-        #WriteTimeLogfile(cmd)    
+        #WriteTimeLogfile(cmd)
         #subprocess.call(cmd,shell=True)
         #sleep(20)
     #WriteTimeLogfile(str(res)+" "+str(iteration))
@@ -35,8 +35,8 @@ config=ReadGPIOConfig()
 
 if config==0 :
     cmd="sudo python3 /home/pi/Scanorhize/Scanorhize.py &"
-    WriteTimeLogfile(cmd)    
-    subprocess.call(cmd,shell=True)
+    WriteTimeLogfile(cmd)
+    call(cmd,shell=True)
 else :
     DateStart=GetCurrentDate()
     CurrentDateinS=DateToSeconds(DateStart)
@@ -47,11 +47,9 @@ else :
     #WriteTimeLogfile("Set StopTime: "+StopTime)
     #SetShuntdownDate(StopTime)
     cmd="sudo python3 /home/pi/Scanorhize/ScanorhizeProcess.py &"
-    WriteTimeLogfile(cmd)    
-    subprocess.call(cmd,shell=True)
+    WriteTimeLogfile(cmd)
+    call(cmd,shell=True)
 
 #cmd="midori -e Fullscreen"
 #print(cmd)
-#subprocess.call(cmd,shell=True)    
-
-
+#subprocess.call(cmd,shell=True)
