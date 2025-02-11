@@ -1,6 +1,9 @@
 """Eteint tous les 3 ports USB des scanners"""
 from OSUtils import is_raspberry_pi
 
+# pylint: disable=ungrouped-imports
+# pylint: disable=import-error
+# Impossible de grouper les imports car les imports conditionnels ne sont pas supportés
 if is_raspberry_pi():
     from RPi import GPIO
 else:

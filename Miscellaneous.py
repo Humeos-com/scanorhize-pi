@@ -8,6 +8,9 @@ from DateUtils import GetCurrentDate
 
 from OSUtils import is_raspberry_pi
 
+# pylint: disable=ungrouped-imports
+# pylint: disable=import-error
+# Impossible de grouper les imports car les imports conditionnels ne sont pas supportés
 if is_raspberry_pi():
     from RPi import GPIO
 else:
@@ -28,6 +31,18 @@ Ch2Pin = 26
 Ch3Pin = 20
 Ch4Pin = 21
 PinArray =[Ch1Pin,Ch2Pin,Ch3Pin,Ch4Pin]
+
+def getCh1Pin():
+    return Ch1Pin
+
+def getCh2Pin():
+    return Ch1Pin
+
+def getCh3Pin():
+    return Ch1Pin
+
+def getCh4Pin():
+    return Ch1Pin
 
 def chaineIntwitherror(chaine, valueerror, valuemin, valuemax):
     try :
