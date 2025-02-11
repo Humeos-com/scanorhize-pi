@@ -11,6 +11,7 @@ import time
 JAVA_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DEFAULT_DATE_TIME = "2024-11-01T00:00:00Z"
 
+
 def DateToSeconds(date: str):
     """Return the number of seconds between the Epoch and date
 
@@ -26,16 +27,18 @@ def DateToSeconds(date: str):
         date_obj = date_obj.replace(tzinfo=timezone.utc)
         seconds = int(date_obj.timestamp())
     except ValueError:
-        seconds = 1732116623 # 2024-11-20
+        seconds = 1732116623  # 2024-11-20
     return seconds
 
+
 def SecondsToDate(seconds: int):
-    try :
+    try:
         date_obj = datetime.fromtimestamp(seconds, tz=timezone.utc)
-        date= date_obj.strftime(JAVA_FORMAT)
+        date = date_obj.strftime(JAVA_FORMAT)
     except ValueError:
         date = DEFAULT_DATE_TIME
     return date
+
 
 def GetCurrentDate():
     """
@@ -45,26 +48,28 @@ def GetCurrentDate():
         str: current UTC TimeStamp
     """
     try:
-        Time=str(datetime.now(timezone.utc).strftime(JAVA_FORMAT))
+        Time = str(datetime.now(timezone.utc).strftime(JAVA_FORMAT))
     except ValueError:
-        Time=DEFAULT_DATE_TIME
+        Time = DEFAULT_DATE_TIME
     return Time
 
-def CalculNextStartDate(StartDate,Period,CurrentDate):
+
+def CalculNextStartDate(StartDate, Period, CurrentDate):
     try:
-        StartTime=DateToSeconds(StartDate)
-        CurrentTime=DateToSeconds(CurrentDate)
-        NextTime=StartTime
-        now=GetCurrentDate()
-        nowTime=DateToSeconds(now)+600
-        print(CurrentTime,nowTime)
-        while(NextTime<CurrentTime or NextTime<nowTime):
-            NextTime=NextTime+Period
+        StartTime = DateToSeconds(StartDate)
+        CurrentTime = DateToSeconds(CurrentDate)
+        NextTime = StartTime
+        now = GetCurrentDate()
+        nowTime = DateToSeconds(now) + 600
+        print(CurrentTime, nowTime)
+        while NextTime < CurrentTime or NextTime < nowTime:
+            NextTime = NextTime + Period
         print(NextTime)
-        NextDate=SecondsToDate(NextTime)
+        NextDate = SecondsToDate(NextTime)
     except ValueError:
-        NextDate=DEFAULT_DATE_TIME
+        NextDate = DEFAULT_DATE_TIME
     return NextDate
+
 
 if __name__ == "__main__":
     local_tz = time.tzname
