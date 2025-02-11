@@ -94,7 +94,7 @@ class ScannerData:
             return 1
         return 0
 
-    def ReadScannerConfig(self, file):
+    def ReadScannerConfig(self, file=""):
         fullpath = ConfigScannerPath + file
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
@@ -124,6 +124,7 @@ class ScannerData:
 # Initialisation de l'objet Scanner
 Scanner = ScannerData()
 
+
 def updateScanParameters(scanner: ScannerData):
     Scannerparam = {
         "scannerName": scanner.ScannerName,
@@ -137,10 +138,10 @@ def updateScanParameters(scanner: ScannerData):
         "resolution3": ResolutionList[2],
         "LastImgTime": scanner.LastImgTime,
         "LastImgFile": scanner.LastImgFile,
-        "l": scanner.zoneAcq.l,
-        "t": scanner.zoneAcq.t,
-        "x": scanner.zoneAcq.x,
-        "y": scanner.zoneAcq.y,
+        "l": scanner.ZoneAcq.l,
+        "t": scanner.ZoneAcq.t,
+        "x": scanner.ZoneAcq.x,
+        "y": scanner.ZoneAcq.y,
         "quality": scanner.quality,
         "token": scanner.token,
         "UseServer": scanner.UseServer,
@@ -379,7 +380,6 @@ def WriteScannerConfig(scanner, file):
 
 
 if __name__ == "__main__":
-
     InitGPIO()
     result_ = ScannerPreview(0)
     Scanner.LastImgFile = result_[0]

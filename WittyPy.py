@@ -1,22 +1,25 @@
-import subprocess
-from subprocess import PIPE, run
+"""
+   Gestionnaire du sceduleur/chargeur Witty Pi
+"""
+
+from subprocess import run
 
 path = "/home/pi/wittypi/"
 
 def ReadWittyFunction(function):
     source = "source"+" "+path+"utilities.sh && "+function
     print(source)
-    result=run(["sudo", "bash","-c", source], capture_output=True)
+    result=run(["sudo", "bash","-c", source], capture_output=True, check=False)
     print(result.stdout)
-    return(result.stdout)
+    return result.stdout
 
 def WriteWittyFunction(function,arg):
-    
+
     source = "source"+" "+path+"utilities.sh && "+function+" "+arg
     print(source)
-    result=run(["sudo", "bash","-c", source], capture_output=True)
+    result=run(["sudo", "bash","-c", source], capture_output=True, check=False)
     print(result.stdout)
-    return(result.stdout)
+    return result.stdout
 
 def ReadTemp():
     tempstringbyte=ReadWittyFunction("get_temperature")
@@ -35,6 +38,7 @@ def ReadCurrent():
     current=float(res2[0])
     print(current)
     return current
+
 def ReadVoltage():
     tempstringbyte=ReadWittyFunction("get_output_voltage")
     tempstring=str(tempstringbyte)
@@ -46,27 +50,27 @@ def ReadVoltage():
 
 def ReadNextStartDate():
     tempstringbyte=ReadWittyFunction("get_startup_time")
-    tempstring=str(tempstringbyte)  
+    tempstring=str(tempstringbyte)
     res1=tempstring.split("'")
     res2=res1[1].split("\\")
     date=res2[0]
     try:
         day=int(date[0:2],10)
     except ValueError:
-        day=1            
+        day=1
     try:
         hour=int(date[3:5],10)
     except ValueError:
-        hour=0                
+        hour=0
     try:
         mins=int(date[6:8],10)
     except ValueError:
-        mins=0                    
+        mins=0
     try:
         secs=int(date[9:11],10)
     except ValueError:
         secs=0
-    #print("day:",day,"hour:",hour,"mins:",mins,"secs:",secs)    
+    #print("day:",day,"hour:",hour,"mins:",mins,"secs:",secs)
     #print(date)
     return (date, day, hour, mins, secs)
 
@@ -75,23 +79,23 @@ def SetNextStartDate(date):#date en UTC!!
     try:
         year=int(date[0:4],10)
     except ValueError:
-        year=2020    
+        year=2020
     try:
         month=int(date[5:7],10)
     except ValueError:
-        month=1        
+        month=1
     try:
         day=int(date[8:10],10)
     except ValueError:
-        day=1            
+        day=1
     try:
         hour=int(date[11:13],10)
     except ValueError:
-        hour=0                
+        hour=0
     try:
         mins=int(date[14:16],10)
     except ValueError:
-        mins=0                    
+        mins=0
     try:
         secs=int(date[17:19],10)
     except ValueError:
@@ -99,30 +103,30 @@ def SetNextStartDate(date):#date en UTC!!
     print("year:",year,"month:",month,"day:",day,"hour:",hour,"mins:",mins,"secs:",secs)
     arg=str(day)+" "+str(hour)+" "+str(mins)+" "+str(secs)
     result=WriteWittyFunction("set_startup_time",arg)
-    return(result)
+    return result
 
 def SetShuntdownDate(date):#date en UTC!!
     print("date: ",date)
     try:
         year=int(date[0:4],10)
     except ValueError:
-        year=2020    
+        year=2020
     try:
         month=int(date[5:7],10)
     except ValueError:
-        month=1        
+        month=1
     try:
         day=int(date[8:10],10)
     except ValueError:
-        day=1            
+        day=1
     try:
         hour=int(date[11:13],10)
     except ValueError:
-        hour=0                
+        hour=0
     try:
         mins=int(date[14:16],10)
     except ValueError:
-        mins=0                    
+        mins=0
     try:
         secs=int(date[17:19],10)
     except ValueError:
@@ -130,7 +134,4 @@ def SetShuntdownDate(date):#date en UTC!!
     print("year:",year,"month:",month,"day:",day,"hour:",hour,"mins:",mins,"secs:",secs)
     arg=str(day)+" "+str(hour)+" "+str(mins)
     result=WriteWittyFunction("set_shutdown_time",arg)
-    return(result)
-
-
-
+    return result

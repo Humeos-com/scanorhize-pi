@@ -4,6 +4,9 @@
 from OSUtils import is_raspberry_pi
 from Miscellaneous import WriteBatterieFile
 
+# pylint: disable=ungrouped-imports
+# pylint: disable=import-error
+# Impossible de grouper les imports car les imports conditionnels ne sont pas supportés
 if is_raspberry_pi():
     from smbus import SMBus
 else:
