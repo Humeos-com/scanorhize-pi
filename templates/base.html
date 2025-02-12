@@ -1,7 +1,7 @@
 <!DOCTYPE html>
    <head>
       <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-      <title>Scanorhize</title>
+      <title>ScanTerrae</title>
       {%block title%}{%endblock%}
    </head>
    <body>         
@@ -12,10 +12,11 @@
       <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
             <div class="navbar-nav"> 
                                          
-                        <a class="nav-link" href="/"> <img src="{{url_for('static',filename='ScanorhizeFull.png')}}" height="60" align="left"/> <span class="sr-only">(current)</span></a>
+                        <a class="nav-link" href="/"> <img src="{{url_for('static',filename='ScanTerrae_logo_small.png')}}" height="60" align="left"/> <span class="sr-only">(current)</span></a>
                         <a class="nav-link" href="/Scanner1"><button type="button" class="btn btn-secondary btn-lg">Scanner 1</button></a>
                         <a class="nav-link" href="/Scanner2"><button type="button" class="btn btn-secondary btn-lg">Scanner 2</button></a> 
                         <a class="nav-link" href="/Scanner3"><button type="button" class="btn btn-secondary btn-lg">Scanner 3</button></a> 
+                        <a class="nav-link" href="/Server"><button type="button" class="btn btn-secondary btn-lg">Server</button></a> 
                         
                                               
             </div>
@@ -23,7 +24,7 @@
       <p>{{SSID}} <p><p>  </p><p>{{IP}} </p>                   
       <img src="{{url_for('static',filename='Mycea_logo.png')}}" height="60"/> 
       <img src="{{url_for('static',filename='axlr-satt_logo.png')}}" height="60" align="right"/>
-      <img src="{{url_for('static',filename='applexia_logo.png')}}" height="30", align="right">
+      <img src="{{url_for('static',filename='ARDITECH_logo_Small.png')}}" height="30", align="right">
 </nav>
 
 {%block content%}{%endblock%}   
