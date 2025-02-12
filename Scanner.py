@@ -14,7 +14,7 @@ from DateUtils import SecondsToDate, DateToSeconds
 X_MAX = 216
 Y_MAX = 297
 
-ConfigScannerPath = "ConfigFile/Scanner/"
+CONFIG_PATH = "ConfigFile/Scanner/"
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["COLOR", "Gray", "Lineart"]
 
@@ -95,7 +95,7 @@ class ScannerData:
         return 0
 
     def ReadScannerConfig(self, file=""):
-        fullpath = ConfigScannerPath + file
+        fullpath = CONFIG_PATH + file
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)
@@ -339,7 +339,7 @@ def ScannerPreview(pin):
 
 def listConfigScanner():
     try:
-        listfile = os.listdir(ConfigScannerPath)  # returns list
+        listfile = os.listdir(CONFIG_PATH)  # returns list
         # print(listfile)
         listfile.sort(reverse=False)
         WriteTimeLogfile(listfile)
@@ -370,7 +370,7 @@ def WriteScannerConfig(scanner, file):
     try:
         # printScanner(scanner)
         json_object = json.dumps(data, indent=len(data))
-        fullpath = ConfigScannerPath + file
+        fullpath = CONFIG_PATH + file
         # print(fullpath)
         with open(fullpath, "w", encoding="utf-8") as outfile:
             outfile.write(json_object)

@@ -10,6 +10,54 @@ from Campaign import RemoveTempImage, CreateTempImage
 from OSUtils import get_os
 
 SCANORIZE_SERVER = "scan.arditi.net"
+CONFIG_PATH = "ConfigFile/Scanner/"
+
+
+class ServerData:
+    """Gestion des paramètres de la carte SIM"""
+
+    def __init__(self):
+        self.apn = ""
+        self.user = ""
+        self.password = ""
+        self.address = ""
+        self.ping = 0
+
+    def print(self):
+        print("APN: ", self.apn)
+        print("User: ", self.user)
+        print("Password: ", self.password)
+        print("Address: ", self.address)
+        print("Ping: ", self.ping)
+
+    def WriteConfig(self):
+        with open(CONFIG_PATH + "Server.json", "w", encoding="utf-8") as f:
+            json.dump(self.__dict__, f)
+
+    def ReadConfig(self):
+        with open(CONFIG_PATH + "Server.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if "apn" in data:
+                self.apn = data["apn"]
+            if "user" in data:
+                self.user = data["user"]
+            if "password" in data:
+                self.password = data["password"]
+            if "address" in data:
+                self.address = data["address"]
+            if "ping" in data:
+                self.ping = data["ping"]
+
+
+def updateServer(server: ServerData):
+    server_param = {
+        "apn": server.apn,
+        "user": server.user,
+        "password": server.password,
+        "address": server.address,
+        "ping": server.ping,
+    }
+    return server_param
 
 
 def CopyFromJson(Scanner, data):
@@ -54,7 +102,7 @@ def ReadConfigFromServer(Scanner):
             data = json.loads(result.stdout)
             WriteTimeLogfile("Config server: " + result.stdout)
             CopyFromJson(Scanner, data)
-            WriteTimeLogfile("json recu : " + data)
+            WriteTimeLogfile("json recu : " + str(data))
         except AttributeError as e:
             WriteTimeLogfile("Error reading json, error: " + str(e))
     else:
