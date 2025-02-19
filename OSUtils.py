@@ -1,8 +1,10 @@
 """
 Permet de gérer les environnements matériels
 """
+
 import os
 import platform
+
 
 def is_raspberry_pi():
     if os.path.exists("/sys/firmware/devicetree/base/model"):
@@ -10,6 +12,7 @@ def is_raspberry_pi():
             if "Raspberry Pi" in f.read():
                 return True
     return False
+
 
 def get_os():
     if is_raspberry_pi():

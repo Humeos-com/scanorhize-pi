@@ -1,6 +1,7 @@
 """
 Main process for Scanorhize: fait l'acquisition, envoie les images à la plateforme Web et éteint le système.
 """
+
 from time import sleep
 from subprocess import run
 import numpy as np
@@ -8,7 +9,13 @@ import numpy as np
 from Scanner import listConfigScanner, WriteScannerConfig, scanAcq, ScannerData
 
 from Server import SendParameters, PostImageToServer, ReadConfigFromServer
-from Miscellaneous import WriteTimeLogfile, InitGPIO, WriteStartDateConfig, ReadStartDateConfig, initDisplayFile
+from Miscellaneous import (
+    WriteTimeLogfile,
+    InitGPIO,
+    WriteStartDateConfig,
+    ReadStartDateConfig,
+    initDisplayFile,
+)
 from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
 from I2C import ReadBatVoltCap
 from WittyPy import SetNextStartDate, ReadTemp

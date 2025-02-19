@@ -1,5 +1,5 @@
 """
-    Fonctions qui encapsulent l'API du serveur Web
+Fonctions qui encapsulent l'API du serveur Web
 """
 
 import os

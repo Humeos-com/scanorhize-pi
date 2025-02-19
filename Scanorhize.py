@@ -1,4 +1,4 @@
-""" Application Web pour configurer les scanners """
+"""Application Web pour configurer les scanners"""
 
 import subprocess
 from time import sleep
@@ -13,8 +13,16 @@ from Scanner import (
     ResolutionList,
     ColorList,
 )
-from Server import ReadConfigFromServer, pingAPI, GetWifiSSID, GetIP, updateServer, ServerData
+from Server import (
+    ReadConfigFromServer,
+    pingAPI,
+    GetWifiSSID,
+    GetIP,
+    updateServer,
+    ServerData,
+)
 from Miscellaneous import WriteTimeLogfile, chaineIntwitherror, InitGPIO
+
 # from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
 # from I2C import ReadBatVoltCap
 
@@ -45,8 +53,8 @@ WriteTimeLogfile(IP)
 listScannerconfigs = listConfigScanner()
 i_scan = 0
 # Initialisation de l'objet Scanner
-#Scanner = ScannerData()
-#Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
+# Scanner = ScannerData()
+# Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
 
 
 # This function does not allow caching of images from browser
@@ -88,11 +96,11 @@ def stream():
 @app.route("/Scanner", methods=["POST", "GET"])
 def ScannerPage():
     Scanner = ScannerData()
-    #global ListScanner
-    #global ResolutionList
-    #global ColorList
-    #global i_scan
-    #global listScannerconfigs
+    # global ListScanner
+    # global ResolutionList
+    # global ColorList
+    # global i_scan
+    # global listScannerconfigs
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     if request.method == "POST":
         print(request.form)
@@ -166,8 +174,8 @@ def Scanner3():
 @app.route("/Scanner/<deviceName>")
 def action(deviceName):
     Scanner = ScannerData()
-    #global Campaign
-    #global i_scan
+    # global Campaign
+    # global i_scan
     # Scannerparam = updateScanParameters(Scanner)
     # filename = ""
     print("devicename : ", deviceName)
@@ -202,10 +210,10 @@ def ServerPage():
         if tmp != "":
             Server.password = tmp
         tmp = request.form["address"]
-        #Api = 0
+        # Api = 0
         if tmp != "":
             Server.address = tmp
-            #Api = 1
+            # Api = 1
 
         if Sim == 1:  # modification paramètres SIM
             #### res = Connect4g()

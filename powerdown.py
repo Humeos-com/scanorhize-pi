@@ -1,4 +1,5 @@
 """Eteint tous les 3 ports USB des scanners"""
+
 from OSUtils import is_raspberry_pi
 
 # pylint: disable=ungrouped-imports
@@ -9,16 +10,17 @@ if is_raspberry_pi():
 else:
     import sys
     import fake_rpi
-    sys.modules['RPi'] = fake_rpi.RPi  # Mock RPi module
-    sys.modules['RPi.GPIO'] = fake_rpi.RPi.GPIO
-    sys.modules['smbus'] = fake_rpi.smbus
+
+    sys.modules["RPi"] = fake_rpi.RPi  # Mock RPi module
+    sys.modules["RPi.GPIO"] = fake_rpi.RPi.GPIO
+    sys.modules["smbus"] = fake_rpi.smbus
     from RPi import GPIO
 
-Ch1Pin = 19 #Scanner1
-Ch2Pin = 26 #Scanner2
-Ch3Pin = 20 #Scanner3
+Ch1Pin = 19  # Scanner1
+Ch2Pin = 26  # Scanner2
+Ch3Pin = 20  # Scanner3
 # Ch4Pin = 21 #Clé 4G
-PinArray =[Ch1Pin,Ch2Pin,Ch3Pin]
+PinArray = [Ch1Pin, Ch2Pin, Ch3Pin]
 
 
 def downGPIO():
@@ -34,6 +36,7 @@ def downGPIO():
         print(f"Exception {e}")
         return 1
     return 0
+
 
 if __name__ == "__main__":
     retval = downGPIO()

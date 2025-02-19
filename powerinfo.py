@@ -1,6 +1,7 @@
 """
-    Renvoie l'état des ports USB
+Renvoie l'état des ports USB
 """
+
 # from Scanner import *
 from OSUtils import is_raspberry_pi
 
@@ -12,23 +13,25 @@ if is_raspberry_pi():
 else:
     import sys
     import fake_rpi
-    sys.modules['RPi'] = fake_rpi.RPi  # Mock RPi module
-    sys.modules['RPi.GPIO'] = fake_rpi.RPi.GPIO
-    sys.modules['smbus'] = fake_rpi.smbus
+
+    sys.modules["RPi"] = fake_rpi.RPi  # Mock RPi module
+    sys.modules["RPi.GPIO"] = fake_rpi.RPi.GPIO
+    sys.modules["smbus"] = fake_rpi.smbus
     from RPi import GPIO
 
 # Miscellaneous functions
 
-Ch1Pin = 19 #Scanner1
-Ch2Pin = 26 #Scanner2
-Ch3Pin = 20 #Scanner3
-Ch4Pin = 21 #Clé 4G
+Ch1Pin = 19  # Scanner1
+Ch2Pin = 26  # Scanner2
+Ch3Pin = 20  # Scanner3
+Ch4Pin = 21  # Clé 4G
 GPIOList = [
     (Ch1Pin, "Scanner 1"),
     (Ch2Pin, "Scanner 2"),
     (Ch3Pin, "Scanner 3"),
-    (Ch4Pin, "Clé 4G")
-    ]
+    (Ch4Pin, "Clé 4G"),
+]
+
 
 def InfoGPIO():
     try:
@@ -45,6 +48,7 @@ def InfoGPIO():
         print(f"GPIO Error: {e}")
         return 1
     return 0
+
 
 def manageGPIO():
     value = input("Voulez-vous modifier l'état des GPIO ? [Non=Entrée, sinon, Oui=o]: ")
