@@ -1,5 +1,5 @@
 """
-Gestionnaire du sceduleur/chargeur Witty Pi
+Gestionnaire du scheduleur RTC/alimentation Witty Pi
 """
 
 from subprocess import run
@@ -123,49 +123,4 @@ def SetNextStartDate(date):  # date en UTC!!
     )
     arg = str(day) + " " + str(hour) + " " + str(mins) + " " + str(secs)
     result = WriteWittyFunction("set_startup_time", arg)
-    return result
-
-
-def SetShuntdownDate(date):  # date en UTC!!
-    print("date: ", date)
-    try:
-        year = int(date[0:4], 10)
-    except ValueError:
-        year = 2020
-    try:
-        month = int(date[5:7], 10)
-    except ValueError:
-        month = 1
-    try:
-        day = int(date[8:10], 10)
-    except ValueError:
-        day = 1
-    try:
-        hour = int(date[11:13], 10)
-    except ValueError:
-        hour = 0
-    try:
-        mins = int(date[14:16], 10)
-    except ValueError:
-        mins = 0
-    try:
-        secs = int(date[17:19], 10)
-    except ValueError:
-        secs = 0
-    print(
-        "year:",
-        year,
-        "month:",
-        month,
-        "day:",
-        day,
-        "hour:",
-        hour,
-        "mins:",
-        mins,
-        "secs:",
-        secs,
-    )
-    arg = str(day) + " " + str(hour) + " " + str(mins)
-    result = WriteWittyFunction("set_shutdown_time", arg)
     return result
