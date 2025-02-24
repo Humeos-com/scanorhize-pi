@@ -4,7 +4,7 @@
 Programmes qui sont installés sur le Raspberry
 
 ## Installation
-L'installation se fait pas copie de la SDCard...
+L'installation se fait par copie de la SDCard...
 
 ### Prérequis
 
