@@ -1,4 +1,4 @@
-"""Lecture de l'état de la batterie via I2C"""
+"""Lecture de l'état de la batterie via la carte SparkFun Battery Babysitter avec le bus I2C"""
 
 from OSUtils import is_raspberry_pi
 from Miscellaneous import WriteBatterieFile
@@ -16,6 +16,7 @@ else:
     from smbus import SMBus
 
 bus = SMBus(1)  # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
+# C'est la carte SparkFun Battery Babysitter
 DEVICE_ADDRESS = 0x55  # 7 bit address (will be left shifted to add the read write bit)
 
 
