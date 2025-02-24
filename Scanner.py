@@ -3,6 +3,7 @@ Gestion des Scanners
 """
 
 import os
+import re
 import dataclasses
 import json
 from subprocess import run
@@ -339,8 +340,8 @@ def ScannerPreview(pin):
 
 def listConfigScanner():
     try:
-        listfile = os.listdir(CONFIG_PATH)  # returns list
-        # print(listfile)
+        # de la forme 1-Scanner.json
+        listfile = [f for f in os.listdir(CONFIG_PATH) if re.match(r'[0-9]-Scanner.json', f)]
         listfile.sort(reverse=False)
         WriteTimeLogfile(listfile)
     except OSError:
