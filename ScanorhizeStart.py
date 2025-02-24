@@ -34,6 +34,7 @@ config = ReadGPIOConfig()
 
 
 if config == 0:
+    # En mode config
     cmd = "sudo python3 /home/pi/Scanorhize/Scanorhize.py &"
     WriteTimeLogfile(cmd)
     call(cmd, shell=True)
@@ -47,7 +48,6 @@ else:
     WriteTimeLogfile("Set NextDate: " + NextDate)
     SetNextStartDate(NextDate)
     # WriteTimeLogfile("Set StopTime: "+StopTime)
-    # SetShuntdownDate(StopTime)
     cmd = "sudo python3 /home/pi/Scanorhize/ScanorhizeProcess.py &"
     WriteTimeLogfile(cmd)
     call(cmd, shell=True)
