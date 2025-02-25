@@ -4,12 +4,16 @@ Gestionnaire du scheduleur RTC/alimentation Witty Pi
 
 from subprocess import run
 
+from OSUtils import is_raspberry_pi
+
 path = "/home/pi/wittypi/"
 
 
 def ReadWittyFunction(function):
     source = "source" + " " + path + "utilities.sh && " + function
     print(source)
+    if not is_raspberry_pi():
+        return 0
     result = run(["sudo", "bash", "-c", source], capture_output=True, check=False)
     print(result.stdout)
     return result.stdout
@@ -19,6 +23,8 @@ def WriteWittyFunction(function, arg):
 
     source = "source" + " " + path + "utilities.sh && " + function + " " + arg
     print(source)
+    if not is_raspberry_pi():
+        return 0
     result = run(["sudo", "bash", "-c", source], capture_output=True, check=False)
     print(result.stdout)
     return result.stdout
@@ -26,6 +32,8 @@ def WriteWittyFunction(function, arg):
 
 def ReadTemp():
     tempstringbyte = ReadWittyFunction("get_temperature")
+    if not is_raspberry_pi():
+        return 0.0
     tempstring = str(tempstringbyte)
     res1 = tempstring.split("'")
     res2 = res1[1].split("\\")
@@ -36,6 +44,8 @@ def ReadTemp():
 
 def ReadCurrent():
     tempstringbyte = ReadWittyFunction("get_output_current")
+    if not is_raspberry_pi():
+        return 0.0
     tempstring = str(tempstringbyte)
     res1 = tempstring.split("'")
     res2 = res1[1].split("\\")
@@ -46,6 +56,8 @@ def ReadCurrent():
 
 def ReadVoltage():
     tempstringbyte = ReadWittyFunction("get_output_voltage")
+    if not is_raspberry_pi():
+        return 0.0
     tempstring = str(tempstringbyte)
     res1 = tempstring.split("'")
     res2 = res1[1].split("\\")
@@ -122,5 +134,7 @@ def SetNextStartDate(date):  # date en UTC!!
         secs,
     )
     arg = str(day) + " " + str(hour) + " " + str(mins) + " " + str(secs)
+    if not is_raspberry_pi():
+        return 0
     result = WriteWittyFunction("set_startup_time", arg)
     return result
