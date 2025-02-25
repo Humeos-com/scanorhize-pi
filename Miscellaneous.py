@@ -24,6 +24,8 @@ else:
     from RPi import GPIO
 
 LOG_DIR = "Log"
+CONFIG_DIR = "ConfigFile"
+NEXT_DATE_FILE = CONFIG_DIR + "/NextStartDate.json"
 DISPLAY_FILE = LOG_DIR + "/Display.txt"
 BATTERY_FILE = LOG_DIR + "/Batterie.txt"
 
@@ -193,11 +195,10 @@ def WriteStartDateConfig(NextStartDate, NextStartseconds):
     }
     try:
         json_object = json.dumps(data, indent=len(data))
-        fullpath = "/home/pi/Scanorhize/ConfigFile/" + "NextStartDate.json"
-
-        with open(fullpath, "w", encoding="utf-8") as outfile:
+        with open(NEXT_DATE_FILE, "w", encoding="utf-8") as outfile:
             outfile.write(json_object)
     except ValueError:
+        print("Error in write config file: ", NEXT_DATE_FILE)
         return 1
 
     return 0
@@ -210,12 +211,11 @@ def ReadStartDateConfig():
         "2021-01-15T11:05:00Z",
         "2021-01-16T11:05:00Z",
     ]
-    fullpath = "/home/pi/Scanorhize/ConfigFile/" + "NextStartDate.json"
     try:
-        with open(fullpath, "r", encoding="utf-8") as openfile:
+        with open(NEXT_DATE_FILE, "r", encoding="utf-8") as openfile:
             data = json.load(openfile)
     except FileNotFoundError:
-        WriteTimeLogfile("No file: " + fullpath)
+        WriteTimeLogfile("Error reading file: " + NEXT_DATE_FILE)
 
     else:
         NextStartDate[0] = data["NextStartDate1"]
@@ -231,7 +231,7 @@ def ReadStartDateConfig():
 def CopyLog():
     # copy log folder to USB
     USBPath = "/media/pi/Image/"
-    LogPath = "/home/pi/Scanorhize/Log"
+    LogPath = "Log"
     cmd = "sudo cp -r " + LogPath + " " + USBPath
     # print(cmd)
     run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
