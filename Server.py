@@ -31,7 +31,7 @@ class ServerData:
         print("Ping: ", self.ping)
 
     def WriteConfig(self):
-        with open(CONFIG_PATH + "Server.json", "w", encoding="utf-8") as f:
+        with open(CONFIG_PATH + "Server.json", "w", encoding="utf-8", indent = "") as f:
             json.dump(self.__dict__, f)
 
     def ReadConfig(self):
