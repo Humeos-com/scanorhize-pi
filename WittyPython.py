@@ -1,8 +1,8 @@
 from time import sleep
 import smbus
 
-WITTY_PI_I2C_ADDRESS = 0x69
-
+WITTY_PI_3_I2C_ADDRESS = 0x69
+WITTY_PI_4_I2C_ADDRESS = 0x8
 
 class WittyPi:
     """Classe pour la carte Witty Pi qui permet de gérer l'alimentation du Raspberry Pi
@@ -13,6 +13,7 @@ class WittyPi:
     def __init__(self):
 
         self.i2c_bus = smbus.SMBus(1)
+        self.i2c_address = WITTY_PI_3_I2C_ADDRESS
 
         self.firmware_id = 0
         self.input_voltage = 0.0
@@ -33,6 +34,12 @@ class WittyPi:
     def get_firmware_id(self):
 
         self.firmware_id = self.read_register(0x00)
+        if self.firmware_id is None:
+            print(f"No Witty Pi board on address 0x{self.i2c_address:02X}")
+            self.i2c_address = WITTY_PI_4_I2C_ADDRESS
+        self.firmware_id = self.read_register(0x00)
+        if self.firmware_id is None:
+            print("Aucune carte Witty Py trouvee.")
 
     def get_input_voltage(self):
 
@@ -63,11 +70,11 @@ class WittyPi:
 
         try:
 
-            data = self.i2c_bus.read_byte_data(WITTY_PI_I2C_ADDRESS, register)
+            data = self.i2c_bus.read_byte_data(self.i2c_address, register)
 
         except OSError as e:
             print(f"Read error: {e}")
-            data = None
+            return None
 
         return data
 
