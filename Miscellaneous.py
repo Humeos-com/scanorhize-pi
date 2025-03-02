@@ -137,7 +137,8 @@ def InitGPIO():
         GPIO.output(Ch1Pin, GPIO.HIGH)
         GPIO.output(Ch2Pin, GPIO.HIGH)
         GPIO.output(Ch3Pin, GPIO.HIGH)
-    except IOError:
+    except IOError as e:
+        print(f"IOError: {e}")
         return 1
     # GPIO.output(Ch4Pin, GPIO.HIGH)
     return 0
