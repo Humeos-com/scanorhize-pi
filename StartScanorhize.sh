@@ -2,6 +2,11 @@
 
 cd /home/pi/Scanorhize
 DATE=$(date '+%Y-%m-%d:%H:%M:%S')
-python3 WittyPython.py > Log/courant_$DATE.log &
+
+if ( -e DEBUG )
+then
+    echo "DEBUG mode: on mesure le courant."
+    python3 WittyPython.py > Log/courant_$DATE.log &
+fi
 sudo python3 ScanorhizeStart.py &
 
