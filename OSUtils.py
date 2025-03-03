@@ -8,19 +8,23 @@ import json
 import logging
 import usb.core
 
+
 # Carte UUGEAR MEGA4
 # 2109:2817 VIA Labs, Inc. USB2.0 Hub, USB 2.10, 4 ports, ppps
 def get_MEGA4():
-
     with_MEGA4 = True
-    dev = usb.core.find(idVendor=0x2109, idProduct=0x2817)
-    if dev is None:
+    try:
+        dev = usb.core.find(idVendor=0x2109, idProduct=0x2817)
+        logging.info("Logging initialized at level: %s", str(dev))
+    except usb.core.NoBackendError:
         print("Pas de carte MEGA4")
         with_MEGA4 = False
     return with_MEGA4
-	
+
+
 class Config:
-    ''' Permet de connaitre quel est l'environnement d'exécution du programme '''
+    """Permet de connaitre quel est l'environnement d'exécution du programme"""
+
     _instance = None  # Class variable to store the single instance
     environment = "PROD"
     log_level = "INFO"
@@ -56,7 +60,9 @@ class Config:
         cls.log_level = os.getenv("LOG_LEVEL", cls.log_level)
 
         if os.path.exists("/sys/firmware/devicetree/base/model"):
-            with open("/sys/firmware/devicetree/base/model", "r", encoding="utf-8") as f:
+            with open(
+                "/sys/firmware/devicetree/base/model", "r", encoding="utf-8"
+            ) as f:
                 if "Raspberry Pi" in f.read():
                     cls.platform = "Raspberry"
 
@@ -74,7 +80,6 @@ class Config:
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
         logging.info("Logging initialized at level: %s", cls.log_level)
-
 
     @classmethod
     def is_dev(cls):
@@ -99,16 +104,19 @@ class Config:
         if cls.usb_mode == "MEGA4":
             return True
         return False
-        
+
 
 def is_dev():
     return Config().is_dev()
 
+
 def is_debug():
     return Config().is_debug()
 
+
 def is_raspberry_pi():
     return Config().is_raspberry_pi()
+
 
 def get_os():
     if is_raspberry_pi():
@@ -117,8 +125,10 @@ def get_os():
         return "MacOS"
     return "Linux"
 
+
 def has_MEGA4():
     return Config().has_MEGA4()
+
 
 if __name__ == "__main__":
     print(get_os())
