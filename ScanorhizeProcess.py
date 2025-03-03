@@ -125,6 +125,7 @@ if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
         Scanner.StartDate, (3600 * 24 * 30), DateStart
     )
     WriteTimeLogfile("No more battery")
+# fin for
 
 SetNextStartDate(nextStartDateValue)
 

@@ -54,7 +54,7 @@ def GetCurrentDate():
     return Time
 
 
-def CalculNextStartDate(StartDate, Period, CurrentDate):
+def CalculNextStartDate(StartDate, Period: int, CurrentDate):
     try:
         StartTime = DateToSeconds(StartDate)
         CurrentTime = DateToSeconds(CurrentDate)

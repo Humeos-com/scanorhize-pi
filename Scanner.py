@@ -55,8 +55,8 @@ class ScannerData:
     UseServer = 0
     error = 0
     Campaign = "CampaignName"
-    StartDate = "20241115T094500Z"  # next start if UseServer=1
-    PeriodeS = "3600"  # next start if UseServer=0
+    StartDate = "2024-11-15T09:45:00Z"  # next start if UseServer=1
+    PeriodeS = 3600  # next start if UseServer=0
 
     def printScanner(self):
         try:
