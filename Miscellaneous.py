@@ -140,7 +140,8 @@ def InitGPIO():
 
 def TurnUsbOn(i_scan, time):
     if has_MEGA4():
-        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan} -l 1-1"
+        # Les ports USB sont numérotés à partir de 1 avec uhubctl
+        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan + 1} -l 1-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
         sleep(time)
     else:
@@ -155,7 +156,8 @@ def TurnUsbOn(i_scan, time):
 
 def TurnUsbOff(i_scan):
     if has_MEGA4():
-        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan} -l 1-1"
+        # Les ports USB sont numérotés à partir de 1 avec uhubctl
+        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan + 1} -l 1-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     else:
         try:
