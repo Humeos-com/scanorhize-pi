@@ -120,7 +120,7 @@ def WriteBatterieFile(Volt, Cap):
 
 def InitGPIO():
     if not is_raspberry_pi():
-        return
+        return 0
     try:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
