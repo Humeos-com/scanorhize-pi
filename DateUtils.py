@@ -54,8 +54,9 @@ def GetCurrentDate():
     return Time
 
 
-def CalculNextStartDate(StartDate, Period: int, CurrentDate):
+def CalculNextStartDate(StartDate, Period, CurrentDate):
     try:
+        Periodi = int(Period)
         StartTime = DateToSeconds(StartDate)
         CurrentTime = DateToSeconds(CurrentDate)
         NextTime = StartTime
@@ -63,7 +64,7 @@ def CalculNextStartDate(StartDate, Period: int, CurrentDate):
         nowTime = DateToSeconds(now) + 600
         print(CurrentTime, nowTime)
         while NextTime < CurrentTime or NextTime < nowTime:
-            NextTime = NextTime + Period
+            NextTime = NextTime + Periodi
         print(NextTime)
         NextDate = SecondsToDate(NextTime)
     except ValueError:
