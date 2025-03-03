@@ -158,7 +158,7 @@ def TurnUsbOn(i_scan, time):
 def TurnUsbOff(i_scan):
     if has_MEGA4():
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
-        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan + 1} -l 2-1"
+        cmd = f"../mega4/uhubctl_64 -a off -p {i_scan + 1} -l 2-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     else:
         try:
