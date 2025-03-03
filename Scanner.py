@@ -9,7 +9,7 @@ import json
 from subprocess import run
 from time import sleep
 
-from Miscellaneous import InitGPIO, TurnPin_On, TurnPin_Off, WriteTimeLogfile
+from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff , WriteTimeLogfile
 from DateUtils import SecondsToDate, DateToSeconds
 
 X_MAX = 216
@@ -191,8 +191,19 @@ def scanSearch():
     return ScannerName
 
 
-def scanAcq(scanner: ScannerData, pin, date):
-    error = TurnPin_On(pin, 40)
+def scanAcq(scanner: ScannerData, i_scan: int, date):
+    """ Lance le scanimage et convertit l'image en jp2000
+
+    Args:
+        scanner (ScannerData): l'objet Scanner en cours
+        i_scan (int): de 0 à 2 pour les 3 scanners
+        date (_type_):
+
+    Returns:
+        _type_: _description_
+    """
+
+    error = TurnUsbOn(i_scan, 40)
     if error != 0:
         scanner.error = 1
         return scanner
@@ -248,10 +259,10 @@ def scanAcq(scanner: ScannerData, pin, date):
         scanner.error = res
         i += 1
         if res != 0:
-            TurnPin_Off(pin)
-            TurnPin_On(pin, 40)
+            TurnUsbOff(i_scan)
+            TurnUsbOn(i_scan, 40)
 
-    TurnPin_Off(pin)
+    TurnUsbOff(i_scan)
     if scanner.error > 0:
         WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
         return scanner
@@ -286,7 +297,7 @@ def scanAcq(scanner: ScannerData, pin, date):
 
     WriteTimeLogfile("EndConvTime")
     # Pour s'assurer que 2 images n'est pas le même temps et donc nom
-    CurrentDateinS = DateToSeconds(date) + pin
+    CurrentDateinS = DateToSeconds(date) + i_scan
     date = SecondsToDate(CurrentDateinS)
     scanner.LastImgTime = date
     # print("image time: ",scanner.LastImgTime)
@@ -295,9 +306,9 @@ def scanAcq(scanner: ScannerData, pin, date):
     return scanner
 
 
-def ScannerPreview(pin):
-    image = str(pin + 1) + ".jpg"
-    error = TurnPin_On(pin, 40)
+def ScannerPreview(i_scan: int):
+    image = str(i_scan + 1) + ".jpg"
+    error = TurnUsbOn(i_scan, 40)
     if error != 0:
         Scanner.error = 1
         res = Scanner.error
@@ -329,7 +340,7 @@ def ScannerPreview(pin):
         if len(result.stderr) > 2:
             res = 12
         i += 1
-    TurnPin_Off(pin)
+    TurnUsbOff(i_scan)
     if res > 0:
         WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
     else:

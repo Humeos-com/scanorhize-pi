@@ -4,10 +4,11 @@ import json
 import datetime
 from subprocess import run
 from time import sleep
+import logging
 
 from DateUtils import GetCurrentDate
 
-from OSUtils import is_raspberry_pi
+from OSUtils import is_raspberry_pi, has_MEGA4
 
 # pylint: disable=ungrouped-imports
 # pylint: disable=import-error
@@ -29,28 +30,19 @@ NEXT_DATE_FILE = CONFIG_DIR + "/NextStartDate.json"
 DISPLAY_FILE = LOG_DIR + "/Display.txt"
 BATTERY_FILE = LOG_DIR + "/Batterie.txt"
 
-
-Ch1Pin = 19
-Ch2Pin = 26
-Ch3Pin = 20
-Ch4Pin = 21
+Ch1Pin = 19  # Scanner1
+Ch2Pin = 26  # Scanner2
+Ch3Pin = 20  # Scanner3
+Ch4Pin = 21  # Clé 4G
 PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
 
-def getCh1Pin():
-    return Ch1Pin
+def getChPin(i_scan: int):
+    if 0 <= i_scan < 4:
+        return PinArray[i_scan]
 
-
-def getCh2Pin():
-    return Ch1Pin
-
-
-def getCh3Pin():
-    return Ch1Pin
-
-
-def getCh4Pin():
-    return Ch1Pin
+    logging.info("La valeur passee doit être comprise entre 0 et 3, ici: %i", i_scan)
+    return -1
 
 
 def chaineIntwitherror(chaine, valueerror, valuemin, valuemax):
@@ -127,49 +119,50 @@ def WriteBatterieFile(Volt, Cap):
 
 
 def InitGPIO():
+    if not is_raspberry_pi():
+        return
     try:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(Ch1Pin, GPIO.OUT)  # Scanner1
-        GPIO.setup(Ch2Pin, GPIO.OUT)  # Scanner2
-        GPIO.setup(Ch3Pin, GPIO.OUT)  # Scanner3
-        GPIO.setup(Ch4Pin, GPIO.OUT)  # Clé 4g
-        GPIO.output(Ch1Pin, GPIO.HIGH)
-        GPIO.output(Ch2Pin, GPIO.HIGH)
-        GPIO.output(Ch3Pin, GPIO.HIGH)
+        if not has_MEGA4():
+            GPIO.setup(Ch1Pin, GPIO.OUT)  # Scanner1
+            GPIO.setup(Ch2Pin, GPIO.OUT)  # Scanner2
+            GPIO.setup(Ch3Pin, GPIO.OUT)  # Scanner3
+            GPIO.setup(Ch4Pin, GPIO.OUT)  # Clé 4g
+            GPIO.output(Ch1Pin, GPIO.HIGH)
+            GPIO.output(Ch2Pin, GPIO.HIGH)
+            GPIO.output(Ch3Pin, GPIO.HIGH)
     except IOError as e:
         print(f"IOError: {e}")
         return 1
-    # GPIO.output(Ch4Pin, GPIO.HIGH)
     return 0
 
 
-def TurnUSBPin_On(pin, time):
-    cmd = "echo '1-1'|sudo tee /sys/bus/usb/drivers/usb/unbind"
-    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-    TurnPin_On(pin, 1)
-    cmd = "echo '1-1'|sudo tee /sys/bus/usb/drivers/usb/bind"
-    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-    sleep(time)
-    return 0
-
-
-def TurnPin_On(pin, time):
-    try:
-        realpin = PinArray[pin]
-        GPIO.output(realpin, GPIO.LOW)
+def TurnUsbOn(i_scan, time):
+    if has_MEGA4():
+        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan} -l 1-1"
+        run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
         sleep(time)
-    except IOError:
-        return 1
+    else:
+        try:
+            realpin = getChPin(i_scan)
+            GPIO.output(realpin, GPIO.LOW)
+            sleep(time)
+        except IOError:
+            return 1
     return 0
 
 
-def TurnPin_Off(pin):
-    try:
-        realpin = PinArray[pin]
-        GPIO.output(realpin, GPIO.HIGH)
-    except IOError:
-        return 1
+def TurnUsbOff(i_scan):
+    if has_MEGA4():
+        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan} -l 1-1"
+        run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+    else:
+        try:
+            realpin = getChPin(i_scan)
+            GPIO.output(realpin, GPIO.HIGH)
+        except IOError:
+            return 1
     return 0
 
 

@@ -69,7 +69,7 @@ for CurrentScanner in listScannerconfigs:
 
         # get image and post image
         WriteTimeLogfile("Start image acquisition")
-        Scanner = scanAcq(Scanner, (i_scan), DateStart)
+        Scanner = scanAcq(Scanner, i_scan, DateStart)
         WriteScannerConfig(Scanner, CurrentScanner)
         scanning = 1
         if Scanner.error == 0:
@@ -113,6 +113,7 @@ for CurrentScanner in listScannerconfigs:
     NextStartDate[i_scan] = nextDate
     WriteTimeLogfile("Next start date: " + nextDate)
     i_scan = i_scan + 1
+
 WriteStartDateConfig(NextStartDate, NextStartseconds)
 nextStartSecs = min(NextStartseconds)
 index_min = np.argmin(NextStartseconds)

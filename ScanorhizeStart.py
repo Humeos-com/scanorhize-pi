@@ -2,7 +2,7 @@
 
 from subprocess import call
 from WittyPy import SetNextStartDate
-from Miscellaneous import InitGPIO, TurnPin_On, ReadGPIOConfig, WriteTimeLogfile
+from Miscellaneous import InitGPIO, TurnUsbOn, ReadGPIOConfig, WriteTimeLogfile
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 
 WriteTimeLogfile("ScanorhizeStart.py")
@@ -10,9 +10,10 @@ WriteTimeLogfile("ScanorhizeStart.py")
 res = InitGPIO()
 if res != 0:
     WriteTimeLogfile("InitGPIOError")
-res = TurnPin_On(3, 0)
+# On allume la clé 4G
+res = TurnUsbOn(3, 0)
 if res != 0:
-    WriteTimeLogfile("TurnPinOnError")
+    WriteTimeLogfile("TurnUsbOnError")
 
 config = ReadGPIOConfig()
 
@@ -35,7 +36,7 @@ config = ReadGPIOConfig()
 
 if config == 0:
     # En mode config
-    cmd = "sudo python3 /home/pi/Scanorhize/Scanorhize.py &"
+    cmd = "sudo python3 Scanorhize.py &"
     WriteTimeLogfile(cmd)
     call(cmd, shell=True)
 else:
@@ -48,7 +49,7 @@ else:
     WriteTimeLogfile("Set NextDate: " + NextDate)
     SetNextStartDate(NextDate)
     # WriteTimeLogfile("Set StopTime: "+StopTime)
-    cmd = "sudo python3 /home/pi/Scanorhize/ScanorhizeProcess.py &"
+    cmd = "sudo python3 ScanorhizeProcess.py &"
     WriteTimeLogfile(cmd)
     call(cmd, shell=True)
 
