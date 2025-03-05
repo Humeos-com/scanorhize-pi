@@ -175,9 +175,12 @@ def ReadGPIOConfig():
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(17, GPIO.IN)
         state = GPIO.input(17)
-    except IOError:
+    except IOError as e:
+        print(f"IOError: {e}")
         state = 1
-    WriteTimeLogfile("etat :" + str(state))
+
+    print("etat GPIO 17:" + str(state))
+    WriteTimeLogfile("etat GPIO 17:" + str(state))
     return state
 
 
@@ -236,6 +239,8 @@ def CopyLog():
 
 
 if __name__ == "__main__":
+    print("Test unitaire main de Miscellaneous")
     InitGPIO()
+    ReadGPIOConfig()
     initDisplayFile()
     WriteTimeLogfile("Test unitaire main de Miscellaneous")
