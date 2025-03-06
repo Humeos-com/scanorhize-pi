@@ -7,6 +7,7 @@ from time import sleep
 import logging
 
 from DateUtils import GetCurrentDate
+from WittyPython import is_WittyPi_3
 
 from OSUtils import is_raspberry_pi, has_MEGA4
 
@@ -29,7 +30,16 @@ CONFIG_DIR = "ConfigFile"
 NEXT_DATE_FILE = CONFIG_DIR + "/NextStartDate.json"
 DISPLAY_FILE = LOG_DIR + "/Display.txt"
 BATTERY_FILE = LOG_DIR + "/Batterie.txt"
+UHUBCTL = "/usr/sbin/uhubctl"
 
+# Pour le mode config
+# Bouton poussoir config
+if is_WittyPi_3():
+    ConfigPin = 17  # pin physique 11
+else:
+    ConfigPin = 16  # pin physique 36 + ground 34
+
+# Pour la carte USB Big 7
 Ch1Pin = 19  # Scanner1
 Ch2Pin = 26  # Scanner2
 Ch3Pin = 20  # Scanner3
@@ -70,15 +80,19 @@ def WriteLogFile(data):
         filename = now.strftime(LOG_DIR + "/Scanorhize_%Y-%m-%d.txt")
         with open(filename, "a", encoding="utf-8") as f:
             f.write(data + "\n")
-
-    except ValueError:
+    except IOError as e:
+        print(f"IOError: {e}")
         return 1
     return 0
 
 
 def initDisplayFile():
-    with open(DISPLAY_FILE, "w", encoding="utf-8") as f:
-        f.write("")
+    try:
+        with open(DISPLAY_FILE, "w", encoding="utf-8") as f:
+            f.write("")
+    except IOError as e:
+        print(f"IOError: {e}")
+        return 1
     return 0
 
 
@@ -89,7 +103,8 @@ def WriteDisplayFile(data, time):
         with open(DISPLAY_FILE, "a", encoding="utf-8") as f:
             f.write(text)
             f.write("\n")
-    except ValueError:
+    except IOError as e:
+        print(f"IOError: {e}")
         return 1
     return 0
 
@@ -113,7 +128,8 @@ def WriteBatterieFile(Volt, Cap):
         with open(BATTERY_FILE, "a", encoding="utf-8") as f:
             f.write(text)
             f.write("\r\n")
-    except ValueError:
+    except IOError as e:
+        print(f"IOError: {e}")
         return 1
     return 0
 
@@ -140,9 +156,9 @@ def InitGPIO():
 
 def TurnUsbOn(i_scan, time):
     if has_MEGA4():
-        # On utilise le Hub 2-1, car c'est le hub USB3
+        # On utilise le Hub 1-1
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
-        cmd = f"../mega4/uhubctl_64 -a on -p {i_scan + 1} -l 2-1"
+        cmd = f"{UHUBCTL} -a on -p {i_scan + 1} -l 1-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
         if is_raspberry_pi():
             sleep(time)
@@ -160,7 +176,7 @@ def TurnUsbOn(i_scan, time):
 def TurnUsbOff(i_scan):
     if has_MEGA4():
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
-        cmd = f"../mega4/uhubctl_64 -a off -p {i_scan + 1} -l 2-1"
+        cmd = f"{UHUBCTL} -a off -p {i_scan + 1} -l 1-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     else:
         try:
@@ -175,14 +191,14 @@ def ReadGPIOConfig():
     try:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(17, GPIO.IN)
-        state = GPIO.input(17)
+        GPIO.setup(ConfigPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        state = GPIO.input(ConfigPin)
     except IOError as e:
         print(f"IOError: {e}")
         state = 1
 
-    print("etat GPIO 17:" + str(state))
-    WriteTimeLogfile("etat GPIO 17:" + str(state))
+    print(f"Etat GPIO {ConfigPin}: {state}")
+    WriteTimeLogfile(f"Etat GPIO {ConfigPin}: {state}")
     return state
 
 

@@ -8,7 +8,6 @@ from Scanner import (
     ScannerData,
     ScannerPreview,
     updateScanParameters,
-    WriteScannerConfig,
     listConfigScanner,
     ResolutionList,
     ColorList,
@@ -140,7 +139,7 @@ def ScannerPage():
             Scanner.StartDate = tmp
         tmp = request.form["PeriodeS"]
         Scanner.PeriodeS = chaineIntwitherror(tmp, Scanner.PeriodeS, 0, 360000)
-        WriteScannerConfig(Scanner, listScannerconfigs[i_scan])
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
     Scanner.ScannerName = "Scanner" + str(i_scan + 1)
     Scannerparam = updateScanParameters(Scanner)
     print("Scanner n° : " + str(i_scan + 1))
@@ -184,11 +183,11 @@ def action(deviceName):
         result = ScannerPreview(i_scan)
         Scanner.LastImgFile = result[0]
         Scanner.error = result[1]
-        WriteScannerConfig(Scanner, listScannerconfigs[i_scan])
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     if deviceName == "GetConfig":
         Scanner = ReadConfigFromServer(Scanner)
-        WriteScannerConfig(Scanner, listScannerconfigs[i_scan])
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
     # Scannerparam = updateScanParameters(Scanner)
 
     return redirect(url_for("ScannerPage"))

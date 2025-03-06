@@ -7,7 +7,7 @@ from time import sleep
 from subprocess import run
 import numpy as np
 
-from Scanner import listConfigScanner, WriteScannerConfig, scanAcq, ScannerData
+from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Server import SendParameters, PostImageToServer, ReadConfigFromServer
 from Miscellaneous import (
@@ -72,7 +72,7 @@ for CurrentScanner in listScannerconfigs:
         # get image and post image
         WriteTimeLogfile("Start image acquisition")
         Scanner = scanAcq(Scanner, i_scan, DateStart)
-        WriteScannerConfig(Scanner, CurrentScanner)
+        Scanner.WriteScannerConfig(CurrentScanner)
         scanning = 1
         if Scanner.error == 0:
             WriteTimeLogfile("Image acquisition Ok")
@@ -107,7 +107,7 @@ for CurrentScanner in listScannerconfigs:
         data = "Scanner config from server"
         WriteTimeLogfile(str(data))
         Scanner = ReadConfigFromServer(Scanner)
-        WriteScannerConfig(Scanner, listScannerconfigs[i_scan])
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     nextDate = CalculNextStartDate(Scanner.StartDate, Scanner.PeriodeS, DateStart)
     nextTime = DateToSeconds(nextDate)

@@ -95,11 +95,23 @@ class WittyPi:
 
         return s
 
+def is_WittyPi_3():
+
+    witty_pi = WittyPi()
+    return witty_pi.i2c_address == WITTY_PI_3_I2C_ADDRESS 
+
+def is_WittyPi_4():
+
+    witty_pi = WittyPi()
+    return witty_pi.i2c_address == WITTY_PI_4_I2C_ADDRESS 
+
 
 def main():
 
     witty_pi = WittyPi()
     print(witty_pi)
+    print(f"Is WittyPi 3: {is_WittyPi_3()}")
+    print(f"Is WittyPi 4: {is_WittyPi_4()}")
 
     for i in range(0, 5000):
         witty_pi.get_output_current()

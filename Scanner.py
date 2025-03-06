@@ -14,9 +14,9 @@ from OSUtils import is_raspberry_pi, is_dev
 
 X_MAX = 216
 Y_MAX = 297
-TIME_USB_READY = 40
+TIME_USB_READY = 25
 if is_dev():
-    TIME_USB_READY = 10
+    TIME_USB_READY = 25
 
 CONFIG_PATH = "ConfigFile/Scanner/"
 ResolutionList = ["300", "600", "1200"]
@@ -131,7 +131,7 @@ class ScannerData:
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
         # on cherche le scanners pour enregistrer le nom du device
-        error = TurnUsbOn(i_scan, 40)
+        error = TurnUsbOn(i_scan, TIME_USB_READY)
         if error != 0:
             self.error = 1
             return self
@@ -156,13 +156,10 @@ class ScannerData:
             if x[0] == "No":
                 res = 1
         else:
-            res = 0
             # fake scanimage message
-            # cas de la carte MEGA4 qui renvoie 2 fois le même scanner
+            res = 0
             scanimage_message = \
-    """device `pixma:04A91912' is a CANON CanoScan LiDE 400 multi-function peripheral
-    device `pixma:04A91912_4CA38D' is a CANON CanoScan LiDE 400 multi-function peripheral"""
-#    """device `pixma:04A91912_4CA38D' is a CANON CanoScan LiDE 400 multi-function peripheral"""
+    """device `pixma:00000_ABABAB' is a CANON CanoScan LiDE 400 multi-function peripheral"""
 
         self.device = "NoScannerDetected"
         devices = []
@@ -171,11 +168,7 @@ class ScannerData:
                 x = (line).split("'")
                 x = (line).split()
                 device = x[1]
-                device = device[1 : len(device) - 1]
-                devices.append(device)
-            # On prend la plus longue chaine
-            devices.sort(reverse=True)
-            self.device = devices[0]
+                self.device = device[1 : len(device) - 1]
         else:
             self.device = "NoScannerDetected"
         print("Scanner :", self.device)
@@ -270,7 +263,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         _type_: _description_
     """
 
-    error = TurnUsbOn(i_scan, 40)
+    error = TurnUsbOn(i_scan, TIME_USB_READY)
     if error != 0:
         scanner.error = 1
         return scanner
@@ -278,7 +271,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     if scanner.device == "NoScannerDetected":
         option_device = ""
     else:
-        option_device = " --device=" + scanner.device
+        option_device = " --device=\"" + scanner.device + "\""
 
     command = (
         "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage" + option_device + " --mode="
@@ -332,7 +325,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         i += 1
         if res != 0:
             TurnUsbOff(i_scan)
-            TurnUsbOn(i_scan, 40)
+            TurnUsbOn(i_scan, TIME_USB_READY)
 
     TurnUsbOff(i_scan)
     if scanner.error > 0:
@@ -380,7 +373,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
 
 def ScannerPreview(i_scan: int):
     image = str(i_scan + 1) + ".jpg"
-    error = TurnUsbOn(i_scan, 40)
+    error = TurnUsbOn(i_scan, TIME_USB_READY)
     if error != 0:
         Scanner.error = 1
         res = Scanner.error
@@ -442,8 +435,8 @@ if __name__ == "__main__":
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
         print(Scanner.scanSearch(scan_num))
-        scan_num += 1
         Scanner.WriteScannerConfig(CurrentScanner)
+        scan_num += 1
 
     if is_raspberry_pi():
         result_ = ScannerPreview(0)
