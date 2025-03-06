@@ -10,10 +10,13 @@ from subprocess import run
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff , WriteTimeLogfile
 from DateUtils import SecondsToDate, DateToSeconds
-from OSUtils import is_raspberry_pi
+from OSUtils import is_raspberry_pi, is_dev
 
 X_MAX = 216
 Y_MAX = 297
+TIME_USB_READY = 40
+if is_dev():
+    TIME_USB_READY = 10
 
 CONFIG_PATH = "ConfigFile/Scanner/"
 ResolutionList = ["300", "600", "1200"]
@@ -255,8 +258,6 @@ imagepath = "/home/pi/Scanorhize/static/"
 imagepathjp2000 = imagepath + "imagejp2000.jp2"
 
 
-
-
 def scanAcq(scanner: ScannerData, i_scan: int, date):
     """ Lance le scanimage et convertit l'image en jp2000
 
@@ -274,8 +275,13 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         scanner.error = 1
         return scanner
     Displayfile = "Log/Display.txt"
+    if scanner.device == "NoScannerDetected":
+        option_device = ""
+    else:
+        option_device = " --device=" + scanner.device
+
     command = (
-        "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage --mode="
+        "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage" + option_device + " --mode="
         + scanner.mode
         + " --resolution="
         + str(scanner.resolution)
