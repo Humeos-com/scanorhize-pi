@@ -7,10 +7,10 @@ import re
 import dataclasses
 import json
 from subprocess import run
-from time import sleep
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff , WriteTimeLogfile
 from DateUtils import SecondsToDate, DateToSeconds
+from OSUtils import is_raspberry_pi
 
 X_MAX = 216
 Y_MAX = 297
@@ -51,6 +51,7 @@ class ScannerData:
     LastImgFile = ""
     ZoneAcq = ZoneRectangle(0, 0, X_MAX, Y_MAX)
     quality = 5
+    device = "NoScannerDetected"
     token = "token_bidon"
     UseServer = 0
     error = 0
@@ -81,6 +82,8 @@ class ScannerData:
                 + " "
                 + str(self.quality)
                 + " "
+                + str(self.device)
+                + " "
                 + str(self.UseServer)
                 + " "
                 + str(self.Campaign)
@@ -102,7 +105,7 @@ class ScannerData:
                 data = json.load(openfile)
         except ValueError:
             WriteTimeLogfile("No file: " + fullpath)
-            WriteScannerConfig(self, file)
+            self.WriteScannerConfig(file)
         else:
             # print(data)
             self.ScannerName = data["ScannerName"]
@@ -114,12 +117,103 @@ class ScannerData:
             self.quality = data["quality"]
             self.token = data["token"]
             self.UseServer = data["UseServer"]
+            self.device = data["device"]
             self.Campaign = data["Campaign"]
             self.StartDate = data["StartDate"]
             self.PeriodeS = data["PeriodeS"]
         finally:
             self.printScanner()
         return self
+
+    def scanSearch(self, i_scan: int):
+        # function to find scanner with sane
+        # on cherche le scanners pour enregistrer le nom du device
+        error = TurnUsbOn(i_scan, 40)
+        if error != 0:
+            self.error = 1
+            return self
+        Displayfile = "Log/Display.txt"
+
+        res = 1
+        i = 0
+        scanimage_message = "No scanners were identified"
+        if is_raspberry_pi():
+            cmd = "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L | tee -a " + Displayfile
+            print("i=", i)
+            # print(cmd)
+            result = run(
+                cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+            )
+            # print(result.returncode, result.stdout, result.stderr)
+            res = result.returncode
+            scanimage_message = result.stdout
+            print(res, scanimage_message)
+            x = (scanimage_message).split()
+            # print(x)
+            if x[0] == "No":
+                res = 1
+        else:
+            res = 0
+            # fake scanimage message
+            # cas de la carte MEGA4 qui renvoie 2 fois le même scanner
+            scanimage_message = \
+    """device `pixma:04A91912' is a CANON CanoScan LiDE 400 multi-function peripheral
+    device `pixma:04A91912_4CA38D' is a CANON CanoScan LiDE 400 multi-function peripheral"""
+#    """device `pixma:04A91912_4CA38D' is a CANON CanoScan LiDE 400 multi-function peripheral"""
+
+        self.device = "NoScannerDetected"
+        devices = []
+        if res == 0:
+            for line in scanimage_message.splitlines():
+                x = (line).split("'")
+                x = (line).split()
+                device = x[1]
+                device = device[1 : len(device) - 1]
+                devices.append(device)
+            # On prend la plus longue chaine
+            devices.sort(reverse=True)
+            self.device = devices[0]
+        else:
+            self.device = "NoScannerDetected"
+        print("Scanner :", self.device)
+        TurnUsbOff(i_scan)
+        if self.error > 0:
+            WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
+
+        return self
+
+
+    def WriteScannerConfig(self, file):
+        # printScanner(scanner)
+        data = {
+            "ScannerName": self.ScannerName,
+            "mode": self.mode,
+            "resolution": self.resolution,
+            "LastImgTime": self.LastImgTime,
+            "LastImgFile": self.LastImgFile,
+            "l": self.ZoneAcq.l,
+            "t": self.ZoneAcq.t,
+            "x": self.ZoneAcq.x,
+            "y": self.ZoneAcq.y,
+            "quality": self.quality,
+            "token": self.token,
+            "UseServer": self.UseServer,
+            "device": self.device,
+            "Campaign": self.Campaign,
+            "StartDate": self.StartDate,
+            "PeriodeS": self.PeriodeS,
+        }
+        try:
+            # printScanner(scanner)
+            json_object = json.dumps(data, indent=len(data))
+            fullpath = CONFIG_PATH + file
+            # print(fullpath)
+            with open(fullpath, "w", encoding="utf-8") as outfile:
+                outfile.write(json_object)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return 1
+        return 0
 
 
 # Initialisation de l'objet Scanner
@@ -144,6 +238,7 @@ def updateScanParameters(scanner: ScannerData):
         "x": scanner.ZoneAcq.x,
         "y": scanner.ZoneAcq.y,
         "quality": scanner.quality,
+        "device": scanner.device,
         "token": scanner.token,
         "UseServer": scanner.UseServer,
         "Campaign": scanner.Campaign,
@@ -160,35 +255,6 @@ imagepath = "/home/pi/Scanorhize/static/"
 imagepathjp2000 = imagepath + "imagejp2000.jp2"
 
 
-def scanSearch():
-    # function to find scanner with sane
-    res = 1
-    i = 0
-    while res != 0 and i < ScanNumber:
-        cmd = "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L"
-        print("i=", i)
-        # print(cmd)
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-        )
-        # print(result.returncode, result.stdout, result.stderr)
-        res = result.returncode
-        print(res, result.stdout)
-        x = (result.stdout).split()
-        # print(x)
-        if x[0] == "No":
-            res = 1
-        i += 1
-    if res == 0:
-        x = (result.stdout).split("'")
-        x = (result.stdout).split()
-        ScannerName = x[1]
-        ScannerName = ScannerName[1 : len(ScannerName) - 1]
-    else:
-        ScannerName = "NoScannerDetected"
-        sleep(10)
-    print("Scanner :", ScannerName)
-    return ScannerName
 
 
 def scanAcq(scanner: ScannerData, i_scan: int, date):
@@ -360,40 +426,22 @@ def listConfigScanner():
     return listfile
 
 
-def WriteScannerConfig(scanner, file):
-    # printScanner(scanner)
-    data = {
-        "ScannerName": scanner.ScannerName,
-        "mode": scanner.mode,
-        "resolution": scanner.resolution,
-        "LastImgTime": scanner.LastImgTime,
-        "LastImgFile": scanner.LastImgFile,
-        "l": scanner.ZoneAcq.l,
-        "t": scanner.ZoneAcq.t,
-        "x": scanner.ZoneAcq.x,
-        "y": scanner.ZoneAcq.y,
-        "quality": scanner.quality,
-        "token": scanner.token,
-        "UseServer": scanner.UseServer,
-        "Campaign": scanner.Campaign,
-        "StartDate": scanner.StartDate,
-        "PeriodeS": scanner.PeriodeS,
-    }
-    try:
-        # printScanner(scanner)
-        json_object = json.dumps(data, indent=len(data))
-        fullpath = CONFIG_PATH + file
-        # print(fullpath)
-        with open(fullpath, "w", encoding="utf-8") as outfile:
-            outfile.write(json_object)
-    except ValueError:
-        return 1
-    return 0
 
 
 if __name__ == "__main__":
     InitGPIO()
-    result_ = ScannerPreview(0)
-    Scanner.LastImgFile = result_[0]
-    Scanner.error = result_[1]
+    Scanner = ScannerData()
+    listScannerconfigs = listConfigScanner()
+    scan_num = 0
+    for CurrentScanner in listScannerconfigs:
+        Scanner.ReadScannerConfig(CurrentScanner)
+        print(Scanner.scanSearch(scan_num))
+        scan_num += 1
+        Scanner.WriteScannerConfig(CurrentScanner)
+
+    if is_raspberry_pi():
+        result_ = ScannerPreview(0)
+        Scanner.LastImgFile = result_[0]
+        Scanner.error = result_[1]
+
     # WriteScannerConfig(Scanner, "1-Scanner.json")

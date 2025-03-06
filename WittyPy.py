@@ -119,21 +119,15 @@ def SetNextStartDate(date):  # date en UTC!!
         secs = int(date[17:19], 10)
     except ValueError:
         secs = 0
+    arg = f"{day:02d} {hour:02d} {mins:02d} {secs:02d}"
     print(
         "year:",
         year,
         "month:",
         month,
-        "day:",
-        day,
-        "hour:",
-        hour,
-        "mins:",
-        mins,
-        "secs:",
-        secs,
+        "DD HH MM SS",
+        arg,
     )
-    arg = str(day) + " " + str(hour) + " " + str(mins) + " " + str(secs)
     if not is_raspberry_pi():
         return 0
     result = WriteWittyFunction("set_startup_time", arg)

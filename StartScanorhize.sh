@@ -3,7 +3,7 @@
 cd /home/pi/Scanorhize
 DATE=$(date '+%Y-%m-%d:%H:%M:%S')
 
-if ( -e DEBUG )
+if [ -e DEBUG ]
 then
     echo "DEBUG mode: on mesure le courant."
     python3 WittyPython.py > Log/courant_$DATE.log &

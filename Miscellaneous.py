@@ -144,12 +144,14 @@ def TurnUsbOn(i_scan, time):
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
         cmd = f"../mega4/uhubctl_64 -a on -p {i_scan + 1} -l 2-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-        sleep(time)
+        if is_raspberry_pi():
+            sleep(time)
     else:
         try:
             realpin = getChPin(i_scan)
             GPIO.output(realpin, GPIO.LOW)
-            sleep(time)
+            if is_raspberry_pi():
+                sleep(time)
         except IOError:
             return 1
     return 0
