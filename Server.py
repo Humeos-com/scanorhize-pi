@@ -86,7 +86,7 @@ def CopyFromJson(Scanner, data):
 
 def ReadConfigFromServer(Scanner):
     cmdRead = (
-        'curl --max-time 60 -X GET "https://'
+        'curl --max-time 20 -X GET "https://'
         + SCANORIZE_SERVER
         + '/api/scanner/configuration" -H "accept: application/json" -H "scanner:'
         + Scanner.token
@@ -117,7 +117,7 @@ def PostImageToServer(Scanner):
     token = Scanner.token
     ImagePath = CreateTempImage(Scanner)
     cmdPost = (
-        'sudo curl --max-time 60 -X POST "https://'
+        'sudo curl --max-time 20 -X POST "https://'
         + SCANORIZE_SERVER
         + '/api/scanner/image" -H "accept: */*" -H "scanner: '
         + token
@@ -152,7 +152,7 @@ def SendParameters(Scanner, battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
     token = Scanner.token
     cmdPUT = (
-        'sudo curl --max-time 60 -X PUT "https://'
+        'sudo curl --max-time 20 -X PUT "https://'
         + SCANORIZE_SERVER
         + "/api/scanner/state?battery="
         + str(battery)
