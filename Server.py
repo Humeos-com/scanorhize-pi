@@ -88,15 +88,9 @@ def CopyFromJson(Scanner, data):
 
 def ReadConfigFromServer(Scanner):
     cmdRead = (
-        'curl --connect-timeout '
-        + CONNECT_TIMEOUT +
-        '--max-time '
-        + MAX_TIME +
-        ' -X GET "https://'
-        + SCANORIZE_SERVER
-        + '/api/scanner/configuration" -H "accept: application/json" -H "scanner:'
-        + Scanner.token
-        + '"'
+        f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+            -X GET "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
+            -H "accept: application/json" -H "scanner:{Scanner.token}"'
     )
     print(cmdRead)
     result = run(
@@ -123,21 +117,12 @@ def PostImageToServer(Scanner):
     token = Scanner.token
     ImagePath = CreateTempImage(Scanner)
     cmdPost = (
-        'curl --connect-timeout '
-        + CONNECT_TIMEOUT +
-        '--max-time '
-        + MAX_TIME +
-        ' -X POST "https://'
-        + SCANORIZE_SERVER
-        + '/api/scanner/image" -H "accept: */*" -H "scanner: '
-        + token
-        + '" -H "Content-Type: multipart/form-data" -F "date='
-        + Date
-        + '" -F "dpi='
-        + str(Resolution)
-        + '" -F "file=@'
-        + ImagePath
-        + '"'
+        f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+            -X POST "https://{SCANORIZE_SERVER}/api/scanner/image" \
+            -H "accept: */*" -H "scanner: {token}" \
+            -H "Content-Type: multipart/form-data" \
+            -F "date={Date}" -F "dpi={Resolution}" \
+            -F "file=@{ImagePath}"'
     )
     print(cmdPost)
     result = run(
@@ -162,22 +147,10 @@ def SendParameters(Scanner, battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
     token = Scanner.token
     cmdPUT = (
-        'curl --connect-timeout '
-        + CONNECT_TIMEOUT +
-        '--max-time '
-        + MAX_TIME +
-        '-X PUT "https://'
-        + SCANORIZE_SERVER
-        + "/api/scanner/state?battery="
-        + str(battery)
-        + "&diskSpace="
-        + str(diskspace)
-        + "&temperature="
-        + str(temperature)
-        + '"'
-        + ' -H "accept: */*" -H "scanner: '
-        + token
-        + '"'
+        f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+            -X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
+            battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
+            -H "accept: */*" -H "scanner: {token}"'
     )
     print(cmdPUT)
     result = run(
