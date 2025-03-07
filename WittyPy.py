@@ -20,7 +20,6 @@ def ReadWittyFunction(function):
 
 
 def WriteWittyFunction(function, arg):
-
     source = "source" + " " + path + "utilities.sh && " + function + " " + arg
     print(source)
     if not is_raspberry_pi():
@@ -132,3 +131,6 @@ def SetNextStartDate(date):  # date en UTC!!
         return 0
     result = WriteWittyFunction("set_startup_time", arg)
     return result
+
+def doShutdown():
+    return ReadWittyFunction("do_shutdown")

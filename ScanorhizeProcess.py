@@ -20,7 +20,7 @@ from Miscellaneous import (
 from OSUtils import is_dev
 from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
 from I2C import ReadBatVoltCap
-from WittyPy import SetNextStartDate, ReadTemp
+from WittyPy import SetNextStartDate, ReadTemp, doShutdown
 from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
 
 DateStart = GetCurrentDate()
@@ -141,5 +141,7 @@ result = run(
     cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
 )
 WriteTimeLogfile(cmdeject)
-cmd = "sudo shutdown -P now"
-result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+# lance le poweroff du Raspberry et éteint le WittyPi
+doShutdown()
+# cmd = "sudo shutdown -P now"
+# result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
