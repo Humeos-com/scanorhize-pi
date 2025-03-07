@@ -11,6 +11,8 @@ from OSUtils import get_os
 
 SCANORIZE_SERVER = "scan.arditi.net"
 CONFIG_PATH = "ConfigFile/Scanner/"
+CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
+MAX_TIME = 120 # Temps max pour faire le POST
 
 
 class ServerData:
@@ -86,7 +88,11 @@ def CopyFromJson(Scanner, data):
 
 def ReadConfigFromServer(Scanner):
     cmdRead = (
-        'curl --max-time 20 -X GET "https://'
+        'curl --connect-timeout '
+        + CONNECT_TIMEOUT +
+        '--max-time '
+        + MAX_TIME +
+        ' -X GET "https://'
         + SCANORIZE_SERVER
         + '/api/scanner/configuration" -H "accept: application/json" -H "scanner:'
         + Scanner.token
@@ -117,7 +123,11 @@ def PostImageToServer(Scanner):
     token = Scanner.token
     ImagePath = CreateTempImage(Scanner)
     cmdPost = (
-        'sudo curl --max-time 20 -X POST "https://'
+        'curl --connect-timeout '
+        + CONNECT_TIMEOUT +
+        '--max-time '
+        + MAX_TIME +
+        ' -X POST "https://'
         + SCANORIZE_SERVER
         + '/api/scanner/image" -H "accept: */*" -H "scanner: '
         + token
@@ -152,7 +162,11 @@ def SendParameters(Scanner, battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
     token = Scanner.token
     cmdPUT = (
-        'sudo curl --max-time 20 -X PUT "https://'
+        'curl --connect-timeout '
+        + CONNECT_TIMEOUT +
+        '--max-time '
+        + MAX_TIME +
+        '-X PUT "https://'
         + SCANORIZE_SERVER
         + "/api/scanner/state?battery="
         + str(battery)
