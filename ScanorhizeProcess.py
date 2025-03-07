@@ -20,8 +20,8 @@ from Miscellaneous import (
 from OSUtils import is_dev
 from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
 from I2C import ReadBatVoltCap
-from WittyPy import SetNextStartDate, ReadTemp, doShutdown
-from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
+from WittyPy import SetNextStartDate, ReadTemp, doShutdown, setNextShutdownDate
+from DateUtils import CalculNextStartDate, DateToSeconds, SecondsToDate, GetCurrentDate, ConvertDateToWitty
 
 DateStart = GetCurrentDate()
 initDisplayFile()
@@ -141,7 +141,16 @@ result = run(
     cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
 )
 WriteTimeLogfile(cmdeject)
+
+# On fixe l'heure d'arrêt, car des fois le Witty ne s'eteint pas sur le doShutdown()
+# qui ne fait que le poweroff du Raspberry
+date_new = GetCurrentDate()
+secs = DateToSeconds(date_new)
+date_new = SecondsToDate(secs + 30)
+setNextShutdownDate(date_new)
+
 # lance le poweroff du Raspberry et éteint le WittyPi
+ConvertDateToWitty(GetCurrentDate())
 doShutdown()
 # cmd = "sudo shutdown -P now"
 # result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)

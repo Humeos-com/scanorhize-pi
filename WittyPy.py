@@ -5,6 +5,7 @@ Gestionnaire du scheduleur RTC/alimentation Witty Pi
 from subprocess import run
 
 from OSUtils import is_raspberry_pi
+from DateUtils import ConvertDateToWitty
 
 path = "/home/pi/wittypi/"
 
@@ -131,6 +132,24 @@ def SetNextStartDate(date):  # date en UTC!!
         return 0
     result = WriteWittyFunction("set_startup_time", arg)
     return result
+
+def setNextShutdownDate(date: str):
+    """_summary_
+
+    Args:
+        date (str): Date in JAVA format
+
+    Returns:
+        result: Date in WittyPi format "DD HH MM SS"
+    """
+
+    datew = ConvertDateToWitty(date)
+    print(f"date: {date} => datew: {datew}")
+    if not is_raspberry_pi():
+        return 0
+    return WriteWittyFunction("set_shutdown_time", datew)
+
+
 
 def doShutdown():
     return ReadWittyFunction("do_shutdown")

@@ -71,6 +71,22 @@ def CalculNextStartDate(StartDate, Period, CurrentDate):
         NextDate = DEFAULT_DATE_TIME
     return NextDate
 
+def ConvertDateToWitty(date: str):
+    """
+    Convert date from JAVA to WittyPy format
+
+    Args:
+        date (str): date in JAVA format
+
+    Returns:
+        str: date in WittyPy format "DD HH MM SS"
+    """
+    try:
+        date_obj = datetime.strptime(date, JAVA_FORMAT)
+        date = date_obj.strftime("%d %H %M %S")
+    except ValueError:
+        date = "01 06 25 00"
+    return date
 
 if __name__ == "__main__":
     local_tz = time.tzname
@@ -80,3 +96,4 @@ if __name__ == "__main__":
     nb_seconds = DateToSeconds(date_new)
     print(DateToSeconds(date_new))
     print(SecondsToDate(nb_seconds))
+    print(ConvertDateToWitty(date_new))
