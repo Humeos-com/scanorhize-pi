@@ -162,7 +162,6 @@ class ScannerData:
     """device `pixma:00000_ABABAB' is a CANON CanoScan LiDE 400 multi-function peripheral"""
 
         self.device = "NoScannerDetected"
-        devices = []
         if res == 0:
             for line in scanimage_message.splitlines():
                 x = (line).split("'")
