@@ -272,7 +272,8 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         option_device = ""
     else:
         option_device = " --device=\"" + scanner.device + "\""
-
+    # On n'utilise pas le device pour l'instant, car sinon, il faut respecter le cablage...
+    option_device = ""
     command = (
         "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage" + option_device + " --mode="
         + scanner.mode
