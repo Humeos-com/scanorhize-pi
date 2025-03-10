@@ -12,7 +12,7 @@ from OSUtils import get_os
 SCANORIZE_SERVER = "scan.arditi.net"
 CONFIG_PATH = "ConfigFile/Scanner/"
 CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
-MAX_TIME = 120 # Temps max pour faire le POST
+MAX_TIME = 200 # Temps max pour faire le POST
 
 
 class ServerData:
@@ -89,8 +89,8 @@ def CopyFromJson(Scanner, data):
 def ReadConfigFromServer(Scanner):
     cmdRead = (
         f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
-            -X GET "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
-            -H "accept: application/json" -H "scanner:{Scanner.token}"'
+-X GET "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
+-H "accept: application/json" -H "scanner:{Scanner.token}"'
     )
     print(cmdRead)
     result = run(
@@ -118,11 +118,11 @@ def PostImageToServer(Scanner):
     ImagePath = CreateTempImage(Scanner)
     cmdPost = (
         f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
-            -X POST "https://{SCANORIZE_SERVER}/api/scanner/image" \
-            -H "accept: */*" -H "scanner: {token}" \
-            -H "Content-Type: multipart/form-data" \
-            -F "date={Date}" -F "dpi={Resolution}" \
-            -F "file=@{ImagePath}"'
+-X POST "https://{SCANORIZE_SERVER}/api/scanner/image" \
+-H "accept: */*" -H "scanner: {token}" \
+-H "Content-Type: multipart/form-data" \
+-F "date={Date}" -F "dpi={Resolution}" \
+-F "file=@{ImagePath}"'
     )
     print(cmdPost)
     result = run(
@@ -148,9 +148,9 @@ def SendParameters(Scanner, battery, diskspace, temperature):
     token = Scanner.token
     cmdPUT = (
         f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
-            -X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
-            battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
-            -H "accept: */*" -H "scanner: {token}"'
+-X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
+battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
+-H "accept: */*" -H "scanner: {token}"'
     )
     print(cmdPUT)
     result = run(
