@@ -262,3 +262,22 @@ if __name__ == "__main__":
     ReadGPIOConfig()
     initDisplayFile()
     WriteTimeLogfile("Test unitaire main de Miscellaneous")
+    value = input("Voulez-vous modifier l'état des GPIO ? [Non=Entrée, sinon, Oui=o]: ")
+    if not value:
+        sys.exit(0)
+    try:
+        for i_scan in [1, 2, 3]:
+            value = input(f"Basculer Scanner-{i_scan} ? [Non=Entrée, sinon, Oui=o]: ")
+            if value:
+                GPIO.setup(getChPin(i_scan), GPIO.OUT)
+                GPIO.output(getChPin(i_scan), not GPIO.input(getChPin(i_scan)))
+                print(f"  bascule Scanner-{i_scan}")
+        #   TurnUsbOn(getChPin(i_scan), 5)
+        #   TurnUsbOff(port)}:
+    except RuntimeError as e:
+        print(f"RuntimeError: {e}")
+        sys.exit(0)
+    except GPIO.Error as e:
+        print(f"GPIO Error: {e}")
+        sys.exit(0)
+
