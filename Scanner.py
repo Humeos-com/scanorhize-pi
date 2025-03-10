@@ -14,13 +14,13 @@ from OSUtils import is_raspberry_pi, is_dev
 
 X_MAX = 216
 Y_MAX = 297
-TIME_USB_READY = 25
+TIME_USB_READY = 40
 if is_dev():
-    TIME_USB_READY = 25
+    TIME_USB_READY = 15
 
 CONFIG_PATH = "ConfigFile/Scanner/"
 ResolutionList = ["300", "600", "1200"]
-ColorList = ["COLOR", "Gray", "Lineart"]
+ColorList = ["Color", "Gray", "Lineart"]
 
 
 @dataclasses.dataclass
