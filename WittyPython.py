@@ -1,5 +1,20 @@
+"""Interroge la carte Witty Pi pour obtenir des informations sur l'alimentation
+de la carte Raspberry Pi
+"""
 from time import sleep
-import smbus
+from OSUtils import is_raspberry_pi
+
+# pylint: disable=ungrouped-imports
+# pylint: disable=import-error
+# Impossible de grouper les imports car les imports conditionnels ne sont pas supportés
+if is_raspberry_pi():
+    from smbus import SMBus
+else:
+    import sys
+    import fake_rpi
+
+    sys.modules["smbus"] = fake_rpi.smbus
+    from smbus import SMBus
 
 WITTY_PI_3_I2C_ADDRESS = 0x69
 WITTY_PI_4_I2C_ADDRESS = 0x8
@@ -10,9 +25,10 @@ class WittyPi:
     Cette classe ne gère pas l'horloge RTC de la carte Witty Pi
     """
 
+    # pylint: disable=too-many-instance-attributes
     def __init__(self):
 
-        self.i2c_bus = smbus.SMBus(1)
+        self.i2c_bus = SMBus(1)
         self.i2c_address = WITTY_PI_3_I2C_ADDRESS
 
         self.firmware_id = 0
@@ -98,12 +114,12 @@ class WittyPi:
 def is_WittyPi_3():
 
     witty_pi = WittyPi()
-    return witty_pi.i2c_address == WITTY_PI_3_I2C_ADDRESS 
+    return witty_pi.i2c_address == WITTY_PI_3_I2C_ADDRESS
 
 def is_WittyPi_4():
 
     witty_pi = WittyPi()
-    return witty_pi.i2c_address == WITTY_PI_4_I2C_ADDRESS 
+    return witty_pi.i2c_address == WITTY_PI_4_I2C_ADDRESS
 
 
 def main():
