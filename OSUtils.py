@@ -15,6 +15,9 @@ def get_MEGA4():
     with_MEGA4 = True
     try:
         dev = usb.core.find(idVendor=0x2109, idProduct=0x2817)
+        if dev is None:
+            print("Pas de carte MEGA4")
+            with_MEGA4 = False
         logging.info("Logging initialized at level: %s", str(dev))
     except usb.core.NoBackendError:
         print("Pas de carte MEGA4")
