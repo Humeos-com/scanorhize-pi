@@ -1,5 +1,6 @@
 """Miscellaneous functions"""
 
+import sys
 import json
 import datetime
 from subprocess import run
@@ -34,24 +35,35 @@ UHUBCTL = "/usr/sbin/uhubctl"
 
 # Pour le mode config
 # Bouton poussoir config
+# pins BCM
 if is_WittyPi_3():
     ConfigPin = 17  # pin physique 11
 else:
     ConfigPin = 16  # pin physique 36 + ground 34
 
 # Pour la carte USB Big 7
+# Pour le relai Banggood initial
+# pins BCM
+# Ch1Pin = 19  # Scanner1
+# Ch2Pin = 26  # Scanner2
+# Ch3Pin = 20  # Scanner3
+# Ch4Pin = 21  # Clé 4G
+
+# Pour le relai SBComponent RelayPi-V2
+# pins BCM
 Ch1Pin = 19  # Scanner1
-Ch2Pin = 26  # Scanner2
-Ch3Pin = 20  # Scanner3
-Ch4Pin = 21  # Clé 4G
+Ch2Pin = 13  # Scanner2
+Ch3Pin =  6  # Scanner3
+Ch4Pin =  5  # Clé 4G
 PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
 
 def getChPin(i_scan: int):
     if 0 <= i_scan < 4:
+        print(f"getChPin: {i_scan} => {PinArray[i_scan]}")
         return PinArray[i_scan]
 
-    logging.info("La valeur passee doit être comprise entre 0 et 3, ici: %i", i_scan)
+    print(f"La valeur passee doit être comprise entre 0 et 4, ici: {i_scan}")
     return -1
 
 
@@ -141,13 +153,13 @@ def InitGPIO():
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         if not has_MEGA4():
-            GPIO.setup(Ch1Pin, GPIO.OUT)  # Scanner1
-            GPIO.setup(Ch2Pin, GPIO.OUT)  # Scanner2
-            GPIO.setup(Ch3Pin, GPIO.OUT)  # Scanner3
-            GPIO.setup(Ch4Pin, GPIO.OUT)  # Clé 4g
-            GPIO.output(Ch1Pin, GPIO.HIGH)
-            GPIO.output(Ch2Pin, GPIO.HIGH)
-            GPIO.output(Ch3Pin, GPIO.HIGH)
+            for i_pin in PinArray:
+                GPIO.setup(i_pin, GPIO.OUT)
+            # On n'arrête pas la clé 4G
+            GPIO.output(PinArray[3], GPIO.HIGH)
+            for i in range(0,3):
+               print(f"Initialisation du GPIO: {PinArray[i]}")
+               GPIO.output(PinArray[i], GPIO.LOW)
     except IOError as e:
         print(f"IOError: {e}")
         return 1
@@ -165,7 +177,9 @@ def TurnUsbOn(i_scan, time):
     else:
         try:
             realpin = getChPin(i_scan)
-            GPIO.output(realpin, GPIO.LOW)
+            GPIO.output(realpin, GPIO.HIGH)
+            # Pour l'ancienne carte Relai
+            # GPIO.output(realpin, GPIO.LOW)
             if is_raspberry_pi():
                 sleep(time)
         except IOError:
@@ -181,7 +195,9 @@ def TurnUsbOff(i_scan):
     else:
         try:
             realpin = getChPin(i_scan)
-            GPIO.output(realpin, GPIO.HIGH)
+            GPIO.output(realpin, GPIO.LOW)
+            # Pour l'ancienne carte Relai
+            # GPIO.output(realpin, GPIO.HIGH)
         except IOError:
             return 1
     return 0
@@ -257,7 +273,6 @@ def CopyLog():
 
 
 if __name__ == "__main__":
-    print("Test unitaire main de Miscellaneous")
     InitGPIO()
     ReadGPIOConfig()
     initDisplayFile()
@@ -266,14 +281,15 @@ if __name__ == "__main__":
     if not value:
         sys.exit(0)
     try:
-        for i_scan in [1, 2, 3]:
-            value = input(f"Basculer Scanner-{i_scan} ? [Non=Entrée, sinon, Oui=o]: ")
-            if value:
+        # On allume la clé 4G
+        TurnUsbOn(3, 5)
+        for i_scan in [0, 1, 2]:
+            value = input(f"Basculer Scanner-{i_scan + 1} ? [Non=Entrée, sinon, Oui=o]: ")
+            if value == "o":
                 GPIO.setup(getChPin(i_scan), GPIO.OUT)
-                GPIO.output(getChPin(i_scan), not GPIO.input(getChPin(i_scan)))
-                print(f"  bascule Scanner-{i_scan}")
-        #   TurnUsbOn(getChPin(i_scan), 5)
-        #   TurnUsbOff(port)}:
+                state = GPIO.input(getChPin(i_scan))
+                GPIO.output(getChPin(i_scan), not state)
+                print(f"  bascule Scanner-{i_scan + 1} pin {getChPin(i_scan)} {not state}")
     except RuntimeError as e:
         print(f"RuntimeError: {e}")
         sys.exit(0)
