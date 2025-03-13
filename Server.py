@@ -109,6 +109,7 @@ def ReadConfigFromServer(Scanner):
         WriteTimeLogfile("Config server error: " + result.stderr)
     return Scanner
 
+
 def SendConfigToServer(Scanner):
     cmdPost = (
         f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \

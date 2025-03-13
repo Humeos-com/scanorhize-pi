@@ -383,7 +383,7 @@ def ScannerPreview(i_scan: int):
         Scanner.error = 1
         res = Scanner.error
         return image, res
-    file = imagepath + image
+    #### file = imagepath + image
     # On ne passe pas le device, car on n'allume qu'un port USB
     # donc scanimage va trouver le seul scanner sous tension !
     command = (

@@ -168,7 +168,7 @@ def action(actionName: str, scan_num_str: str):
     # Scannerparam = updateScanParameters(Scanner)
 
     if actionName == "SendConfig":
-        Scanner = SendConfigToServer(Scanner)
+        SendConfigToServer(Scanner)
 
 
     return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))

@@ -5,7 +5,7 @@ import json
 import datetime
 from subprocess import run
 from time import sleep
-import logging
+# import logging
 
 from DateUtils import GetCurrentDate
 from WittyPython import is_WittyPi_3
@@ -18,7 +18,6 @@ from OSUtils import is_raspberry_pi, has_MEGA4
 if is_raspberry_pi():
     from RPi import GPIO
 else:
-    import sys
     import fake_rpi
 
     sys.modules["RPi"] = fake_rpi.RPi  # Mock RPi module
@@ -53,8 +52,8 @@ else:
 # pins BCM
 Ch1Pin = 19  # Scanner1
 Ch2Pin = 13  # Scanner2
-Ch3Pin =  6  # Scanner3
-Ch4Pin =  5  # Clé 4G
+Ch3Pin = 6  # Scanner3
+Ch4Pin = 5  # Clé 4G
 PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
 
@@ -157,9 +156,9 @@ def InitGPIO():
                 GPIO.setup(i_pin, GPIO.OUT)
             # On n'arrête pas la clé 4G
             GPIO.output(PinArray[3], GPIO.HIGH)
-            for i in range(0,3):
-               print(f"Initialisation du GPIO: {PinArray[i]}")
-               GPIO.output(PinArray[i], GPIO.LOW)
+            for i in range(0, 3):
+                print(f"Initialisation du GPIO: {PinArray[i]}")
+                GPIO.output(PinArray[i], GPIO.LOW)
     except IOError as e:
         print(f"IOError: {e}")
         return 1
@@ -208,14 +207,14 @@ def ReadGPIOConfig():
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(ConfigPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        state = GPIO.input(ConfigPin)
+        state_ = GPIO.input(ConfigPin)
     except IOError as e:
         print(f"IOError: {e}")
-        state = 1
+        state_ = 1
 
-    print(f"Etat GPIO {ConfigPin}: {state}")
-    WriteTimeLogfile(f"Etat GPIO {ConfigPin}: {state}")
-    return state
+    print(f"Etat GPIO {ConfigPin}: {state_}")
+    WriteTimeLogfile(f"Etat GPIO {ConfigPin}: {state_}")
+    return state_
 
 
 def WriteStartDateConfig(NextStartDate, NextStartseconds):
@@ -283,17 +282,20 @@ if __name__ == "__main__":
     try:
         # On allume la clé 4G
         TurnUsbOn(3, 5)
-        for i_scan in [0, 1, 2]:
-            value = input(f"Basculer Scanner-{i_scan + 1} ? [Non=Entrée, sinon, Oui=o]: ")
+        for int_scan in [0, 1, 2]:
+            value = input(
+                f"Basculer Scanner-{int_scan + 1} ? [Non=Entrée, sinon, Oui=o]: "
+            )
             if value == "o":
-                GPIO.setup(getChPin(i_scan), GPIO.OUT)
-                state = GPIO.input(getChPin(i_scan))
-                GPIO.output(getChPin(i_scan), not state)
-                print(f"  bascule Scanner-{i_scan + 1} pin {getChPin(i_scan)} {not state}")
+                GPIO.setup(getChPin(int_scan), GPIO.OUT)
+                state = GPIO.input(getChPin(int_scan))
+                GPIO.output(getChPin(int_scan), not state)
+                print(
+                    f"  bascule Scanner-{int_scan + 1} pin {getChPin(int_scan)} {not state}"
+                )
     except RuntimeError as e:
         print(f"RuntimeError: {e}")
         sys.exit(0)
     except GPIO.Error as e:
         print(f"GPIO Error: {e}")
         sys.exit(0)
-
