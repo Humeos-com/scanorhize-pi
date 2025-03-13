@@ -77,7 +77,6 @@ class WittyPi:
 
         self.temperature = self.read_register(0x07)
 
-
     def get_firmware_revision(self):
 
         self.firmware_revision = self.read_register(0x12)
@@ -96,18 +95,16 @@ class WittyPi:
 
     def __str__(self):
 
-        s = "Witty Pi\n"
-
-        s += f"  Firmware ID: {self.firmware_id:02X}\n"
-        s += f"  Firmware revision: {self.firmware_revision}\n"
-        s += f"  Input voltage: {self.input_voltage:.3f}V\n"
-        s += f"  Output voltage: {self.output_voltage:.3f}V\n"
-        s += f"  Output current: {self.output_current:.3f}A\n"
-        s += (
-            "  Power mode: "
-            + ("LDO regulator" if self.power_mode == 1 else "5V USB")
-            + "\n"
-        )
+        s = ("Witty Pi\n"
+        f"  Firmware ID: {self.firmware_id:02X}\n"
+        f"  Firmware revision: {self.firmware_revision}\n"
+        f"  Input voltage: {self.input_voltage:.3f}V\n"
+        f"  Output voltage: {self.output_voltage:.3f}V\n"
+        f"  Output current: {self.output_current:.3f}A\n"
+        "  Power mode: "
+        + ("LDO regulator" if self.power_mode == 1 else "5V USB")
+        + "\n"
+        f"  Temperature: {self.temperature:.1f}C")
 
         return s
 
