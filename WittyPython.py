@@ -75,17 +75,28 @@ class WittyPi:
 
     def get_temperature(self):
 
-        self.temperature = self.read_register(0x07)
+        data = self.read_register(50, 2)
+        # Step 1: Swap bytes
+        data = (((data & 0xFF) << 8) | ((data & 0xFF00) >> 8)) >> 5
+        # Step 2: Two's complement correction (if data >= 1024)
+        if data >= 0x400:
+            data = (data & 0x3FF) - 1024  # Convert to negative if needed
+        # Step 3: Scale by 0.125
+        data = data * 0.125
+        self.temperature = data
 
     def get_firmware_revision(self):
 
-        self.firmware_revision = self.read_register(0x12)
+        self.firmware_revision = self.read_register(12)
 
-    def read_register(self, register):
+    def read_register(self, register, len_=1):
 
         try:
 
-            data = self.i2c_bus.read_byte_data(self.i2c_address, register)
+            if len_ == 1:
+                data = self.i2c_bus.read_byte_data(self.i2c_address, register)
+            else:
+                data = self.i2c_bus.read_word_data(self.i2c_address, register)
 
         except OSError as e:
             print(f"Read error: {e}")
