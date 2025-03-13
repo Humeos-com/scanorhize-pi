@@ -19,6 +19,7 @@ if is_dev():
     TIME_USB_READY = 15
 
 CONFIG_PATH = "ConfigFile/Scanner/"
+DISPLAY_FILE = "Log/Display.txt"
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
 
@@ -135,13 +136,12 @@ class ScannerData:
         if error != 0:
             self.error = 1
             return self
-        Displayfile = "Log/Display.txt"
 
         res = 1
         i = 0
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
-            cmd = "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L | tee -a " + Displayfile
+            cmd = "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L | tee -a " + DISPLAY_FILE
             print("i=", i)
             # print(cmd)
             result = run(
@@ -210,6 +210,9 @@ class ScannerData:
             return 1
         return 0
 
+    def json(self):
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+
 
 # Initialisation de l'objet Scanner
 Scanner = ScannerData()
@@ -245,8 +248,10 @@ def updateScanParameters(scanner: ScannerData):
 
 ScanNumber = 3
 imagetiff = "imagescan.tiff"
-imagepathtiff = "/home/pi/Scanorhize/static/" + imagetiff
-imagepath = "/home/pi/Scanorhize/static/"
+# imagepathtiff = "/home/pi/Scanorhize/static/" + imagetiff
+# imagepath = "/home/pi/Scanorhize/static/"
+imagepathtiff = "static/" + imagetiff
+imagepath = "static/"
 imagepathjp2000 = imagepath + "imagejp2000.jp2"
 
 
@@ -266,7 +271,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     if error != 0:
         scanner.error = 1
         return scanner
-    Displayfile = "Log/Display.txt"
+
     if scanner.device == "NoScannerDetected":
         option_device = ""
     else:
@@ -289,7 +294,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         + " --format=tiff >"
         + imagepathtiff
         + " | tee -a "
-        + Displayfile
+        + DISPLAY_FILE
     )
     print(command)
     res = 1
@@ -342,7 +347,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         + " "
         + imagepathjp2000
         + "| tee -a "
-        + Displayfile
+        + DISPLAY_FILE
     )
     # print(commandconv)
     WriteTimeLogfile("Start conversion jp2")
@@ -372,7 +377,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
 
 
 def ScannerPreview(i_scan: int):
-    image = str(i_scan + 1) + ".jpg"
+    image = f"{i_scan + 1}.jpg"
     error = TurnUsbOn(i_scan, TIME_USB_READY)
     if error != 0:
         Scanner.error = 1
@@ -385,10 +390,15 @@ def ScannerPreview(i_scan: int):
         "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage --mode="
         + Scanner.mode
         + " --resolution=75"
-        + " --format=jpeg >"
-        + file
+        + " --format=tiff >"
+        + imagepathtiff
+        + " | tee -a "
+        + DISPLAY_FILE
+        # TODO: Il faudrait faire la conversion en JPEG !!!!
+#        + " --format=jpeg >"
+#        + file
     )
-    # print(command)
+    WriteTimeLogfile("command:" + command)
     res = 1
     i = 0
     while res != 0 and i < 2:

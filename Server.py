@@ -109,6 +109,16 @@ def ReadConfigFromServer(Scanner):
         WriteTimeLogfile("Config server error: " + result.stderr)
     return Scanner
 
+def SendConfigToServer(Scanner):
+    cmdPost = (
+        f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+-X POST "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
+-H "accept: application/json" -H "scanner:{Scanner.token}" \
+-H "Content-Type: application/json" \
+-d {Scanner.json()}'
+    )
+    WriteTimeLogfile(cmdPost)
+
 
 def PostImageToServer(Scanner):
     error = 0

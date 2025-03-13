@@ -11,7 +11,7 @@
                      <div class="input-group-prepend">
                      <span class="input-group-text">Scanner</span>
                      </div>
-                     <input type="text" class="form-control" name="Scanner" placeholder={{scannerName}}>
+                     <input type="text" class="form-control" name="Scanner" value={{scannerName}} placeholder={{scannerName}}>
               </div>
        <div class="input-group mb-3">
               <div class="input-group-prepend">              
@@ -64,7 +64,7 @@
                      <div class="input-group-prepend">
                      <span class="input-group-text">Qualité Compression(0..100 no-loss)</span>
                      </div>
-                     <input type="text" class="form-control" name="quality" placeholder={{quality}}>
+                     <input type="text" class="form-control" name="quality" value={{quality}} placeholder={{quality}}>
               </div>
        </div>
        <div class="col-sm">
@@ -72,7 +72,13 @@
 			<div class="input-group-prepend">
 			<span class="input-group-text" >Token</span>
 			</div>
-			<input type="text" class="form-control" name="token"placeholder={{token}}>
+			<input type="text" class="form-control" name="token" value={{token}} placeholder={{token}}>
+       </div>
+       <div class="input-group mb-3">
+              <div class="input-group-prepend">
+              <span class="input-group-text">Serial number</span>
+              </div>
+              <input type="text" class="form-control" name="device" value={{device}} placeholder={{device}}>
        </div>
        <div class="input-group mb-3">
               <div class="input-group-prepend">
@@ -84,26 +90,28 @@
 			<div class="input-group-prepend">
 			<span class="input-group-text" >Campaign</span>
 			</div>
-			<input type="text" class="form-control" name="Campaign"placeholder={{Campaign}}>
+			<input type="text" class="form-control" name="Campaign" value={{Campaign}} placeholder={{Campaign}}>
        </div>
        <div class="input-group mb-3">
 			<div class="input-group-prepend">
 			<span class="input-group-text" >StartDate (YYYY-MM-DDTHH:mm:ssZ)</span>
 			</div>
-			<input type="text" class="form-control" name="StartDate"placeholder={{StartDate}}>
+			<input type="text" class="form-control" name="StartDate" value={{StartDate}} placeholder={{StartDate}}>
        </div>
        <div class="input-group mb-3">
 			<div class="input-group-prepend">
 			<span class="input-group-text" >PeriodeS</span>
 			</div>
-			<input type="text" class="form-control" name="PeriodeS"placeholder={{PeriodeS}}>
+			<input type="text" class="form-control" name="PeriodeS" value={{PeriodeS}} placeholder={{PeriodeS}}>
        </div>
        </div>
 </form> 
 <div class="col-sm">
-       <a href="/Scanner/GetConfig" class="btn btn-primary">Get server config</a>
-       <button type="submit" class="btn btn-primary">Submit</button> 
-       <a href="/Scanner/acqimg" class="btn btn-primary">IMAGE SCAN</a>
+       <button type="submit" class="btn btn-primary">Save conf locally</button> 
+       <a href="/Scanner/SendConfig/{{scan_num_str}}" class="btn btn-primary">Send conf to server</a>
+       <a href="/Scanner/GetConfig/{{scan_num_str}}" class="btn btn-primary">Get conf from server</a>
+       <a href="/Scanner/acqimg/{{scan_num_str}}" class="btn btn-primary">Image scan</a>
+ 
        <p>Last image time : {{LastImgTime}}</p> 
        <img src = " {{url_for('static', filename=imagename)}}"width="80%", alt="Take a scan"/>      
        </div>       

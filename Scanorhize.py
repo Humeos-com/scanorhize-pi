@@ -14,6 +14,7 @@ from Scanner import (
 )
 from Server import (
     ReadConfigFromServer,
+    SendConfigToServer,
     pingAPI,
     GetWifiSSID,
     GetIP,
@@ -21,6 +22,7 @@ from Server import (
     ServerData,
 )
 from Miscellaneous import WriteTimeLogfile, chaineIntwitherror, InitGPIO
+from OSUtils import is_raspberry_pi
 
 # from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
 # from I2C import ReadBatVoltCap
@@ -39,7 +41,8 @@ WriteTimeLogfile("Start Scanorhize.py")
 res = 0
 while res == 0:
     res = pingAPI("www.google.com")
-    sleep(5)
+    if is_raspberry_pi():
+        sleep(5)
 
 WriteTimeLogfile("Launch Web app")
 app = Flask(__name__)
@@ -50,11 +53,6 @@ WriteTimeLogfile(SSID)
 IP = GetIP()
 WriteTimeLogfile(IP)
 listScannerconfigs = listConfigScanner()
-i_scan = 0
-# Initialisation de l'objet Scanner
-# Scanner = ScannerData()
-# Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
-
 
 # This function does not allow caching of images from browser
 @app.after_request
@@ -92,24 +90,21 @@ def stream():
     return app.response_class(generate(), mimetype="text/plain")
 
 
-@app.route("/Scanner", methods=["POST", "GET"])
-def ScannerPage():
+@app.route("/Scanner/<scan_num_str>", methods=["POST", "GET"])
+def ScannerPage(scan_num_str: str):
+    form = request.form
     Scanner = ScannerData()
-    # global ListScanner
-    # global ResolutionList
-    # global ColorList
-    # global i_scan
-    # global listScannerconfigs
+    i_scan = int(scan_num_str) - 1
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     if request.method == "POST":
-        print(request.form)
-        restmp = request.form["resolution"]
+        print(form)
+        restmp = form["resolution"]
         result = int(restmp, 10)
         if result > 3:  # pas de selection
             result = 1
         Scanner.resolution = ResolutionList[result - 1]
         print(Scanner.resolution)
-        modetmp = request.form["mode"]
+        modetmp = form["mode"]
         print(modetmp, " ", Scanner.mode)
         if modetmp != Scanner.mode:
             mode = int(modetmp, 10)
@@ -118,79 +113,65 @@ def ScannerPage():
         tmp = request.form["l"]
         # print("tmp=",tmp,"tmp type: ",type(tmp),"l type: ",type(Scanner.l))
         Scanner.ZoneAcq.l = chaineIntwitherror(tmp, Scanner.ZoneAcq.l, 0, 216.7)
-        tmp = request.form["t"]
+        tmp = form["t"]
         Scanner.ZoneAcq.t = chaineIntwitherror(tmp, Scanner.ZoneAcq.t, 0, 297.5)
-        tmp = request.form["x"]
+        tmp = form["x"]
         Scanner.ZoneAcq.x = chaineIntwitherror(tmp, Scanner.ZoneAcq.x, 0, 216.7)
-        tmp = request.form["y"]
+        tmp = form["y"]
         Scanner.ZoneAcq.y = chaineIntwitherror(tmp, Scanner.ZoneAcq.y, 0, 297.5)
-        tmp = request.form["quality"]
+        tmp = form["quality"]
         Scanner.quality = chaineIntwitherror(tmp, Scanner.quality, 0, 90)
-        tmp = request.form["token"]  # token vide pour non utilisation du scanner
+        tmp = form["token"]  # token vide pour non utilisation du scanner
         if tmp != "":
             Scanner.token = tmp
-        tmp = request.form["UseServer"]
+        tmp = form["UseServer"]
         Scanner.UseServer = chaineIntwitherror(tmp, Scanner.UseServer, 0, 1)
-        tmp = request.form["Campaign"]  # token vide pour non utilisation du scanner
+        tmp = form["Campaign"]  # token vide pour non utilisation du scanner
         if tmp != "":
             Scanner.Campaign = tmp
-        tmp = request.form["StartDate"]  # token vide pour non utilisation du scanner
+        tmp = form["StartDate"]  # token vide pour non utilisation du scanner
         if tmp != "":
             Scanner.StartDate = tmp
-        tmp = request.form["PeriodeS"]
+        tmp = form["PeriodeS"]
         Scanner.PeriodeS = chaineIntwitherror(tmp, Scanner.PeriodeS, 0, 360000)
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-    Scanner.ScannerName = "Scanner" + str(i_scan + 1)
+    Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
     print("Scanner n° : " + str(i_scan + 1))
     Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     print(filename)
-    return render_template("image.html", **Scannerparam, imagename=filename)
+    # return render_template("image.html", form=form, imagename=filename)
+    return render_template("image.html", **Scannerparam, scan_num_str=scan_num_str, imagename=filename)
 
 
-@app.route("/Scanner1", methods=["POST", "GET"])
-def Scanner1():
-    global i_scan
-    i_scan = 0
-    return redirect(url_for("ScannerPage"))
-
-
-@app.route("/Scanner2", methods=["POST", "GET"])
-def Scanner2():
-    global i_scan
-    i_scan = 1
-    return redirect(url_for("ScannerPage"))
-
-
-@app.route("/Scanner3", methods=["POST", "GET"])
-def Scanner3():
-    global i_scan
-    i_scan = 2
-    return redirect(url_for("ScannerPage"))
-
-
-@app.route("/Scanner/<deviceName>")
-def action(deviceName):
+@app.route("/Scanner/<actionName>/<scan_num_str>")
+def action(actionName: str, scan_num_str: str):
+    i_scan = int(scan_num_str) - 1
     Scanner = ScannerData()
+    Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     # global Campaign
     # global i_scan
     # Scannerparam = updateScanParameters(Scanner)
     # filename = ""
-    print("devicename : ", deviceName)
-    if deviceName == "acqimg":
+    print("action : ", actionName)
+    if actionName == "acqimg":
         InitGPIO()
         result = ScannerPreview(i_scan)
         Scanner.LastImgFile = result[0]
         Scanner.error = result[1]
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
-    if deviceName == "GetConfig":
+    if actionName == "GetConfig":
         Scanner = ReadConfigFromServer(Scanner)
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
     # Scannerparam = updateScanParameters(Scanner)
 
-    return redirect(url_for("ScannerPage"))
+    if actionName == "SendConfig":
+        Scanner = SendConfigToServer(Scanner)
+
+
+    return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
 
 
 @app.route("/Server", methods=["POST", "GET"])
