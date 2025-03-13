@@ -8,7 +8,7 @@ import dataclasses
 import json
 from subprocess import run
 
-from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff , WriteTimeLogfile
+from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, WriteTimeLogfile
 from DateUtils import SecondsToDate, DateToSeconds
 from OSUtils import is_raspberry_pi, is_dev
 
@@ -66,35 +66,11 @@ class ScannerData:
     def printScanner(self):
         try:
             data = (
-                self.ScannerName
-                + " "
-                + str(self.mode)
-                + " "
-                + str(self.resolution)
-                + " "
-                + str(self.LastImgTime)
-                + " "
-                + str(self.LastImgFile)
-                + " "
-                + str(self.ZoneAcq.l)
-                + " "
-                + str(self.ZoneAcq.t)
-                + " "
-                + str(self.ZoneAcq.x)
-                + " "
-                + str(self.ZoneAcq.y)
-                + " "
-                + str(self.quality)
-                + " "
-                + str(self.device)
-                + " "
-                + str(self.UseServer)
-                + " "
-                + str(self.Campaign)
-                + " "
-                + str(self.StartDate)
-                + " "
-                + str(self.PeriodeS)
+            f"{self.ScannerName} {self.mode} {self.resolution} "
+            f"{self.LastImgTime} {self.LastImgFile} {self.ZoneAcq.l} "
+            f"{self.ZoneAcq.t} {self.ZoneAcq.x} {self.ZoneAcq.y} "
+            f"{self.quality} {self.device} {self.UseServer} {self.Campaign} "
+            f"{self.StartDate} {self.PeriodeS}"
             )
             print(data)
             # WriteLogFile(data)
@@ -141,11 +117,18 @@ class ScannerData:
         i = 0
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
-            cmd = "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L | tee -a " + DISPLAY_FILE
+            cmd = (
+                "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L | tee -a "
+                + DISPLAY_FILE
+            )
             print("i=", i)
             # print(cmd)
             result = run(
-                cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+                cmd,
+                capture_output=True,
+                universal_newlines=True,
+                shell=True,
+                check=False,
             )
             # print(result.returncode, result.stdout, result.stderr)
             res = result.returncode
@@ -158,8 +141,7 @@ class ScannerData:
         else:
             # fake scanimage message
             res = 0
-            scanimage_message = \
-    """device `pixma:00000_ABABAB' is a CANON CanoScan LiDE 400 multi-function peripheral"""
+            scanimage_message = """device `pixma:00000_ABABAB' is a CANON CanoScan LiDE 400 multi-function peripheral"""
 
         self.device = "NoScannerDetected"
         if res == 0:
@@ -176,7 +158,6 @@ class ScannerData:
             WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
 
         return self
-
 
     def WriteScannerConfig(self, file):
         # printScanner(scanner)
@@ -256,7 +237,7 @@ imagepathjp2000 = imagepath + "imagejp2000.jp2"
 
 
 def scanAcq(scanner: ScannerData, i_scan: int, date):
-    """ Lance le scanimage et convertit l'image en jp2000
+    """Lance le scanimage et convertit l'image en jp2000
 
     Args:
         scanner (ScannerData): l'objet Scanner en cours
@@ -275,11 +256,13 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     if scanner.device == "NoScannerDetected":
         option_device = ""
     else:
-        option_device = " --device=\"" + scanner.device + "\""
+        option_device = ' --device="' + scanner.device + '"'
     # On n'utilise pas le device pour l'instant, car sinon, il faut respecter le cablage...
     option_device = ""
     command = (
-        "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage" + option_device + " --mode="
+        "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage"
+        + option_device
+        + " --mode="
         + scanner.mode
         + " --resolution="
         + str(scanner.resolution)
@@ -395,8 +378,8 @@ def ScannerPreview(i_scan: int):
         + " | tee -a "
         + DISPLAY_FILE
         # TODO: Il faudrait faire la conversion en JPEG !!!!
-#        + " --format=jpeg >"
-#        + file
+        #        + " --format=jpeg >"
+        #        + file
     )
     WriteTimeLogfile("command:" + command)
     res = 1
@@ -427,14 +410,14 @@ def ScannerPreview(i_scan: int):
 def listConfigScanner():
     try:
         # de la forme 1-Scanner.json
-        listfile = [f for f in os.listdir(CONFIG_PATH) if re.match(r'[0-9]-Scanner.json', f)]
+        listfile = [
+            f for f in os.listdir(CONFIG_PATH) if re.match(r"[0-9]-Scanner.json", f)
+        ]
         listfile.sort(reverse=False)
         WriteTimeLogfile(listfile)
     except OSError:
         listfile = ["1-Scanner.json", "2-Scanner.json", "3-Scanner.json"]
     return listfile
-
-
 
 
 if __name__ == "__main__":

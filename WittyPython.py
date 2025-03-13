@@ -25,57 +25,77 @@ class WittyPi:
     Cette classe ne gère pas l'horloge RTC de la carte Witty Pi
     """
 
+    _instance = None  # Class variable to store the single instance
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(WittyPi, cls).__new__(cls)
+            # cls._load_config()
+        return cls._instance
+
     # pylint: disable=too-many-instance-attributes
-    def __init__(self):
+    @classmethod
+    def __init__(cls):
 
-        self.i2c_bus = SMBus(1)
-        self.i2c_address = WITTY_PI_3_I2C_ADDRESS
+        cls.i2c_bus = SMBus(1)
+        cls.i2c_address = WITTY_PI_3_I2C_ADDRESS
 
-        self.firmware_id = 0
-        self.input_voltage = 0.0
-        self.output_voltage = 0.0
-        self.output_current = 0.0
-        self.temperature = 0.0
-        self.power_mode = 0
-        self.firmware_revision = 0
+        cls.firmware_id = 0
+        cls.input_voltage = 0.0
+        cls.output_voltage = 0.0
+        cls.output_current = 0.0
+        cls.temperature = 0.0
+        cls.power_mode = 0
+        cls.firmware_revision = 0
 
-        self.get_firmware_id()
-        self.get_input_voltage()
-        self.get_output_voltage()
-        self.get_output_current()
-        self.get_temperature()
-        self.get_power_mode()
-        self.get_firmware_revision()
+        cls.get_firmware_id()
+        cls.get_input_voltage()
+        cls.get_output_voltage()
+        cls.get_output_current()
+        cls.get_temperature()
+        cls.get_power_mode()
+        cls.get_firmware_revision()
 
-    def get_firmware_id(self):
+    @classmethod
+    def get_firmware_id(cls):
 
-        self.firmware_id = self.read_register(0x00)
-        if self.firmware_id is None:
-            print(f"No Witty Pi board on address 0x{self.i2c_address:02X}")
-            self.i2c_address = WITTY_PI_4_I2C_ADDRESS
-        self.firmware_id = self.read_register(0x00)
-        if self.firmware_id is None:
+        cls.firmware_id = cls.read_register(0x00)
+        if cls.firmware_id is None:
+            print(f"No Witty Pi board on address 0x{cls.i2c_address:02X}")
+            cls.i2c_address = WITTY_PI_4_I2C_ADDRESS
+        cls.firmware_id = cls.read_register(0x00)
+        if cls.firmware_id is None:
             print("Aucune carte Witty Py trouvee.")
+        return cls.firmware_id
 
-    def get_input_voltage(self):
+    @classmethod
+    def get_input_voltage(cls):
 
-        self.input_voltage = self.read_register(0x01) + self.read_register(0x02) / 100
+        cls.input_voltage = cls.read_register(0x01) + cls.read_register(0x02) / 100
+        return cls.input_voltage
 
-    def get_output_voltage(self):
+    @classmethod
+    def get_output_voltage(cls):
 
-        self.output_voltage = self.read_register(0x03) + self.read_register(0x04) / 100
+        cls.output_voltage = cls.read_register(0x03) + cls.read_register(0x04) / 100
+        return cls.output_voltage
 
-    def get_output_current(self):
+    @classmethod
+    def get_output_current(cls):
 
-        self.output_current = self.read_register(0x05) + self.read_register(0x06) / 100
+        cls.output_current = cls.read_register(0x05) + cls.read_register(0x06) / 100
+        return cls.output_current
 
-    def get_power_mode(self):
+    @classmethod
+    def get_power_mode(cls):
 
-        self.power_mode = self.read_register(0x07)
+        cls.power_mode = cls.read_register(0x07)
+        return cls.power_mode
 
-    def get_temperature(self):
+    @classmethod
+    def get_temperature(cls):
 
-        data = self.read_register(50, 2)
+        data = cls.read_register(50, 2)
         # Step 1: Swap bytes
         data = (((data & 0xFF) << 8) | ((data & 0xFF00) >> 8)) >> 5
         # Step 2: Two's complement correction (if data >= 1024)
@@ -83,20 +103,24 @@ class WittyPi:
             data = (data & 0x3FF) - 1024  # Convert to negative if needed
         # Step 3: Scale by 0.125
         data = data * 0.125
-        self.temperature = data
+        cls.temperature = data
+        return cls.temperature
 
-    def get_firmware_revision(self):
+    @classmethod
+    def get_firmware_revision(cls):
 
-        self.firmware_revision = self.read_register(12)
+        cls.firmware_revision = cls.read_register(12)
+        return cls.firmware_revision
 
-    def read_register(self, register, len_=1):
+    @classmethod
+    def read_register(cls, register, len_=1):
 
         try:
 
             if len_ == 1:
-                data = self.i2c_bus.read_byte_data(self.i2c_address, register)
+                data = cls.i2c_bus.read_byte_data(cls.i2c_address, register)
             else:
-                data = self.i2c_bus.read_word_data(self.i2c_address, register)
+                data = cls.i2c_bus.read_word_data(cls.i2c_address, register)
 
         except OSError as e:
             print(f"Read error: {e}")
@@ -104,42 +128,49 @@ class WittyPi:
 
         return data
 
-    def __str__(self):
+    @classmethod
+    def is_WittyPi_3(cls):
+
+        return cls.i2c_address == WITTY_PI_3_I2C_ADDRESS
+
+    @classmethod
+    def is_WittyPi_4(cls):
+
+        return cls.i2c_address == WITTY_PI_4_I2C_ADDRESS
+
+    @classmethod
+    def __str__(cls):
 
         s = ("Witty Pi\n"
-        f"  Firmware ID: {self.firmware_id:02X}\n"
-        f"  Firmware revision: {self.firmware_revision}\n"
-        f"  Input voltage: {self.input_voltage:.3f}V\n"
-        f"  Output voltage: {self.output_voltage:.3f}V\n"
-        f"  Output current: {self.output_current:.3f}A\n"
+        f"  Firmware ID: {cls.firmware_id:02X}\n"
+        f"  Firmware revision: {cls.firmware_revision}\n"
+        f"  Input voltage: {cls.input_voltage:.3f}V\n"
+        f"  Output voltage: {cls.output_voltage:.3f}V\n"
+        f"  Output current: {cls.output_current:.3f}A\n"
         "  Power mode: "
-        + ("LDO regulator" if self.power_mode == 1 else "5V USB")
+        + ("LDO regulator" if cls.power_mode == 1 else "5V USB")
         + "\n"
-        f"  Temperature: {self.temperature:.1f}C")
+        f"  Temperature: {cls.temperature:.1f}C")
 
         return s
 
 def is_WittyPi_3():
 
-    witty_pi = WittyPi()
-    return witty_pi.i2c_address == WITTY_PI_3_I2C_ADDRESS
+    return WittyPi().is_WittyPi_3()
 
 def is_WittyPi_4():
 
-    witty_pi = WittyPi()
-    return witty_pi.i2c_address == WITTY_PI_4_I2C_ADDRESS
+    return WittyPi().is_WittyPi_4()
 
 
 def main():
 
-    witty_pi = WittyPi()
-    print(witty_pi)
+    print(WittyPi())
     print(f"Is WittyPi 3: {is_WittyPi_3()}")
     print(f"Is WittyPi 4: {is_WittyPi_4()}")
 
     for i in range(0, 5000):
-        witty_pi.get_output_current()
-        print(f"{i}:{witty_pi.output_current:.3f}", flush=True)
+        print(f"{i}:{WittyPi().get_output_current():.3f}", flush=True)
         sleep(1)
 
 

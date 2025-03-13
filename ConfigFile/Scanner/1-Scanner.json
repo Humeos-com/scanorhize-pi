@@ -1,18 +1,18 @@
 {
                 "ScannerName": "Scanner-1",
-                "mode": "Color",
-                "resolution": "300",
+                "mode": "COLOR",
+                "resolution": 300,
                 "LastImgTime": "",
                 "LastImgFile": "1.jpg",
                 "l": 0,
                 "t": 0,
                 "x": 216,
                 "y": 297,
-                "quality": 10,
+                "quality": 50,
                 "token": "G2IGG0eedSxemoWkMeZ9p4v_I1UCvKYXkV5ObWc8ErYLNXiiPM_g5xE3qNsFMW5wLhq4YK1SmR4b19Vn66qLyA",
                 "UseServer": 0,
-                "device": "pixma:04A91912_4CA38D",
-                "Campaign": "CampaignName",
-                "StartDate": "2025-03-06T00:00:00Z",
-                "PeriodeS": 3600
+                "device": "pixma:00000_ABABAB",
+                "Campaign": "Config2",
+                "StartDate": "2025-03-10T08:30:00Z",
+                "PeriodeS": 600
 }

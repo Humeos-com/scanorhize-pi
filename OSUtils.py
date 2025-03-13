@@ -1,5 +1,6 @@
 """
 Permet de gérer les environnements matériels
+Singleton pour la configuration de l'application
 """
 
 import os
