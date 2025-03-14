@@ -54,6 +54,7 @@ IP = GetIP()
 WriteTimeLogfile(IP)
 listScannerconfigs = listConfigScanner()
 
+
 # This function does not allow caching of images from browser
 @app.after_request
 def add_header(response):
@@ -142,7 +143,9 @@ def ScannerPage(scan_num_str: str):
     filename = str(i_scan + 1) + ".jpg"
     print(filename)
     # return render_template("image.html", form=form, imagename=filename)
-    return render_template("image.html", **Scannerparam, scan_num_str=scan_num_str, imagename=filename)
+    return render_template(
+        "image.html", **Scannerparam, scan_num_str=scan_num_str, imagename=filename
+    )
 
 
 @app.route("/Scanner/<actionName>/<scan_num_str>")
@@ -169,7 +172,6 @@ def action(actionName: str, scan_num_str: str):
 
     if actionName == "SendConfig":
         SendConfigToServer(Scanner)
-
 
     return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
 

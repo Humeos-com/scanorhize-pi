@@ -133,6 +133,7 @@ def SetNextStartDate(date):  # date en UTC!!
     result = WriteWittyFunction("set_startup_time", arg)
     return result
 
+
 def setNextShutdownDate(date: str):
     """_summary_
 
@@ -148,7 +149,6 @@ def setNextShutdownDate(date: str):
     if not is_raspberry_pi():
         return 0
     return WriteWittyFunction("set_shutdown_time", datew)
-
 
 
 def doShutdown():

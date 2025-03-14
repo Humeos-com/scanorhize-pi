@@ -66,11 +66,11 @@ class ScannerData:
     def printScanner(self):
         try:
             data = (
-            f"{self.ScannerName} {self.mode} {self.resolution} "
-            f"{self.LastImgTime} {self.LastImgFile} {self.ZoneAcq.l} "
-            f"{self.ZoneAcq.t} {self.ZoneAcq.x} {self.ZoneAcq.y} "
-            f"{self.quality} {self.device} {self.UseServer} {self.Campaign} "
-            f"{self.StartDate} {self.PeriodeS}"
+                f"{self.ScannerName} {self.mode} {self.resolution} "
+                f"{self.LastImgTime} {self.LastImgFile} {self.ZoneAcq.l} "
+                f"{self.ZoneAcq.t} {self.ZoneAcq.x} {self.ZoneAcq.y} "
+                f"{self.quality} {self.device} {self.UseServer} {self.Campaign} "
+                f"{self.StartDate} {self.PeriodeS}"
             )
             print(data)
             # WriteLogFile(data)

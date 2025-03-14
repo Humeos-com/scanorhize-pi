@@ -1,6 +1,7 @@
 """Interroge la carte Witty Pi pour obtenir des informations sur l'alimentation
 de la carte Raspberry Pi
 """
+
 from time import sleep
 from OSUtils import is_raspberry_pi
 
@@ -19,6 +20,7 @@ else:
 WITTY_PI_3_I2C_ADDRESS = 0x69
 WITTY_PI_4_I2C_ADDRESS = 0x8
 
+
 class WittyPi:
     """Classe pour la carte Witty Pi qui permet de gérer l'alimentation du Raspberry Pi
     via un circuit intégré I2C
@@ -35,7 +37,6 @@ class WittyPi:
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self):
-
         """Initialize the instance if not already initialized."""
         if not hasattr(self, "initialized"):  # Prevent re-initialization
             self.i2c_bus = SMBus(1)
@@ -141,21 +142,24 @@ class WittyPi:
             else:
                 s = "  Pas de carte WittyPi !\n"
         s += (
-        f"  Firmware ID: {self.firmware_id:02X}\n"
-        f"  Firmware revision: {self.firmware_revision}\n"
-        f"  Input voltage: {self.input_voltage:.3f}V\n"
-        f"  Output voltage: {self.output_voltage:.3f}V\n"
-        f"  Output current: {self.output_current:.3f}A\n"
-        "  Power mode: "
-        + ("LDO regulator" if self.power_mode == 1 else "5V USB")
-        + "\n"
-        f"  Temperature: {self.temperature:.1f}C")
+            f"  Firmware ID: {self.firmware_id:02X}\n"
+            f"  Firmware revision: {self.firmware_revision}\n"
+            f"  Input voltage: {self.input_voltage:.3f}V\n"
+            f"  Output voltage: {self.output_voltage:.3f}V\n"
+            f"  Output current: {self.output_current:.3f}A\n"
+            "  Power mode: "
+            + ("LDO regulator" if self.power_mode == 1 else "5V USB")
+            + "\n"
+            f"  Temperature: {self.temperature:.1f}C"
+        )
 
         return s
+
 
 def is_WittyPi_3():
 
     return WittyPi().is_WittyPi_3()
+
 
 def is_WittyPi_4():
 

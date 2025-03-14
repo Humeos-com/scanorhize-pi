@@ -71,6 +71,7 @@ def CalculNextStartDate(StartDate, Period, CurrentDate):
         NextDate = DEFAULT_DATE_TIME
     return NextDate
 
+
 def ConvertDateToWitty(date: str):
     """
     Convert date from JAVA to WittyPy format
@@ -87,6 +88,7 @@ def ConvertDateToWitty(date: str):
     except ValueError:
         date = "01 06 25 00"
     return date
+
 
 if __name__ == "__main__":
     local_tz = time.tzname
