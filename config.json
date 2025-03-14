@@ -1,4 +1,4 @@
 {
-    "environment": "DEV",
+    "environment": "PROD",
     "log_level": "WARNING"
 }
