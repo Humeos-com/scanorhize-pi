@@ -1,6 +1,6 @@
 """
-Permet de gérer les environnements matériels
-Singleton pour la configuration de l'application
+Permet de gérer l'environnement matériel OS, cartes, etc.
+Utilise le pattern Singleton pour stocker la configuration
 """
 
 import os

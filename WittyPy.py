@@ -1,5 +1,7 @@
 """
-Gestionnaire du scheduleur RTC/alimentation Witty Pi
+Gestionnaire du scheduleur RTC de la carte WittyPi.
+On utilise les commandes Shell fournies par WittyPi.
+Ca fonctionne quelque soit la version de la carte WittyPi.
 """
 
 from subprocess import run
@@ -28,42 +30,6 @@ def WriteWittyFunction(function, arg):
     result = run(["sudo", "bash", "-c", source], capture_output=True, check=False)
     print(result.stdout)
     return result.stdout
-
-
-def ReadTemp():
-    tempstringbyte = ReadWittyFunction("get_temperature")
-    if not is_raspberry_pi():
-        return 0.0
-    tempstring = str(tempstringbyte)
-    res1 = tempstring.split("'")
-    res2 = res1[1].split("\\")
-    temp = round(float(res2[0]), 1)
-    print(temp)
-    return temp
-
-
-def ReadCurrent():
-    tempstringbyte = ReadWittyFunction("get_output_current")
-    if not is_raspberry_pi():
-        return 0.0
-    tempstring = str(tempstringbyte)
-    res1 = tempstring.split("'")
-    res2 = res1[1].split("\\")
-    current = float(res2[0])
-    print(current)
-    return current
-
-
-def ReadVoltage():
-    tempstringbyte = ReadWittyFunction("get_output_voltage")
-    if not is_raspberry_pi():
-        return 0.0
-    tempstring = str(tempstringbyte)
-    res1 = tempstring.split("'")
-    res2 = res1[1].split("\\")
-    volt = float(res2[0])
-    print(volt)
-    return volt
 
 
 def ReadNextStartDate():

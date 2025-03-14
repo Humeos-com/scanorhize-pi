@@ -5,6 +5,8 @@ Archive les fichiers au format JP2
 from subprocess import run
 import os
 from Miscellaneous import WriteTimeLogfile
+from OSUtils import is_raspberry_pi
+
 
 FolderImage = "/home/pi/Documents"
 
@@ -78,7 +80,7 @@ def CopyImageToUSB(Scanner, FolderImage_):
 
 def CreateTempImage(Scanner):
     try:
-        imagepath = "/home/pi/Scanorhize/static/"
+        imagepath = "static/"
         Date = (Scanner.LastImgTime).replace(":", "-")
         Imagejp2000Path = Scanner.LastImgFile
         jp2Path = imagepath + Date + ".jp2"
@@ -95,7 +97,7 @@ def CreateTempImage(Scanner):
         )
         return jp2Path
     except OSError:
-        jp2Path = "/home/pi/Scanorhize/static/error.jp2"
+        jp2Path = "static/error.jp2"
         return jp2Path
 
 
@@ -113,6 +115,9 @@ def RemoveTempImage(Image):
 def USBSpace():
     USBfolder = "/media/pi/"
     BackupFolder = "/home/pi/Documents"
+    if not is_raspberry_pi():
+        return 4096, 98, USBfolder
+
     cmd = "df -hm"
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False

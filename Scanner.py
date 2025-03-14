@@ -377,7 +377,7 @@ def ScannerPreview(i_scan: int):
         + imagepathtiff
         + " | tee -a "
         + DISPLAY_FILE
-        # TODO: Il faudrait faire la conversion en JPEG !!!!
+        # ######: Il faudrait faire la conversion en JPEG !!!!
         #        + " --format=jpeg >"
         #        + file
     )

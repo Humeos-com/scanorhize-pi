@@ -19,8 +19,8 @@ from Miscellaneous import (
 )
 from OSUtils import is_dev
 from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
-from I2C import ReadBatVoltCap
-from WittyPy import SetNextStartDate, ReadTemp, doShutdown, setNextShutdownDate
+from WittyPython import ReadBatVoltCap, ReadTemp
+from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
 from DateUtils import CalculNextStartDate, DateToSeconds, SecondsToDate, GetCurrentDate
 
 DateStart = GetCurrentDate()
@@ -29,8 +29,6 @@ WriteTimeLogfile("StartProcess")
 res = InitGPIO()
 if res != 0:
     WriteTimeLogfile("InitGPIOError")
-Bat = ReadBatVoltCap()
-Temperature = ReadTemp()
 
 # init
 Scanner = ScannerData()
@@ -44,6 +42,18 @@ internet = 1
 DatesSaved = ReadStartDateConfig()
 NextStartDate = DatesSaved[0]
 NextStartseconds = DatesSaved[1]
+
+# Paramètres à envoyer au début du process
+Bat = ReadBatVoltCap()
+Temperature = ReadTemp()
+USB = USBSpace()
+WriteTimeLogfile(
+                f"Bat: {Bat[1]}  "
+                f"USB: {USB[0]}  "
+                f"Temp: {Temperature}"
+            )
+SendParameters(Scanner, Bat[1], USB[0], Temperature)
+
 
 for CurrentScanner in listScannerconfigs:
     Scanner.ReadScannerConfig(CurrentScanner)
@@ -84,16 +94,6 @@ for CurrentScanner in listScannerconfigs:
             else:
                 WriteTimeLogfile("Error in copy to USB")
 
-            USB = USBSpace()
-            WriteTimeLogfile(
-                "Bat :"
-                + str(Bat[1])
-                + "USB :"
-                + str(USB[0])
-                + "Temp :"
-                + str(Temperature)
-            )
-            SendParameters(Scanner, Bat[1], USB[0], Temperature)
             WriteTimeLogfile("StartPostImage")
             PostError = PostImageToServer(Scanner)
             if PostError != 0:

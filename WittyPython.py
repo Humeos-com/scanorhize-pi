@@ -26,6 +26,7 @@ class WittyPi:
     via un circuit intégré I2C
     Cette classe ne gère pas l'horloge RTC de la carte Witty Pi
     """
+    # pylint: disable=too-many-instance-attributes
 
     _instance = None  # Class variable to store the single instance
 
@@ -35,13 +36,11 @@ class WittyPi:
             cls._instance = super(WittyPi, cls).__new__(cls)
         return cls._instance
 
-    # pylint: disable=too-many-instance-attributes
     def __init__(self):
         """Initialize the instance if not already initialized."""
         if not hasattr(self, "initialized"):  # Prevent re-initialization
             self.i2c_bus = SMBus(1)
             self.i2c_address = WITTY_PI_3_I2C_ADDRESS
-
             self.firmware_id = 0
             self.input_voltage = 0.0
             self.output_voltage = 0.0
@@ -100,8 +99,7 @@ class WittyPi:
         if data >= 0x400:
             data = (data & 0x3FF) - 1024  # Convert to negative if needed
         # Step 3: Scale by 0.125
-        data = data * 0.125
-        self.temperature = data
+        self.temperature = data * 0.125
         return self.temperature
 
     def get_firmware_revision(self):
@@ -147,9 +145,7 @@ class WittyPi:
             f"  Input voltage: {self.input_voltage:.3f}V\n"
             f"  Output voltage: {self.output_voltage:.3f}V\n"
             f"  Output current: {self.output_current:.3f}A\n"
-            "  Power mode: "
-            + ("LDO regulator" if self.power_mode == 1 else "5V USB")
-            + "\n"
+            f"  Power mode: {'LDO regulator' if self.power_mode == 1 else '5V USB'}\n"
             f"  Temperature: {self.temperature:.1f}C"
         )
 
@@ -165,10 +161,21 @@ def is_WittyPi_4():
 
     return WittyPi().is_WittyPi_4()
 
+def ReadBatVoltCap():
+
+    Volt = WittyPi().get_input_voltage()
+    Cap = round((Volt - 2.7) / 1.49 * 100, 2)
+    return (Volt, Cap)
+
+def ReadTemp():
+
+    return WittyPi().get_temperature()
 
 def main():
 
     print(WittyPi())
+    print(ReadBatVoltCap())
+    print(ReadTemp())
 
     for i in range(0, 5000):
         print(f"{i}:{WittyPi().get_output_current():.3f}", flush=True)
