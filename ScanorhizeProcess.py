@@ -132,7 +132,7 @@ if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
 SetNextStartDate(nextStartDateValue)
 
 if is_dev():
-    print("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
+    WriteTimeLogfile("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
     sys.exit(0)
 
 # CopyLog()
