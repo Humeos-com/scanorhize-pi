@@ -53,8 +53,10 @@ else:
 # pins BCM
 Ch1Pin = 19  # Scanner1
 Ch2Pin = 13  # Scanner2
-Ch3Pin = 6  # Scanner3
-Ch4Pin = 5  # Clé 4G
+# Attention pour ces 2 pins, il faut supprimer les jumpers jaunes
+# et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
+Ch3Pin = 22  # Scanner3
+Ch4Pin = 27  # Clé 4G
 PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
 
