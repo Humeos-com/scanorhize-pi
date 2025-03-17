@@ -62,7 +62,7 @@ PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
 def getChPin(i_scan: int):
     if 0 <= i_scan < 4:
-        print(f"getChPin: {i_scan} => {PinArray[i_scan]}")
+        # print(f"getChPin: {i_scan} => {PinArray[i_scan]}")
         return PinArray[i_scan]
 
     print(f"La valeur passee doit être comprise entre 0 et 4, ici: {i_scan}")
@@ -220,11 +220,11 @@ def ReadGPIOConfig():
     return state_
 
 
-def WriteStartDateConfig(NextStartDate, NextStartseconds):
+def WriteStartDateConfig(LastStartDate, NextStartseconds):
     data = {
-        "NextStartDate1": NextStartDate[0],
-        "NextStartDate2": NextStartDate[1],
-        "NextStartDate3": NextStartDate[2],
+        "LastStartDate1": LastStartDate[0],
+        "LastStartDate2": LastStartDate[1],
+        "LastStartDate3": LastStartDate[2],
         "NextTime1": NextStartseconds[0],
         "NextTime2": NextStartseconds[1],
         "NextTime3": NextStartseconds[2],
@@ -242,10 +242,10 @@ def WriteStartDateConfig(NextStartDate, NextStartseconds):
 
 def ReadStartDateConfig():
     NextStartseconds = [0, 0, 0]
-    NextStartDate = [
-        "2021-01-14T11:05:00Z",
-        "2021-01-15T11:05:00Z",
-        "2021-01-16T11:05:00Z",
+    LastStartDate = [
+        "2025-01-01T00:05:00Z",
+        "2025-01-01T00:05:00Z",
+        "2025-01-01T00:05:00Z",
     ]
     try:
         with open(NEXT_DATE_FILE, "r", encoding="utf-8") as openfile:
@@ -254,14 +254,14 @@ def ReadStartDateConfig():
         WriteTimeLogfile("Error reading file: " + NEXT_DATE_FILE)
 
     else:
-        NextStartDate[0] = data["NextStartDate1"]
-        NextStartDate[1] = data["NextStartDate2"]
-        NextStartDate[2] = data["NextStartDate3"]
+        LastStartDate[0] = data["LastStartDate1"]
+        LastStartDate[1] = data["LastStartDate2"]
+        LastStartDate[2] = data["LastStartDate3"]
         NextStartseconds[0] = data["NextTime1"]
         NextStartseconds[1] = data["NextTime2"]
         NextStartseconds[2] = data["NextTime3"]
 
-    return NextStartDate, NextStartseconds
+    return LastStartDate, NextStartseconds
 
 
 def CopyLog():
