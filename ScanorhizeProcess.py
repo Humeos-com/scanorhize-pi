@@ -33,14 +33,14 @@ if res != 0:
 # init
 Scanner = ScannerData()
 NextStartseconds = [0, 0, 0]
-NextStartDate = [" ", " ", " "]
+LastStartDate = [" ", " ", " "]
 
 listScannerconfigs = listConfigScanner()
 i_scan = 0
 scanning = 0
 internet = 1
 DatesSaved = ReadStartDateConfig()
-NextStartDate = DatesSaved[0]
+LastStartDate = DatesSaved[0]
 NextStartseconds = DatesSaved[1]
 
 # Paramètres à envoyer au début du process
@@ -112,14 +112,14 @@ for CurrentScanner in listScannerconfigs:
     nextDate = CalculNextStartDate(Scanner.StartDate, Scanner.PeriodeS, DateStart)
     nextTime = DateToSeconds(nextDate)
     NextStartseconds[i_scan] = nextTime
-    NextStartDate[i_scan] = nextDate
+    LastStartDate[i_scan] = nextDate
     WriteTimeLogfile("Next start date: " + nextDate)
     i_scan = i_scan + 1
 
-WriteStartDateConfig(NextStartDate, NextStartseconds)
+WriteStartDateConfig(LastStartDate, NextStartseconds)
 nextStartSecs = min(NextStartseconds)
 index_min = np.argmin(NextStartseconds)
-nextStartDateValue = NextStartDate[index_min]
+nextStartDateValue = LastStartDate[index_min]
 WriteTimeLogfile("Next start at: " + nextStartDateValue)
 
 if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
