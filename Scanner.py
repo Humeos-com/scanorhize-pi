@@ -16,7 +16,9 @@ X_MAX = 216
 Y_MAX = 297
 TIME_USB_READY = 40
 if is_dev():
-    TIME_USB_READY = 15
+    TIME_USB_READY = 10
+if not is_raspberry_pi():
+    TIME_USB_READY = 0
 
 CONFIG_PATH = "ConfigFile/Scanner/"
 DISPLAY_FILE = "Log/Display.txt"
@@ -226,7 +228,6 @@ def updateScanParameters(scanner: ScannerData):
     }
     return Scannerparam
 
-
 ScanNumber = 3
 imagetiff = "imagescan.tiff"
 # imagepathtiff = "/home/pi/Scanorhize/static/" + imagetiff
@@ -248,6 +249,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         _type_: _description_
     """
 
+    WriteTimeLogfile(f"scanAcq: on allume le port USB: {i_scan + 1}")
     error = TurnUsbOn(i_scan, TIME_USB_READY)
     if error != 0:
         scanner.error = 1
@@ -279,7 +281,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         + " | tee -a "
         + DISPLAY_FILE
     )
-    print(command)
+    WriteTimeLogfile("scanAcq: " + command)
     res = 1
     i = 0
     while res != 0 and i < 2:
@@ -311,9 +313,9 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
             res = 12
         scanner.error = res
         i += 1
-        if res != 0:
-            TurnUsbOff(i_scan)
-            TurnUsbOn(i_scan, TIME_USB_READY)
+        # if res != 0:
+        #    TurnUsbOff(i_scan)
+        #    TurnUsbOn(i_scan, TIME_USB_READY)
 
     TurnUsbOff(i_scan)
     if scanner.error > 0:
@@ -333,7 +335,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         + DISPLAY_FILE
     )
     # print(commandconv)
-    WriteTimeLogfile("Start conversion jp2")
+    WriteTimeLogfile("scanAcq: Start conversion jp2: " + commandconv)
     result = run(
         commandconv,
         capture_output=True,
@@ -355,7 +357,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     scanner.LastImgTime = date
     # print("image time: ",scanner.LastImgTime)
     scanner.LastImgFile = imagepathjp2000
-    # WriteTimeLogfile("EndscanAcqTime")
+    WriteTimeLogfile("scanAcq: end")
     return scanner
 
 

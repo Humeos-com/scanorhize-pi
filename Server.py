@@ -12,7 +12,7 @@ from OSUtils import get_os
 SCANORIZE_SERVER = "scan.arditi.net"
 CONFIG_PATH = "ConfigFile/Scanner/"
 CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
-MAX_TIME = 200  # Temps max pour faire le POST
+MAX_TIME = 300  # Temps max pour faire le POST
 
 
 class ServerData:
@@ -129,21 +129,22 @@ def PostImageToServer(Scanner):
 -H "Content-Type: multipart/form-data" \
 -F "date={Date}" -F "dpi={Resolution}" \
 -F "file=@{ImagePath}"'
-    print(cmdPost)
+    WriteTimeLogfile(cmdPost)
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     # print(result.returncode, result.stdout, result.stderr)
     if result.returncode != 0:
         WriteTimeLogfile(
-            "Post return: "
-            + str(result.returncode)
-            + "stdout :"
-            + str(result.stdout)
-            + " error: "
-            + str(result.stderr)
+            "Post: return: " + str(result.returncode) + " error: " + result.stderr
         )
         error = 1
+    else:
+        results = json.loads(result.stdout)
+        error = 0
+        if results["status"] != 200:   # 200 = OK
+            WriteTimeLogfile(f"Post error: {results['status']}")
+            error = 1
     RemoveTempImage(ImagePath)
     return error
 
@@ -155,15 +156,19 @@ def SendParameters(Scanner, battery, diskspace, temperature):
 -X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
 battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
 -H "accept: */*" -H "scanner: {token}"'
-    print(cmdPUT)
+    WriteTimeLogfile(cmdPUT)
     result = run(
         cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     # print(result.returncode, result.stdout, result.stderr)
     if result.returncode != 0:
         WriteTimeLogfile(
-            "Put return: " + str(result.returncode) + " error: " + result.stderr
+            "Put: return: " + str(result.returncode) + " error: " + result.stderr
         )
+    else:
+        results = json.loads(result.stdout)
+        if results["status"] != 200:   # 200 = OK
+            WriteTimeLogfile(f"Put error: {results['status']}")
     return 0
 
 
@@ -205,7 +210,7 @@ def pingAPI(address):
         response = os.system("ping -c 1 " + address)
         # print("address: ",address,"response : ",response)
     except OSError as e:
-        print(f"Ping Error: {e}")
+        WriteTimeLogfile(f"Ping Error: {e}")
         response = 1
     if response == 0:
         print("Ping OK")
