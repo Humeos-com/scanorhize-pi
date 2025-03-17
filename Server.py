@@ -133,18 +133,22 @@ def PostImageToServer(Scanner):
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    # print(result.returncode, result.stdout, result.stderr)
+    # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
     if result.returncode != 0:
         WriteTimeLogfile(
-            "Post: return: " + str(result.returncode) + " error: " + result.stderr
+            "PostImageToServer: return: " + str(result.returncode) + " error: " + result.stderr
         )
         error = 1
     else:
-        results = json.loads(result.stdout)
         error = 0
-        if results["status"] != 200:   # 200 = OK
-            WriteTimeLogfile(f"Post error: {results['status']}")
-            error = 1
+        try:
+            results = json.loads(result.stdout)
+            if results["status"] != 200:   # 200 = OK
+                WriteTimeLogfile(f"Post error: {results['status']}")
+                error = 1
+        except:
+            WriteTimeLogfile("PostImageToServer: OK")
+
     RemoveTempImage(ImagePath)
     return error
 
