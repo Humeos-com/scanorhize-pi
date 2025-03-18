@@ -136,18 +136,23 @@ def PostImageToServer(Scanner):
     # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
     if result.returncode != 0:
         WriteTimeLogfile(
-            "PostImageToServer: return: " + str(result.returncode) + " error: " + result.stderr
+            "PostImageToServer: return: "
+            + str(result.returncode)
+            + " error: "
+            + result.stderr
         )
         error = 1
     else:
         error = 0
         try:
             results = json.loads(result.stdout)
-            if results["status"] != 200:   # 200 = OK
+            if results["status"] != 200:  # 200 = OK
                 WriteTimeLogfile(f"Post error: {results['status']}")
                 error = 1
-        except:
-            WriteTimeLogfile("PostImageToServer: OK")
+        except AttributeError as e:
+            WriteTimeLogfile("Error reading json, error: " + str(e))
+
+        WriteTimeLogfile("PostImageToServer: OK")
 
     RemoveTempImage(ImagePath)
     return error
@@ -171,7 +176,7 @@ battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
         )
     else:
         results = json.loads(result.stdout)
-        if results["status"] != 200:   # 200 = OK
+        if results["status"] != 200:  # 200 = OK
             WriteTimeLogfile(f"Put error: {results['status']}")
     return 0
 

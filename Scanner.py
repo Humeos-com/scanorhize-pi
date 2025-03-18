@@ -81,31 +81,37 @@ class ScannerData:
         return 0
 
     def ReadScannerConfig(self, file=""):
-        fullpath = CONFIG_PATH + file
+        fullpath = os.path.join(CONFIG_PATH, file)
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
-                data = json.load(openfile)
-        except ValueError:
-            WriteTimeLogfile("No file: " + fullpath)
+                data = json.load(openfile)  # Load JSON into a dictionary
+            # Convert ZoneAcq dict back to ZoneRectangle object
+            if 'ZoneAcq' in data:
+                zone_data = data['ZoneAcq']
+                data['ZoneAcq'] = ZoneRectangle(
+                    zone_data['l'],
+                    zone_data['t'],
+                    zone_data['x'],
+                    zone_data['y']
+                )
+        except (FileNotFoundError, ValueError):
+            WriteTimeLogfile(f"No file: {fullpath}")
             self.WriteScannerConfig(file)
         else:
-            # print(data)
-            self.ScannerName = data["ScannerName"]
-            self.mode = data["mode"]
-            self.resolution = data["resolution"]
-            self.LastImgTime = data["LastImgTime"]
-            self.LastImgFile = data["LastImgFile"]
-            self.ZoneAcq = ZoneRectangle(data["l"], data["t"], data["x"], data["y"])
-            self.quality = data["quality"]
-            self.token = data["token"]
-            self.UseServer = data["UseServer"]
-            self.device = data["device"]
-            self.Campaign = data["Campaign"]
-            self.StartDate = data["StartDate"]
-            self.PeriodeS = data["PeriodeS"]
+            self.__dict__.update(data)
         finally:
             self.printScanner()
         return self
+
+    def WriteScannerConfig(self, file):
+        fullpath = os.path.join(CONFIG_PATH, file)
+        json_data = self.json()
+        with open(fullpath, "w", encoding="utf-8") as outfile:
+            outfile.write(json_data)
+        return 0
+
+    def json(self):
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, ensure_ascii=False, indent=4)
 
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
@@ -161,45 +167,8 @@ class ScannerData:
 
         return self
 
-    def WriteScannerConfig(self, file):
-        # printScanner(scanner)
-        data = {
-            "ScannerName": self.ScannerName,
-            "mode": self.mode,
-            "resolution": self.resolution,
-            "LastImgTime": self.LastImgTime,
-            "LastImgFile": self.LastImgFile,
-            "l": self.ZoneAcq.l,
-            "t": self.ZoneAcq.t,
-            "x": self.ZoneAcq.x,
-            "y": self.ZoneAcq.y,
-            "quality": self.quality,
-            "token": self.token,
-            "UseServer": self.UseServer,
-            "device": self.device,
-            "Campaign": self.Campaign,
-            "StartDate": self.StartDate,
-            "PeriodeS": self.PeriodeS,
-        }
-        try:
-            # printScanner(scanner)
-            json_object = json.dumps(data, indent=len(data))
-            fullpath = CONFIG_PATH + file
-            # print(fullpath)
-            with open(fullpath, "w", encoding="utf-8") as outfile:
-                outfile.write(json_object)
-        except ValueError as e:
-            print(f"Error: {e}")
-            return 1
-        return 0
-
-    def json(self):
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
-
-
 # Initialisation de l'objet Scanner
 Scanner = ScannerData()
-
 
 def updateScanParameters(scanner: ScannerData):
     Scannerparam = {
@@ -227,6 +196,7 @@ def updateScanParameters(scanner: ScannerData):
         "PeriodeS": scanner.PeriodeS,
     }
     return Scannerparam
+
 
 ScanNumber = 3
 imagetiff = "imagescan.tiff"
@@ -287,35 +257,36 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     while res != 0 and i < 2:
         # print("i=",i)
         WriteTimeLogfile("StartScan :" + str(i))
-        result = run(
-            command,
-            capture_output=True,
-            universal_newlines=True,
-            shell=True,
-            check=False,
-        )
-        WriteTimeLogfile(
-            "code: "
-            + str(result.returncode)
-            + "stdout :"
-            + str(result.stdout)
-            + "stderr :"
-            + str(result.stderr)
-        )
-        res = result.returncode
-        if len(result.stderr) > 2:
-            res = 12
-        if (
-            "no SANE" in result.stderr
-            or "Error" in result.stderr
-            or "failed" in result.stderr
-        ):
-            res = 12
-        scanner.error = res
-        i += 1
-        # if res != 0:
-        #    TurnUsbOff(i_scan)
-        #    TurnUsbOn(i_scan, TIME_USB_READY)
+        if is_raspberry_pi():
+            result = run(
+                command,
+                capture_output=True,
+                universal_newlines=True,
+                shell=True,
+                check=False,
+            )
+            WriteTimeLogfile(
+                "code: "
+                + str(result.returncode)
+                + "stdout :"
+                + str(result.stdout)
+                + "stderr :"
+                + str(result.stderr)
+            )
+            res = result.returncode
+            if len(result.stderr) > 2:
+                res = 12
+            if (
+                "no SANE" in result.stderr
+                or "Error" in result.stderr
+                or "failed" in result.stderr
+            ):
+                res = 12
+            scanner.error = res
+            i += 1
+            # if res != 0:
+            #    TurnUsbOff(i_scan)
+            #    TurnUsbOn(i_scan, TIME_USB_READY)
 
     TurnUsbOff(i_scan)
     if scanner.error > 0:
