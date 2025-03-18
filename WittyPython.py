@@ -26,6 +26,7 @@ class WittyPi:
     via un circuit intégré I2C
     Cette classe ne gère pas l'horloge RTC de la carte Witty Pi
     """
+
     # pylint: disable=too-many-instance-attributes
 
     _instance = None  # Class variable to store the single instance
@@ -161,15 +162,18 @@ def is_WittyPi_4():
 
     return WittyPi().is_WittyPi_4()
 
+
 def ReadBatVoltCap():
 
     Volt = WittyPi().get_input_voltage()
     Cap = round((Volt - 2.7) / 1.49 * 100, 2)
     return (Volt, Cap)
 
+
 def ReadTemp():
 
     return WittyPi().get_temperature()
+
 
 def main():
 
