@@ -33,50 +33,47 @@ if res != 0:
 # init
 Scanner = ScannerData()
 NextStartseconds = [0, 0, 0]
-LastStartDate = [" ", " ", " "]
+NextStartDate = [" ", " ", " "]
 
 listScannerconfigs = listConfigScanner()
-i_scan = 0
 scanning = 0
 internet = 1
-DatesSaved = ReadStartDateConfig()
-LastStartDate = DatesSaved[0]
-NextStartseconds = DatesSaved[1]
+NextStartDate = ReadStartDateConfig()
+i_scan = 0
+for dates in NextStartDate:
+    NextStartseconds[i_scan] = DateToSeconds(dates)
+    i_scan = i_scan + 1
 
 # Paramètres à envoyer au début du process
 Bat = ReadBatVoltCap()
 Temperature = ReadTemp()
 USB = USBSpace()
-WriteTimeLogfile(
-                f"Bat: {Bat[1]}  "
-                f"USB: {USB[0]}  "
-                f"Temp: {Temperature}"
-            )
+WriteTimeLogfile(f"Bat: {Bat[1]}  " f"USB: {USB[0]}  " f"Temp: {Temperature}")
 SendParameters(Scanner, Bat[1], USB[0], Temperature)
 
-
+i_scan = 0
 for CurrentScanner in listScannerconfigs:
     Scanner.ReadScannerConfig(CurrentScanner)
     data = "scanner file: " + CurrentScanner
     WriteTimeLogfile(data)
 
-    ScannerStartinS = DateToSeconds(Scanner.StartDate)
+    DateOriginS = DateToSeconds(Scanner.StartDate)
     CurrentDateinS = DateToSeconds(DateStart)
     data = (
         "Scanner : "
         + Scanner.StartDate
         + " "
-        + str(ScannerStartinS)
+        + str(DateOriginS)
         + " Current : "
         + DateStart
         + " "
         + str(CurrentDateinS)
         + " NextStart : "
-        + str(NextStartseconds[i_scan])
+        + str(NextStartDate[i_scan])
     )
     WriteTimeLogfile(data)
 
-    if CurrentDateinS > ScannerStartinS and CurrentDateinS >= NextStartseconds[i_scan]:
+    if CurrentDateinS > DateOriginS and CurrentDateinS >= NextStartseconds[i_scan]:
         WriteTimeLogfile("Turn scanner" + str(i_scan + 1) + " On")
 
         # get image and post image
@@ -109,17 +106,18 @@ for CurrentScanner in listScannerconfigs:
         Scanner = ReadConfigFromServer(Scanner)
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
-    nextDate = CalculNextStartDate(Scanner.StartDate, Scanner.PeriodeS, DateStart)
-    nextTime = DateToSeconds(nextDate)
-    NextStartseconds[i_scan] = nextTime
-    LastStartDate[i_scan] = nextDate
+    nextDate, nextDateS = CalculNextStartDate(
+        Scanner.StartDate, Scanner.PeriodeS, DateStart
+    )
+    NextStartDate[i_scan] = nextDate
     WriteTimeLogfile("Next start date: " + nextDate)
     i_scan = i_scan + 1
+# fin for
 
-WriteStartDateConfig(LastStartDate, NextStartseconds)
+WriteStartDateConfig(NextStartDate)
 nextStartSecs = min(NextStartseconds)
 index_min = np.argmin(NextStartseconds)
-nextStartDateValue = LastStartDate[index_min]
+nextStartDateValue = NextStartDate[index_min]
 WriteTimeLogfile("Next start at: " + nextStartDateValue)
 
 if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
@@ -127,7 +125,6 @@ if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
         Scanner.StartDate, (3600 * 24 * 30), DateStart
     )
     WriteTimeLogfile("No more battery")
-# fin for
 
 SetNextStartDate(nextStartDateValue)
 

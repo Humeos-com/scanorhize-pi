@@ -10,6 +10,7 @@ import time
 # Java Zoned Timestamp, with TZ=UTC
 JAVA_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DEFAULT_DATE_TIME = "2024-11-01T00:00:00Z"
+DEFAULT_SECONDS = 1742310000  # 2025-03-18T15:00:00Z
 
 
 def DateToSeconds(date: str):
@@ -21,13 +22,12 @@ def DateToSeconds(date: str):
     Returns:
         int: number of seconds
     """
-    print("date: ", date)
     try:
         date_obj = datetime.strptime(date, JAVA_FORMAT)
         date_obj = date_obj.replace(tzinfo=timezone.utc)
         seconds = int(date_obj.timestamp())
     except ValueError:
-        seconds = 1732116623  # 2024-11-20
+        seconds = DEFAULT_SECONDS
     return seconds
 
 
@@ -54,22 +54,33 @@ def GetCurrentDate():
     return Time
 
 
-def CalculNextStartDate(StartDate, Period, CurrentDate):
+def CalculNextStartDate(StartDate: str, Period: int, CurrentDate: str):
+    """Calcule la prochaine date de début de campagne au format JAVA UTC
+    Compte combien de fois la période s'est écoulée depuis la date de début
+    et retourne la prochaine date de début de campagne
+
+    Args:
+        StartDate (str): en JAVA UTC
+        Period (int): en secondes
+        CurrentDate (str): en JAVA UTC
+
+    Returns:
+        string: le prochaine date de début de campagne en JAVA UTC
+    """
     try:
         Periodi = int(Period)
         StartTime = DateToSeconds(StartDate)
         CurrentTime = DateToSeconds(CurrentDate)
         NextTime = StartTime
         now = GetCurrentDate()
-        nowTime = DateToSeconds(now) + 600
-        print(CurrentTime, nowTime)
+        nowTime = DateToSeconds(now) + 180
         while NextTime < CurrentTime or NextTime < nowTime:
             NextTime = NextTime + Periodi
-        print(NextTime)
         NextDate = SecondsToDate(NextTime)
     except ValueError:
         NextDate = DEFAULT_DATE_TIME
-    return NextDate
+        NextTime = DEFAULT_SECONDS
+    return NextDate, NextTime
 
 
 def ConvertDateToWitty(date: str):
@@ -99,3 +110,4 @@ if __name__ == "__main__":
     print(DateToSeconds(date_new))
     print(SecondsToDate(nb_seconds))
     print(ConvertDateToWitty(date_new))
+    print(CalculNextStartDate(DEFAULT_DATE_TIME, "3600", date_new))

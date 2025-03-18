@@ -153,10 +153,6 @@ def action(actionName: str, scan_num_str: str):
     i_scan = int(scan_num_str) - 1
     Scanner = ScannerData()
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
-    # global Campaign
-    # global i_scan
-    # Scannerparam = updateScanParameters(Scanner)
-    # filename = ""
     print("action : ", actionName)
     if actionName == "acqimg":
         InitGPIO()
@@ -168,7 +164,6 @@ def action(actionName: str, scan_num_str: str):
     if actionName == "GetConfig":
         Scanner = ReadConfigFromServer(Scanner)
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-    # Scannerparam = updateScanParameters(Scanner)
 
     if actionName == "SendConfig":
         SendConfigToServer(Scanner)

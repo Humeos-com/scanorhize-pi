@@ -32,6 +32,8 @@ NEXT_DATE_FILE = CONFIG_DIR + "/NextStartDate.json"
 DISPLAY_FILE = LOG_DIR + "/Display.txt"
 BATTERY_FILE = LOG_DIR + "/Batterie.txt"
 UHUBCTL = "/usr/sbin/uhubctl"
+USB_DIR = "/media/pi/Image"
+LOG_DIR = "Log"
 
 # Pour le mode config
 # Bouton poussoir config
@@ -220,14 +222,11 @@ def ReadGPIOConfig():
     return state_
 
 
-def WriteStartDateConfig(LastStartDate, NextStartseconds):
+def WriteStartDateConfig(NextStartDate):
     data = {
-        "LastStartDate1": LastStartDate[0],
-        "LastStartDate2": LastStartDate[1],
-        "LastStartDate3": LastStartDate[2],
-        "NextTime1": NextStartseconds[0],
-        "NextTime2": NextStartseconds[1],
-        "NextTime3": NextStartseconds[2],
+        "NextStartDate1": NextStartDate[0],
+        "NextStartDate2": NextStartDate[1],
+        "NextStartDate3": NextStartDate[2],
     }
     try:
         json_object = json.dumps(data, indent=len(data))
@@ -241,8 +240,7 @@ def WriteStartDateConfig(LastStartDate, NextStartseconds):
 
 
 def ReadStartDateConfig():
-    NextStartseconds = [0, 0, 0]
-    LastStartDate = [
+    NextStartDate = [
         "2025-01-01T00:05:00Z",
         "2025-01-01T00:05:00Z",
         "2025-01-01T00:05:00Z",
@@ -254,27 +252,24 @@ def ReadStartDateConfig():
         WriteTimeLogfile("Error reading file: " + NEXT_DATE_FILE)
 
     else:
-        LastStartDate[0] = data["LastStartDate1"]
-        LastStartDate[1] = data["LastStartDate2"]
-        LastStartDate[2] = data["LastStartDate3"]
-        NextStartseconds[0] = data["NextTime1"]
-        NextStartseconds[1] = data["NextTime2"]
-        NextStartseconds[2] = data["NextTime3"]
+        NextStartDate[0] = data["NextStartDate1"]
+        NextStartDate[1] = data["NextStartDate2"]
+        NextStartDate[2] = data["NextStartDate3"]
 
-    return LastStartDate, NextStartseconds
+    return NextStartDate
 
 
 def CopyLog():
     # copy log folder to USB
-    USBPath = "/media/pi/Image/"
-    LogPath = "Log"
-    cmd = "sudo cp -r " + LogPath + " " + USBPath
+    cmd = "sudo cp -r " + LOG_DIR + " " + USB_DIR
     # print(cmd)
     run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     # print(result.returncode,result.stdout,result.stderr)
 
 
 if __name__ == "__main__":
+    print("Test unitaire Miscellaneous")
+    print(f"{NEXT_DATE_FILE}: {ReadStartDateConfig()}")
     InitGPIO()
     ReadGPIOConfig()
     initDisplayFile()
