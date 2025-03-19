@@ -8,9 +8,10 @@ import json
 from Miscellaneous import WriteTimeLogfile
 from Campaign import RemoveTempImage, CreateTempImage
 from OSUtils import get_os
+from Scanner import ScannerData, listConfigScanner
 
 SCANORIZE_SERVER = "scan.arditi.net"
-CONFIG_PATH = "ConfigFile/Scanner/"
+CONFIG_PATH = "ConfigFile/Scanner"
 CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
 MAX_TIME = 300  # Temps max pour faire le POST
 
@@ -33,11 +34,11 @@ class ServerData:
         print("Ping: ", self.ping)
 
     def WriteConfig(self):
-        with open(CONFIG_PATH + "Server.json", "w", encoding="utf-8", indent="") as f:
+        with open(os.path.join(CONFIG_PATH, "Server.json"), "w", encoding="utf-8", indent="") as f:
             json.dump(self.__dict__, f)
 
     def ReadConfig(self):
-        with open(CONFIG_PATH + "Server.json", "r", encoding="utf-8") as f:
+        with open(os.path.join(CONFIG_PATH, "Server.json"), "r", encoding="utf-8") as f:
             data = json.load(f)
             if "apn" in data:
                 self.apn = data["apn"]
@@ -62,105 +63,122 @@ def updateServer(server: ServerData):
     return server_param
 
 
-def CopyFromJson(Scanner, data):
+def CopyFromJson(ScannerObj: ScannerData, data):
     if "name" in data:
-        Scanner.Campaign = data["name"]
+        ScannerObj.Campaign = data["name"]
     if "startDate" in data:
-        Scanner.StartDate = data["startDate"]
+        ScannerObj.StartDate = data["startDate"]
     if "periode" in data:
-        Scanner.PeriodeS = data["periode"]
+        ScannerObj.PeriodeS = data["periode"]
     if "mode" in data:
-        Scanner.mode = data["mode"]
+        ScannerObj.mode = data["mode"]
     if "t" in data:
-        Scanner.ZoneAcq.t = data["t"]
+        ScannerObj.ZoneAcq.t = data["t"]
     if "l" in data:
-        Scanner.ZoneAcq.l = data["l"]
+        ScannerObj.ZoneAcq.l = data["l"]
     if "x" in data:
-        Scanner.ZoneAcq.x = data["x"]
+        ScannerObj.ZoneAcq.x = data["x"]
     if "y" in data:
-        Scanner.ZoneAcq.y = data["y"]
+        ScannerObj.ZoneAcq.y = data["y"]
     if "resolution" in data:
-        Scanner.resolution = data["resolution"]
+        ScannerObj.resolution = data["resolution"]
     if "quality" in data:
-        Scanner.quality = data["quality"]
-    return Scanner
+        ScannerObj.quality = data["quality"]
+    return ScannerObj
 
 
-def ReadConfigFromServer(Scanner):
+def ReadConfigFromServer(ScannerObj: ScannerData):
     cmdRead = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X GET "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
--H "accept: application/json" -H "scanner:{Scanner.token}"'
+-H "accept: application/json" -H "scanner:{ScannerObj.token}"'
     print(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     print(result.returncode, result.stdout, result.stderr)
-    if (result.returncode) == 0:
-        try:
-            data = json.loads(result.stdout)
-            WriteTimeLogfile("Config server: " + result.stdout)
-            CopyFromJson(Scanner, data)
-            WriteTimeLogfile("json recu : " + str(data))
-        except AttributeError as e:
-            WriteTimeLogfile("Error reading json, error: " + str(e))
+
+    if result.returncode != 0:
+        WriteTimeLogfile(f"ReadConfigFromServer: return: {result.returncode} error: {result.stderr}")
+        error = 1
     else:
-        WriteTimeLogfile("Config server error: " + result.stderr)
-    return Scanner
+        try:
+            if result.stdout.strip():  # Check if stdout is not empty
+                results = json.loads(result.stdout)
+                CopyFromJson(ScannerObj, results)
+                error = 0
+            else:
+                # reponse vide
+                WriteTimeLogfile("ReadConfigFromServer: aucune donnée reçue")
+                error = 1
+        except json.JSONDecodeError as e:
+            WriteTimeLogfile(f"JSON decode error: {str(e)}")
+            error = 1
+        except AttributeError as e:
+            WriteTimeLogfile(f"Error reading json, error: {str(e)}")
+            error = 1
+
+        if not error:
+            WriteTimeLogfile("ReadConfigFromServer: OK")
+    return ScannerObj
 
 
-def SendConfigToServer(Scanner):
+def SendConfigToServer(ScannerObj: ScannerData):
     cmdPost = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X POST "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
--H "accept: application/json" -H "scanner:{Scanner.token}" \
+-H "accept: application/json" -H "scanner:{ScannerObj.token}" \
 -H "Content-Type: application/json" \
--d {Scanner.json()}'
+-d {ScannerObj.json()}'
     WriteTimeLogfile(cmdPost)
 
 
-def PostImageToServer(Scanner):
+def PostImageToServer(ScannerObj: ScannerData):
     error = 0
-    Date = Scanner.LastImgTime
-    Resolution = Scanner.resolution
-    token = Scanner.token
-    ImagePath = CreateTempImage(Scanner)
+    Date = ScannerObj.LastImgTime
+    Resolution = ScannerObj.resolution
+    token = ScannerObj.token
+    ImagePath = CreateTempImage(ScannerObj)
+
     cmdPost = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X POST "https://{SCANORIZE_SERVER}/api/scanner/image" \
 -H "accept: */*" -H "scanner: {token}" \
 -H "Content-Type: multipart/form-data" \
 -F "date={Date}" -F "dpi={Resolution}" \
 -F "file=@{ImagePath}"'
+
     WriteTimeLogfile(cmdPost)
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
     if result.returncode != 0:
-        WriteTimeLogfile(
-            "PostImageToServer: return: "
-            + str(result.returncode)
-            + " error: "
-            + result.stderr
-        )
+        WriteTimeLogfile(f"PostImageToServer: return: {result.returncode} error: {result.stderr}")
         error = 1
     else:
-        error = 0
         try:
-            results = json.loads(result.stdout)
-            if results["status"] != 200:  # 200 = OK
-                WriteTimeLogfile(f"Post error: {results['status']}")
-                error = 1
+            if result.stdout.strip():  # Check if stdout is not empty
+                results = json.loads(result.stdout)
+                if results["status"] != 200:  # 200 = OK
+                    WriteTimeLogfile(f"Post error: {results['status']}: {results['message']}")
+                    error = 1
+            else:
+                # reponse vide = reponse normale sur le post des images
+                error = 0
+        except json.JSONDecodeError as e:
+            WriteTimeLogfile(f"JSON decode error: {str(e)}")
+            error = 1
         except AttributeError as e:
-            WriteTimeLogfile("Error reading json, error: " + str(e))
+            WriteTimeLogfile(f"Error reading json, error: {str(e)}")
+            error = 1
 
-        WriteTimeLogfile("PostImageToServer: OK")
+        if not error:
+            WriteTimeLogfile("PostImageToServer: OK")
 
     RemoveTempImage(ImagePath)
     return error
 
-
-def SendParameters(Scanner, battery, diskspace, temperature):
+def SendParameters(ScannerObj: ScannerData, battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
-    token = Scanner.token
+    token = ScannerObj.token
     cmdPUT = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
 battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
@@ -225,3 +243,17 @@ def pingAPI(address):
         print("Ping OK")
         return 1
     return 0
+
+if __name__ == "__main__":
+    Scanner = ScannerData()
+    listScannerconfigs = listConfigScanner()
+    scan_num = 0
+    for CurrentScanner in listScannerconfigs:
+        Scanner.ReadScannerConfig(CurrentScanner)
+        PostImageToServer(Scanner)
+        scan_num += 1
+
+
+
+    # WriteScannerConfig(Scanner, "1-Scanner.json")
+
