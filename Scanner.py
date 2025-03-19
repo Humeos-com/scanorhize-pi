@@ -96,7 +96,7 @@ class ScannerData:
                 )
         except (FileNotFoundError, ValueError):
             WriteTimeLogfile(f"No file: {fullpath}")
-            self.WriteScannerConfig(file)
+            ## self.WriteScannerConfig(file)
         else:
             self.__dict__.update(data)
         finally:
@@ -106,8 +106,12 @@ class ScannerData:
     def WriteScannerConfig(self, file):
         fullpath = os.path.join(CONFIG_PATH, file)
         json_data = self.json()
-        with open(fullpath, "w", encoding="utf-8") as outfile:
-            outfile.write(json_data)
+        try:
+            with open(fullpath, "w", encoding="utf-8") as outfile:
+                outfile.write(json_data)
+        except OSError as e:
+            WriteTimeLogfile(f"WriteScannerConfig Error: {e}")
+            return 1
         return 0
 
     def json(self):
