@@ -2,13 +2,25 @@
 Archive les fichiers au format JP2
 """
 
-from subprocess import run
 import os
+from os import path
+# import sys
+import shutil
 from Miscellaneous import WriteTimeLogfile
 from OSUtils import is_raspberry_pi
 
+# Define base folders for different platforms
+if is_raspberry_pi():
+    BASE_DIR = "/home/pi"
+    USB_DIR = "/media/pi"
+else:
+    # For Windows/macOS development
+    BASE_DIR = path.join(path.dirname(path.dirname(__file__)))
+    USB_DIR = path.join(BASE_DIR, "media")
 
-FolderImage = "/home/pi/Documents"
+# Define derived paths using os.path.join
+DOCUMENTS_DIR = path.join(BASE_DIR, "Documents")
+FOLDER_IMAGE = DOCUMENTS_DIR  # Default folder for images
 
 
 def CreateFolderImage(Name, i_scan):
@@ -21,8 +33,6 @@ def CreateFolderImage(Name, i_scan):
     Returns:
         str: the right place for images
     """
-    global FolderImage
-    BackupFolder = "/home/pi/Documents"
     try:
         USB = USBSpace()
         USBfolder = USB[2]
@@ -32,29 +42,12 @@ def CreateFolderImage(Name, i_scan):
         if not os.path.exists(FolderImage):
             os.makedirs(FolderImage)
     except OSError as err:
-        FolderImage = BackupFolder
+        FolderImage = FOLDER_IMAGE
         WriteTimeLogfile("CreateFolder Error: " + err + "set to backup")
-        data = "Folder save: " + FolderImage
+        data = "Folder save: " + FOLDER_IMAGE
 
     WriteTimeLogfile(data)
     return FolderImage
-
-
-def USBDrive():
-    USBfolder = "/media/pi/"
-    BackupFolder = "/home/pi/Documents"
-    try:
-        dirlist = os.listdir(USBfolder)
-        print(dirlist)
-        mediafolders = len(dirlist)
-        print("sizedirlist : ", mediafolders)
-        if mediafolders > 0:
-            MountFolder = USBfolder + dirlist[0]
-        else:
-            MountFolder = BackupFolder
-    except OSError:
-        MountFolder = BackupFolder
-    return MountFolder
 
 
 def CopyImageToUSB(Scanner, FolderImage_):
@@ -64,19 +57,17 @@ def CopyImageToUSB(Scanner, FolderImage_):
         imagejpg2000 = fileName + ".jp2"
         jp2Path = FolderImage_ + imagejpg2000
         print(jp2Path)
-        cmd = "sudo cp " + Scanner.LastImgFile + " " + jp2Path
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-        )
-        if result.returncode == 0:
-            return 0
-        WriteTimeLogfile(
-            str(result.returncode) + str(result.stdout) + str(result.stderr)
-        )
-        return result.returncode
-    except OSError:
-        return 1
+        # Check if source file exists
+        if not os.path.exists(Scanner.LastImgFile):
+            WriteTimeLogfile(f"Source file not found: {Scanner.LastImgFile}")
+            return 1
+        # Use shutil.copy2 instead of shell command
+        shutil.copy2(Scanner.LastImgFile, jp2Path)
+        return 0
 
+    except (IOError, OSError) as err:
+        WriteTimeLogfile(f"CopyImageToUSB: Error: {str(err)}")
+        return 1
 
 def CreateTempImage(Scanner):
     try:
@@ -84,64 +75,47 @@ def CreateTempImage(Scanner):
         Date = (Scanner.LastImgTime).replace(":", "-")
         Imagejp2000Path = Scanner.LastImgFile
         jp2Path = imagepath + Date + ".jp2"
-        # print(jp2Path)
-        cmd = "sudo cp " + Imagejp2000Path + " " + jp2Path
-        print(cmd)
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-        )
-        if result.returncode == 0:
-            return jp2Path
-        WriteTimeLogfile(
-            str(result.returncode) + str(result.stdout) + str(result.stderr)
-        )
+
+        # Check if source file exists
+        if not os.path.exists(Imagejp2000Path):
+            WriteTimeLogfile(f"Source file not found: {Imagejp2000Path}")
+            return "static/error.jp2"
+
+        # Use shutil.copy2 instead of shell command
+        shutil.copy2(Imagejp2000Path, jp2Path)
         return jp2Path
-    except OSError:
-        jp2Path = "static/error.jp2"
-        return jp2Path
+
+    except (IOError, OSError) as err:
+        print(f"File copy error: {err}")
+        WriteTimeLogfile(f"Error in CreateTempImage: {str(err)}")
+        return "static/error.jp2"
 
 
 def RemoveTempImage(Image):
-    cmd = "/bin/rm -f " + Image
-    result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
-    if result.returncode == 0:
+    try:
+        os.remove(Image)
         return 0
-    WriteTimeLogfile(str(result.returncode) + str(result.stdout) + str(result.stderr))
-    return result.returncode
+    except OSError as err:
+        WriteTimeLogfile(f"Error removing {Image}: {err}")
+        return 1
 
 
 def USBSpace():
-    USBfolder = "/media/pi/"
-    BackupFolder = "/home/pi/Documents"
     if not is_raspberry_pi():
-        return 4096, 98, USBfolder
+        return 4096, 98, USB_DIR
 
-    cmd = "df -hm"
-    result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
-    # print(result.stdout, type(result.stdout))
     try:
-        x = (result.stdout).split("\n")
-        for line in x:
-            res = USBfolder in line
-            if res:
-                USBline = line
-                break
-        print(USBline)
-        x = (USBline).split()
+        stat = os.statvfs(USB_DIR)
 
-        FreeSpace = x[3]
-        FreePercent = x[4]
-        MountFolder = x[5]
-    except OSError:
-        FreeSpace = 0
-        FreePercent = 0
-        MountFolder = BackupFolder
-        WriteTimeLogfile(
-            str(result.returncode) + str(result.stdout) + str(result.stderr)
-        )
-    print(FreeSpace, FreePercent, MountFolder)
-    return FreeSpace, FreePercent, MountFolder
+        # Calculate free space in MB
+        free_space = (stat.f_bavail * stat.f_frsize) / (1024 * 1024)
+
+        # Calculate percentage free
+        total_space = (stat.f_blocks * stat.f_frsize) / (1024 * 1024)
+        free_percent = (free_space / total_space) * 100
+
+        return int(free_space), int(free_percent), USB_DIR
+
+    except OSError as err:
+        WriteTimeLogfile(f"Error getting disk space: {err}")
+        return 0, 0, FOLDER_IMAGE
