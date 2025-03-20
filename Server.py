@@ -185,9 +185,9 @@ def PostImageToServer(ScannerObj: ScannerData):
     return error
 
 
-def SendParameters(ScannerObj: ScannerData, battery, diskspace, temperature):
+def SendParameters(battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
-    token = ScannerObj.token
+    token = "G2IGG0eedSxemoWkMeZ9p4v_I1UCvKYXkV5ObWc8ErYLNXiiPM_g5xE3qNsFMW5wLhq4YK1SmR4b19Vn66qLyA"
     cmdPUT = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
 battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
@@ -202,9 +202,10 @@ battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
             "Put: return: " + str(result.returncode) + " error: " + result.stderr
         )
     else:
-        results = json.loads(result.stdout)
-        if results["status"] != 200:  # 200 = OK
-            WriteTimeLogfile(f"Put error: {results['status']}: {results['message']}")
+        if result.stdout.strip():  # Check if stdout is not empty
+            results = json.loads(result.stdout)
+            if results["status"] != 200:  # 200 = OK
+                WriteTimeLogfile(f"Put error: {results['status']}: {results['message']}")
     return 0
 
 
