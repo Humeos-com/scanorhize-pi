@@ -289,10 +289,10 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
             ):
                 res = 12
             scanner.error = res
-            i += 1
-            # if res != 0:
-            #    TurnUsbOff(i_scan)
-            #    TurnUsbOn(i_scan, TIME_USB_READY)
+        i += 1
+        # if res != 0:
+        #    TurnUsbOff(i_scan)
+        #    TurnUsbOn(i_scan, TIME_USB_READY)
 
     TurnUsbOff(i_scan)
     if scanner.error > 0:
