@@ -34,7 +34,9 @@ class ServerData:
         print("Ping: ", self.ping)
 
     def WriteConfig(self):
-        with open(os.path.join(CONFIG_PATH, "Server.json"), "w", encoding="utf-8", indent="") as f:
+        with open(
+            os.path.join(CONFIG_PATH, "Server.json"), "w", encoding="utf-8", indent=""
+        ) as f:
             json.dump(self.__dict__, f)
 
     def ReadConfig(self):
@@ -98,7 +100,9 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
     print(result.returncode, result.stdout, result.stderr)
 
     if result.returncode != 0:
-        WriteTimeLogfile(f"ReadConfigFromServer: return: {result.returncode} error: {result.stderr}")
+        WriteTimeLogfile(
+            f"ReadConfigFromServer: return: {result.returncode} error: {result.stderr}"
+        )
         error = 1
     else:
         try:
@@ -151,14 +155,18 @@ def PostImageToServer(ScannerObj: ScannerData):
     )
     # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
     if result.returncode != 0:
-        WriteTimeLogfile(f"PostImageToServer: return: {result.returncode} error: {result.stderr}")
+        WriteTimeLogfile(
+            f"PostImageToServer: return: {result.returncode} error: {result.stderr}"
+        )
         error = 1
     else:
         try:
             if result.stdout.strip():  # Check if stdout is not empty
                 results = json.loads(result.stdout)
                 if results["status"] != 200:  # 200 = OK
-                    WriteTimeLogfile(f"Post error: {results['status']}: {results['message']}")
+                    WriteTimeLogfile(
+                        f"Post error: {results['status']}: {results['message']}"
+                    )
                     error = 1
             else:
                 # reponse vide = reponse normale sur le post des images
@@ -175,6 +183,7 @@ def PostImageToServer(ScannerObj: ScannerData):
 
     RemoveTempImage(ImagePath)
     return error
+
 
 def SendParameters(ScannerObj: ScannerData, battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
@@ -195,7 +204,7 @@ battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
     else:
         results = json.loads(result.stdout)
         if results["status"] != 200:  # 200 = OK
-            WriteTimeLogfile(f"Put error: {results['status']}")
+            WriteTimeLogfile(f"Put error: {results['status']}: {results['message']}")
     return 0
 
 
@@ -244,6 +253,7 @@ def pingAPI(address):
         return 1
     return 0
 
+
 if __name__ == "__main__":
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
@@ -253,7 +263,4 @@ if __name__ == "__main__":
         PostImageToServer(Scanner)
         scan_num += 1
 
-
-
     # WriteScannerConfig(Scanner, "1-Scanner.json")
-

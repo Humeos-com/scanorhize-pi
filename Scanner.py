@@ -115,7 +115,8 @@ class ScannerData:
         return 0
 
     def json(self):
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, ensure_ascii=False, indent=4)
+        return json.dumps(self, default=lambda o: o.__dict__,
+                          sort_keys=True, ensure_ascii=False, indent=4)
 
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
@@ -153,7 +154,8 @@ class ScannerData:
         else:
             # fake scanimage message
             res = 0
-            scanimage_message = """device `pixma:00000_ABABAB' is a CANON CanoScan LiDE 400 multi-function peripheral"""
+            scanimage_message = """device `pixma:00000_ABABAB' \
+ is a CANON CanoScan LiDE 400 multi-function peripheral"""
 
         self.device = "NoScannerDetected"
         if res == 0:

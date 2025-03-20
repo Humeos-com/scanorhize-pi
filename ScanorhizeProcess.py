@@ -1,5 +1,6 @@
 """
-Main process for Scanorhize: fait l'acquisition, envoie les images à la plateforme Web et éteint le système.
+Main process for Scanorhize: fait l'acquisition,
+ envoie les images à la plateforme Web et éteint le système.
 """
 
 import sys
