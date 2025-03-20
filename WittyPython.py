@@ -27,8 +27,6 @@ class WittyPi:
     Cette classe ne gère pas l'horloge RTC de la carte Witty Pi
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     _instance = None  # Class variable to store the single instance
 
     def __new__(cls):
