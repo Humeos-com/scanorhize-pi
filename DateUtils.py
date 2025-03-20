@@ -65,7 +65,8 @@ def CalculNextStartDate(StartDate: str, Period: int, CurrentDate: str):
         CurrentDate (str): en JAVA UTC
 
     Returns:
-        string: le prochaine date de début de campagne en JAVA UTC
+        string: la prochaine date de début de campagne en JAVA UTC
+        int: la prochaine date de début de campagne en secondes
     """
     try:
         Periodi = int(Period)
