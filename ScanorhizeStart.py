@@ -26,7 +26,6 @@ if res != 0:
     WriteTimeLogfile("TurnUsbOnError")
 
 config = ReadGPIOConfig()
-config = 1
 
 # connexion réseau en parralèle pour optimiser le temps
 # res=0
