@@ -205,7 +205,9 @@ battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
         if result.stdout.strip():  # Check if stdout is not empty
             results = json.loads(result.stdout)
             if results["status"] != 200:  # 200 = OK
-                WriteTimeLogfile(f"Put error: {results['status']}: {results['message']}")
+                WriteTimeLogfile(
+                    f"Put error: {results['status']}: {results['message']}"
+                )
     return 0
 
 
@@ -256,6 +258,7 @@ def pingAPI(address):
 
 
 if __name__ == "__main__":
+    # pylint: disable=duplicate-code
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     scan_num = 0

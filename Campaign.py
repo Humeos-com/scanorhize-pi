@@ -4,6 +4,7 @@ Archive les fichiers au format JP2
 
 import os
 from os import path
+
 # import sys
 import shutil
 from Miscellaneous import WriteTimeLogfile
@@ -68,6 +69,7 @@ def CopyImageToUSB(Scanner, FolderImage_):
     except (IOError, OSError) as err:
         WriteTimeLogfile(f"CopyImageToUSB: Error: {str(err)}")
         return 1
+
 
 def CreateTempImage(Scanner):
     try:

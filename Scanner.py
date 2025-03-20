@@ -86,13 +86,10 @@ class ScannerData:
             with open(fullpath, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)  # Load JSON into a dictionary
             # Convert ZoneAcq dict back to ZoneRectangle object
-            if 'ZoneAcq' in data:
-                zone_data = data['ZoneAcq']
-                data['ZoneAcq'] = ZoneRectangle(
-                    zone_data['l'],
-                    zone_data['t'],
-                    zone_data['x'],
-                    zone_data['y']
+            if "ZoneAcq" in data:
+                zone_data = data["ZoneAcq"]
+                data["ZoneAcq"] = ZoneRectangle(
+                    zone_data["l"], zone_data["t"], zone_data["x"], zone_data["y"]
                 )
         except (FileNotFoundError, ValueError):
             WriteTimeLogfile(f"No file: {fullpath}")
@@ -115,8 +112,13 @@ class ScannerData:
         return 0
 
     def json(self):
-        return json.dumps(self, default=lambda o: o.__dict__,
-                          sort_keys=True, ensure_ascii=False, indent=4)
+        return json.dumps(
+            self,
+            default=lambda o: o.__dict__,
+            sort_keys=True,
+            ensure_ascii=False,
+            indent=4,
+        )
 
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
@@ -173,8 +175,10 @@ class ScannerData:
 
         return self
 
+
 # Initialisation de l'objet Scanner
 Scanner = ScannerData()
+
 
 def updateScanParameters(scanner: ScannerData):
     Scannerparam = {
@@ -400,6 +404,7 @@ def listConfigScanner():
 
 
 if __name__ == "__main__":
+    # pylint: disable=duplicate-code
     InitGPIO()
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
