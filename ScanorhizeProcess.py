@@ -3,10 +3,7 @@ Main process for Scanorhize: fait l'acquisition,
  envoie les images à la plateforme Web et éteint le système.
 """
 
-import sys
 from time import sleep
-from subprocess import run
-import numpy as np
 
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
@@ -18,11 +15,9 @@ from Miscellaneous import (
     ReadStartDateConfig,
     initDisplayFile,
 )
-from OSUtils import is_dev
 from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
 from WittyPython import ReadBatVoltCap, ReadTemp
-from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
-from DateUtils import CalculNextStartDate, DateToSeconds, SecondsToDate, GetCurrentDate
+from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
 
 DateStart = GetCurrentDate()
 initDisplayFile()
@@ -50,7 +45,7 @@ Bat = ReadBatVoltCap()
 Temperature = ReadTemp()
 USB = USBSpace()
 WriteTimeLogfile(f"Bat: {Bat[1]}  " f"USB: {USB[0]}  " f"Temp: {Temperature}")
-SendParameters(Scanner, Bat[1], USB[0], Temperature)
+SendParameters(Bat[1], USB[0], Temperature)
 
 i_scan = 0
 for CurrentScanner in listScannerconfigs:
@@ -116,39 +111,3 @@ for CurrentScanner in listScannerconfigs:
 # fin for
 
 WriteStartDateConfig(NextStartDate)
-nextStartSecs = min(NextStartseconds)
-index_min = np.argmin(NextStartseconds)
-nextStartDateValue = NextStartDate[index_min]
-WriteTimeLogfile("Next start at: " + nextStartDateValue)
-
-if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
-    nextStartDateValue = CalculNextStartDate(
-        Scanner.StartDate, (3600 * 24 * 30), DateStart
-    )
-    WriteTimeLogfile("No more battery")
-
-SetNextStartDate(nextStartDateValue)
-
-if is_dev():
-    WriteTimeLogfile("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
-    sys.exit(0)
-
-# CopyLog()
-cmdeject = "sudo eject /dev/sda"
-result = run(
-    cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
-)
-WriteTimeLogfile(cmdeject)
-
-# On fixe l'heure d'arrêt, car des fois le Witty ne s'eteint pas sur le doShutdown()
-# qui ne fait que le poweroff du Raspberry
-date_new = GetCurrentDate()
-secs = DateToSeconds(date_new)
-date_new = SecondsToDate(secs + 30)
-WriteTimeLogfile("Next stop at: " + date_new)
-setNextShutdownDate(date_new)
-
-# lance le poweroff du Raspberry et éteint le WittyPi
-doShutdown()
-# cmd = "sudo shutdown -P now"
-# result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
