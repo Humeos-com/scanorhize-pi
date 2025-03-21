@@ -66,7 +66,6 @@ SetNextStartDate(NextDate)
 # On scanne les images et on les envoie à la plateforme Web
 cmd = "python3 ScanorhizeProcess.py"
 WriteTimeLogfile(cmd)
-call(cmd, shell=True)
 result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
 
 ## On ne lance pas par l'import, car s'il y a une erreur, le programme s'arrête
