@@ -1,12 +1,13 @@
 """Lance le scanner et programme le prochain réveil"""
 
 import sys
-from subprocess import call, run
+from subprocess import run, CalledProcessError
 
 from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
 from WittyPython import ReadBatVoltCap
 from Miscellaneous import (
     InitGPIO,
+    EndGPIO,
     TurnUsbOn,
     ReadGPIOConfig,
     WriteTimeLogfile,
@@ -26,6 +27,7 @@ if res != 0:
     WriteTimeLogfile("TurnUsbOnError")
 
 config = ReadGPIOConfig()
+EndGPIO()
 
 # connexion réseau en parralèle pour optimiser le temps
 # res=0
@@ -48,7 +50,7 @@ if config == 0:
     # En mode config
     cmd = "sudo python3 Scanorhize.py &"
     WriteTimeLogfile(cmd)
-    call(cmd, shell=True)
+    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     sys.exit(1)
 
 
@@ -66,7 +68,10 @@ SetNextStartDate(NextDate)
 # On scanne les images et on les envoie à la plateforme Web
 cmd = "python3 ScanorhizeProcess.py"
 WriteTimeLogfile(cmd)
-result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+try:
+    result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=True)
+except CalledProcessError as exc:
+    WriteTimeLogfile(exc.stderr)
 
 ## On ne lance pas par l'import, car s'il y a une erreur, le programme s'arrête
 ## import ScanorhizeProcess
@@ -84,7 +89,7 @@ for dates in NextStartDate:
     i_scan = i_scan + 1
 
 # Quand la carte WittyPi n'a plus de batterie, son heure interne est aléatoire.
-# Lorsque les acquisitions ne fonctionne pas, la nextStartDate ne bouge pas.
+# Lorsque les acquisitions ne fonctionnent pas, la nextStartDate ne bouge pas.
 # Donc elle se retrouve dans le passé. Avec un minimum de secs_now + 600, on
 # espère que la carte WittyPi se réveillera.
 nextStartSecs = max(int(min(NextStartseconds)), (secs_now + 600))

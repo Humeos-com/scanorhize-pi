@@ -149,6 +149,12 @@ def WriteBatterieFile(Volt, Cap):
         return 1
     return 0
 
+def EndGPIO():
+    if not is_raspberry_pi():
+        return
+    GPIO.cleanup()
+    return
+
 
 def InitGPIO():
     if not is_raspberry_pi():
@@ -293,7 +299,9 @@ if __name__ == "__main__":
                 )
     except RuntimeError as e:
         print(f"RuntimeError: {e}")
+        EndGPIO()
         sys.exit(0)
     except GPIO.Error as e:
         print(f"GPIO Error: {e}")
+        EndGPIO()
         sys.exit(0)
