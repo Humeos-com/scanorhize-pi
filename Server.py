@@ -3,14 +3,18 @@ Fonctions qui encapsulent l'API du serveur Web
 """
 
 import os
+import sys
 from subprocess import run, SubprocessError
 import json
 from Miscellaneous import WriteTimeLogfile
 from Campaign import RemoveTempImage, CreateTempImage
 from OSUtils import get_os
-from Scanner import ScannerData, listConfigScanner
+from Scanner import ScannerData, listConfigScanner, listScannerSerials
+from AuthUtils import getHwAddr
 
-SCANORIZE_SERVER = "scan.arditi.net"
+
+# SCANORHIZE_SERVER = "scan.arditi.net"
+SCANORHIZE_SERVER = "scanorhize.duckdns.org"
 CONFIG_PATH = "ConfigFile/Scanner"
 CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
 MAX_TIME = 300  # Temps max pour faire le POST
@@ -89,9 +93,67 @@ def CopyFromJson(ScannerObj: ScannerData, data):
     return ScannerObj
 
 
+def getTokens():
+
+    # Get list of scanner serials
+    scanner_serials = listScannerSerials()
+
+    # Create dictionary with port entries dynamically
+    serial_dict = {}
+    for i, serial in enumerate(scanner_serials, 1):
+        serial_dict[f'port{i}'] = serial
+
+    json_data = {
+        'macAddress': getHwAddr(),
+        'serialNumbers': serial_dict
+    }
+
+    cmdPost = f'''curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+-X POST "https://{SCANORHIZE_SERVER}/auth/devices" \
+-H "accept: */*" -H "Content-Type: application/json" \
+--data '{json.dumps(json_data)}' '''
+
+
+    WriteTimeLogfile(cmdPost)
+    result = run(
+        cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
+    )
+    # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
+    if result.returncode != 0:
+        WriteTimeLogfile(
+            f"PostImageToServer: return: {result.returncode} error: {result.stderr}"
+        )
+        error = 1
+    else:
+        try:
+            if result.stdout.strip():  # Check if stdout is not empty
+                results = json.loads(result.stdout)
+                if results["status"] != 200:  # 200 = OK
+                    WriteTimeLogfile(
+                        f"Post error: {results['status']}: {results['message']}"
+                    )
+                    error = 1
+            else:
+                # reponse vide = reponse normale sur le post des images
+                error = 0
+        except json.JSONDecodeError as e:
+            WriteTimeLogfile(f"JSON decode error: {str(e)}")
+            error = 1
+        except AttributeError as e:
+            WriteTimeLogfile(f"Error reading json, error: {str(e)}")
+            error = 1
+
+        if not error:
+            WriteTimeLogfile("PostImageToServer: OK")
+
+    return error
+
+
+
+
 def ReadConfigFromServer(ScannerObj: ScannerData):
     cmdRead = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X GET "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
+-X GET "https://{SCANORHIZE_SERVER}/api/scanner/configuration" \
 -H "accept: application/json" -H "scanner:{ScannerObj.token}"'
     print(cmdRead)
     result = run(
@@ -128,7 +190,7 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
 
 def SendConfigToServer(ScannerObj: ScannerData):
     cmdPost = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X POST "https://{SCANORIZE_SERVER}/api/scanner/configuration" \
+-X POST "https://{SCANORHIZE_SERVER}/api/scanner/configuration" \
 -H "accept: application/json" -H "scanner:{ScannerObj.token}" \
 -H "Content-Type: application/json" \
 -d {ScannerObj.json()}'
@@ -143,7 +205,7 @@ def PostImageToServer(ScannerObj: ScannerData):
     ImagePath = CreateTempImage(ScannerObj)
 
     cmdPost = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X POST "https://{SCANORIZE_SERVER}/api/scanner/image" \
+-X POST "https://{SCANORHIZE_SERVER}/api/scanner/image" \
 -H "accept: */*" -H "scanner: {token}" \
 -H "Content-Type: multipart/form-data" \
 -F "date={Date}" -F "dpi={Resolution}" \
@@ -189,7 +251,7 @@ def SendParameters(battery, diskspace, temperature):
     # print(battery,diskspace,temperature)
     token = "G2IGG0eedSxemoWkMeZ9p4v_I1UCvKYXkV5ObWc8ErYLNXiiPM_g5xE3qNsFMW5wLhq4YK1SmR4b19Vn66qLyA"
     cmdPUT = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X PUT "https://{SCANORIZE_SERVER}/api/scanner/state?\
+-X PUT "https://{SCANORHIZE_SERVER}/api/scanner/state?\
 battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
 -H "accept: */*" -H "scanner: {token}"'
     WriteTimeLogfile(cmdPUT)
@@ -259,6 +321,8 @@ def pingAPI(address):
 
 if __name__ == "__main__":
     # pylint: disable=duplicate-code
+    getTokens()
+    sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     scan_num = 0

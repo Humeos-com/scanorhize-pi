@@ -3,6 +3,7 @@ Gestion des Scanners
 """
 
 import os
+import sys
 import re
 import dataclasses
 import json
@@ -178,6 +179,21 @@ class ScannerData:
 
 # Initialisation de l'objet Scanner
 Scanner = ScannerData()
+
+def extract_serial(device_string: str) -> str:
+    """Extract serial number from device string
+
+    Args:
+        device_string (str): Device string in format 'pixma:SERIAL'
+
+    Returns:
+        str: Serial number part after the colon, or empty string if invalid format
+    """
+    try:
+        parts = device_string.split(':')
+        return parts[1] if len(parts) > 1 else ""
+    except (IndexError, AttributeError):
+        return ""
 
 
 def updateScanParameters(scanner: ScannerData):
@@ -390,6 +406,25 @@ def ScannerPreview(i_scan: int):
     return image, res
 
 
+def listScannerSerials():
+    """Renvoie la liste des numéros de série des scanners
+
+    Returns:
+        list: les numéros de série des scanners
+    """
+    Scanner_ = ScannerData()
+    listScannerconfigs_ = listConfigScanner()
+    listserials = []
+
+    for CurrentScanner_ in listScannerconfigs_:
+        Scanner_.ReadScannerConfig(CurrentScanner_)
+        serial = extract_serial(Scanner_.device)
+        if serial:  # Only add non-empty serials
+            listserials.append(serial)
+
+    WriteTimeLogfile(listserials)
+    return listserials
+
 def listConfigScanner():
     try:
         # de la forme 1-Scanner.json
@@ -408,6 +443,7 @@ if __name__ == "__main__":
     InitGPIO()
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
+    listScannerSerials()
     scan_num = 0
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
@@ -421,3 +457,5 @@ if __name__ == "__main__":
         Scanner.error = result_[1]
 
     # WriteScannerConfig(Scanner, "1-Scanner.json")
+    sys.exit(0)
+
