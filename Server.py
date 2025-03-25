@@ -16,12 +16,13 @@ from AuthUtils import getHwAddr
 # SCANORHIZE_SERVER = "scan.arditi.net"
 SCANORHIZE_SERVER = "scanorhize.duckdns.org"
 CONFIG_PATH = "ConfigFile/Scanner"
+CONFIG_HUB = "Hub.json"
 CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
 MAX_TIME = 300  # Temps max pour faire le POST
 
 
-class ServerData:
-    """Gestion des paramètres de la carte SIM"""
+class HubData:
+    """Gestion des paramètres du Raspberry et de la carte SIM"""
 
     def __init__(self):
         self.apn = ""
@@ -29,36 +30,40 @@ class ServerData:
         self.password = ""
         self.address = ""
         self.ping = 0
+        self.token = "token_bidon"
+        self.batteryLevelPercent = 0
+        self.diskSpacePercent = 0
+        self.temperature = 0
 
-    def print(self):
-        print("APN: ", self.apn)
-        print("User: ", self.user)
-        print("Password: ", self.password)
-        print("Address: ", self.address)
-        print("Ping: ", self.ping)
+    def printHub(self):
+        for name, value in self.__dict__.items():
+            print(f"{name}: {value}")
+
 
     def WriteConfig(self):
-        with open(
-            os.path.join(CONFIG_PATH, "Server.json"), "w", encoding="utf-8", indent=""
-        ) as f:
-            json.dump(self.__dict__, f)
+        fullpath = os.path.join(CONFIG_PATH, CONFIG_HUB)
+        try:
+            with open(fullpath, "w", encoding="utf-8") as openfile:
+                json.dump(self.__dict__, openfile, sort_keys=True, ensure_ascii=False, indent=4)
+        except (FileNotFoundError, ValueError):
+            WriteTimeLogfile(f"No file: {fullpath}")
+
 
     def ReadConfig(self):
-        with open(os.path.join(CONFIG_PATH, "Server.json"), "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if "apn" in data:
-                self.apn = data["apn"]
-            if "user" in data:
-                self.user = data["user"]
-            if "password" in data:
-                self.password = data["password"]
-            if "address" in data:
-                self.address = data["address"]
-            if "ping" in data:
-                self.ping = data["ping"]
+        fullpath = os.path.join(CONFIG_PATH, CONFIG_HUB)
+        try:
+            with open(fullpath, "r", encoding="utf-8") as openfile:
+                data = json.load(openfile)  # Load JSON into a dictionary
+        except (FileNotFoundError, ValueError):
+            WriteTimeLogfile(f"No file: {fullpath}")
+        else:
+            self.__dict__.update(data)
+        finally:
+            self.printHub()
+        return self
 
 
-def updateServer(server: ServerData):
+def updateServer(server: HubData):
     server_param = {
         "apn": server.apn,
         "user": server.user,
@@ -141,6 +146,10 @@ def getTokens():
 
         if body.strip():
             results = json.loads(body)
+            Hub_ = HubData()
+            Hub_.ReadConfig()
+            Hub_.token = results["accessTokenHub"]
+            Hub_.WriteConfig()
             for i in range(1, num_scan+1):
                 # Initialisation de l'objet Scanner
                 Scanner_ = ScannerData()
