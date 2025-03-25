@@ -7,7 +7,6 @@ import sys
 import re
 import dataclasses
 import json
-import inspect
 from subprocess import run
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, WriteTimeLogfile
@@ -26,7 +25,6 @@ CONFIG_PATH = "ConfigFile/Scanner/"
 DISPLAY_FILE = "Log/Display.txt"
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
-
 
 @dataclasses.dataclass
 class ZoneRectangle:
