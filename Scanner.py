@@ -7,6 +7,7 @@ import sys
 import re
 import dataclasses
 import json
+import inspect
 from subprocess import run
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, WriteTimeLogfile
@@ -58,8 +59,10 @@ class ScannerData:
     LastImgFile = ""
     ZoneAcq = ZoneRectangle(0, 0, X_MAX, Y_MAX)
     quality = 5
-    device = "NoScannerDetected"
+    device = "NoScannerDetected"  # le device au sens SANE usb+fabricant+série
     token = "token_bidon"
+    projectId = ""
+    sampleId = ""
     UseServer = 0
     error = 0
     Campaign = "CampaignName"
@@ -67,19 +70,8 @@ class ScannerData:
     PeriodeS = 3600  # next start if UseServer=0
 
     def printScanner(self):
-        try:
-            data = (
-                f"{self.ScannerName} {self.mode} {self.resolution} "
-                f"{self.LastImgTime} {self.LastImgFile} {self.ZoneAcq.l} "
-                f"{self.ZoneAcq.t} {self.ZoneAcq.x} {self.ZoneAcq.y} "
-                f"{self.quality} {self.device} {self.UseServer} {self.Campaign} "
-                f"{self.StartDate} {self.PeriodeS}"
-            )
-            print(data)
-            # WriteLogFile(data)
-        except ValueError:
-            return 1
-        return 0
+        for name, value in self.__dict__.items():
+            print(f"{name}: {value}")
 
     def ReadScannerConfig(self, file=""):
         fullpath = os.path.join(CONFIG_PATH, file)
