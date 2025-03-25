@@ -100,55 +100,62 @@ def getTokens():
 
     # Create dictionary with port entries dynamically
     serial_dict = {}
-    for i, serial in enumerate(scanner_serials, 1):
-        serial_dict[f'port{i}'] = serial
+    num_scan = 0
+    for num_scan, serial in enumerate(scanner_serials, 1):
+        serial_dict[f'port{num_scan}'] = serial
+    # num_scan contient le nombre de scanners
 
     json_data = {
         'macAddress': getHwAddr(),
         'serialNumbers': serial_dict
     }
 
-    cmdPost = f'''curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+    cmdPost = f'''curl -i --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X POST "https://{SCANORHIZE_SERVER}/auth/devices" \
 -H "accept: */*" -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' '''
-
 
     WriteTimeLogfile(cmdPost)
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
     if result.returncode != 0:
-        WriteTimeLogfile(
-            f"PostImageToServer: return: {result.returncode} error: {result.stderr}"
-        )
-        error = 1
-    else:
-        try:
-            if result.stdout.strip():  # Check if stdout is not empty
-                results = json.loads(result.stdout)
-                if results["status"] != 200:  # 200 = OK
-                    WriteTimeLogfile(
-                        f"Post error: {results['status']}: {results['message']}"
-                    )
-                    error = 1
-            else:
-                # reponse vide = reponse normale sur le post des images
-                error = 0
-        except json.JSONDecodeError as e:
-            WriteTimeLogfile(f"JSON decode error: {str(e)}")
-            error = 1
-        except AttributeError as e:
-            WriteTimeLogfile(f"Error reading json, error: {str(e)}")
-            error = 1
+        WriteTimeLogfile(f"Post auth/devices: return: {result.returncode} error: {result.stderr}")
+        return 1
 
-        if not error:
-            WriteTimeLogfile("PostImageToServer: OK")
+    # Parse headers and body from response
+    try:
+        response_parts = result.stdout.split('\n\n', 1)
+        headers = response_parts[0]
+        body = response_parts[1] if len(response_parts) > 1 else ''
 
-    return error
+        # Get status code from first line of headers
+        status_line = headers.split('\n')[0]
+        status_code = int(status_line.split()[1])
 
+        WriteTimeLogfile(f"Response status code: {status_code}")
 
+        if not 200 <= status_code < 300:
+            WriteTimeLogfile(f"Error: HTTP {status_code}")
+            return 1
+
+        if body.strip():
+            results = json.loads(body)
+            for i in range(1, num_scan+1):
+                # Initialisation de l'objet Scanner
+                Scanner_ = ScannerData()
+                Scanner_.ReadScannerConfig(f"{i}-Scanner.json")
+                # On met à jour les valeurs
+                Scanner_.token = results["accessTokenScanners"][f"port{i}"]
+                Scanner_.projectId = results["projectId"]
+                Scanner_.sampleIds = results["sampleIds"][f"port{i}"]
+                # On sauve le tout
+                Scanner_.WriteScannerConfig(f"{i}-Scanner.json")
+        return 0
+
+    except (IndexError, ValueError, json.JSONDecodeError) as e:
+        WriteTimeLogfile(f"Error parsing response: {str(e)}")
+        return 1
 
 
 def ReadConfigFromServer(ScannerObj: ScannerData):
@@ -204,7 +211,7 @@ def PostImageToServer(ScannerObj: ScannerData):
     token = ScannerObj.token
     ImagePath = CreateTempImage(ScannerObj)
 
-    cmdPost = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+    cmdPost = f'curl -i --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
 -X POST "https://{SCANORHIZE_SERVER}/api/scanner/image" \
 -H "accept: */*" -H "scanner: {token}" \
 -H "Content-Type: multipart/form-data" \
