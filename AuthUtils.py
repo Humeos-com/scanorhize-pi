@@ -67,6 +67,9 @@ class AuthenticationData:
         self.__initialized = value
 
 def getHwAddr(ifname=IFACE):
+    if not is_raspberry_pi():
+        return "0A:0B:0C:0D:0E:0F"
+
     s = socket(AF_INET, SOCK_DGRAM)
     # Convert ifname name to bytes using `.encode()`
     return ':'.join('%02x' % b for b in ioctl(
