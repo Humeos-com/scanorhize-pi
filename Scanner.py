@@ -16,10 +16,14 @@ from OSUtils import is_raspberry_pi, is_dev
 X_MAX = 216
 Y_MAX = 297
 TIME_USB_READY = 40
+TIME_AFTER_SCAN = 10
 if is_dev():
     TIME_USB_READY = 10
+    TIME_AFTER_SCAN = 10
 if not is_raspberry_pi():
     TIME_USB_READY = 0
+    TIME_AFTER_SCAN = 0
+
 
 CONFIG_PATH = "ConfigFile/Scanner/"
 DISPLAY_FILE = "Log/Display.txt"
@@ -304,7 +308,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         #    TurnUsbOff(i_scan)
         #    TurnUsbOn(i_scan, TIME_USB_READY)
 
-    TurnUsbOff(i_scan)
+    TurnUsbOff(i_scan, TIME_AFTER_SCAN)
     if scanner.error > 0:
         WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
         return scanner
