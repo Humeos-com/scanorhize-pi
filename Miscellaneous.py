@@ -187,6 +187,9 @@ def TurnUsbOn(i_scan, time):
     else:
         try:
             realpin = getChPin(i_scan)
+            GPIO.setwarnings(False)
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(realpin, GPIO.OUT)
             GPIO.output(realpin, GPIO.HIGH)
             # Pour l'ancienne carte Relai
             # GPIO.output(realpin, GPIO.LOW)
@@ -305,3 +308,5 @@ if __name__ == "__main__":
         print(f"GPIO Error: {e}")
         EndGPIO()
         sys.exit(0)
+
+    EndGPIO()
