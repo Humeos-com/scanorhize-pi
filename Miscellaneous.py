@@ -200,7 +200,8 @@ def TurnUsbOn(i_scan, time):
     return 0
 
 
-def TurnUsbOff(i_scan):
+def TurnUsbOff(i_scan, delay=0):
+    sleep(delay)
     if has_MEGA4():
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
         cmd = f"{UHUBCTL} -a off -p {i_scan + 1} -l 1-1"
