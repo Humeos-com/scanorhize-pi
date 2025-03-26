@@ -208,6 +208,9 @@ def TurnUsbOff(i_scan):
     else:
         try:
             realpin = getChPin(i_scan)
+            GPIO.setwarnings(False)
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(realpin, GPIO.OUT)
             GPIO.output(realpin, GPIO.LOW)
             # Pour l'ancienne carte Relai
             # GPIO.output(realpin, GPIO.HIGH)
