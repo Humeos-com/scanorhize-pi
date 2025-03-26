@@ -163,7 +163,7 @@ def getTokens():
         return 0
 
     except (IndexError, ValueError, json.JSONDecodeError) as e:
-        WriteTimeLogfile(f"Error parsing response: {str(e)}")
+        WriteTimeLogfile(f"getTokens: Error parsing response: {str(e)}")
         return 1
 
 
@@ -263,30 +263,56 @@ def PostImageToServer(ScannerObj: ScannerData):
     return error
 
 
-def SendParameters(battery, diskspace, temperature):
+def SendParameters(Hub_: HubData):
     # print(battery,diskspace,temperature)
-    token = "G2IGG0eedSxemoWkMeZ9p4v_I1UCvKYXkV5ObWc8ErYLNXiiPM_g5xE3qNsFMW5wLhq4YK1SmR4b19Vn66qLyA"
-    cmdPUT = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X PUT "https://{SCANORHIZE_SERVER}/api/scanner/state?\
-battery={battery}&diskSpace={diskspace}&temperature={temperature}" \
--H "accept: */*" -H "scanner: {token}"'
+    json_data = {
+        "batteryLevelPercent": Hub_.batteryLevelPercent,
+        "temperatureCelsius": Hub_.temperature,
+        "availableMemoryGB": Hub_.diskSpacePercent,
+    }
+
+    cmdPUT = f'''curl -i --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
+-X PATCH "https://{SCANORHIZE_SERVER}/hub-device" \
+-H "Authorization: Bearer {Hub_.token}" \
+-H "Content-Type: application/json" \
+--data '{json.dumps(json_data)}' '''
+
     WriteTimeLogfile(cmdPUT)
     result = run(
         cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    # print(result.returncode, result.stdout, result.stderr)
     if result.returncode != 0:
-        WriteTimeLogfile(
-            "Put: return: " + str(result.returncode) + " error: " + result.stderr
-        )
-    else:
-        if result.stdout.strip():  # Check if stdout is not empty
-            results = json.loads(result.stdout)
-            if results["status"] != 200:  # 200 = OK
-                WriteTimeLogfile(
-                    f"Put error: {results['status']}: {results['message']}"
-                )
-    return 0
+        WriteTimeLogfile(f"Post hub-device: return: {result.returncode} error: {result.stderr}")
+        return 1
+
+    # Parse headers and body from response
+    try:
+        response_parts = result.stdout.split('\n\n', 1)
+        headers = response_parts[0]
+        body = response_parts[1] if len(response_parts) > 1 else ''
+
+        # Get status code from first line of headers
+        status_line = headers.split('\n')[0]
+        status_code = int(status_line.split()[1])
+
+        WriteTimeLogfile(f"Response status code: {status_code}")
+
+        if not 200 <= status_code < 300:
+            WriteTimeLogfile(f"Error: HTTP {status_code}")
+            return 1
+
+        if body.strip():
+            results = json.loads(body)
+            if results["message"] == "Status updated":
+                WriteTimeLogfile("Parameters sent to server: OK")
+                return 0
+            WriteTimeLogfile(f"Error: {results['message']}")
+            return 1
+
+    except (IndexError, ValueError, json.JSONDecodeError) as e:
+        WriteTimeLogfile(f"SendParameters: Error parsing response: {str(e)}")
+        return 1
+
 
 
 def GetWifiSSID():

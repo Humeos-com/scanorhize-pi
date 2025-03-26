@@ -7,7 +7,7 @@ from time import sleep
 
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
-from Server import SendParameters, PostImageToServer, ReadConfigFromServer
+from Server import HubData, getTokens, SendParameters, PostImageToServer, ReadConfigFromServer
 from Miscellaneous import (
     WriteTimeLogfile,
     InitGPIO,
@@ -41,11 +41,17 @@ for dates in NextStartDate:
     i_scan = i_scan + 1
 
 # Paramètres à envoyer au début du process
-Bat = ReadBatVoltCap()
-Temperature = ReadTemp()
-USB = USBSpace()
-WriteTimeLogfile(f"Bat: {Bat[1]}  " f"USB: {USB[0]}  " f"Temp: {Temperature}")
-SendParameters(Bat[1], USB[0], Temperature)
+# A faire dans le serveur Flask pour initialiser les données
+# getTokens()
+Hub_ = HubData()
+Hub_.ReadConfig()
+volt, Hub_.batteryLevelPercent = ReadBatVoltCap()
+Hub_.diskSpacePercent = USBSpace()[0]
+Hub_.temperature = ReadTemp()
+Hub_.WriteConfig()
+
+WriteTimeLogfile(f"Bat: {Hub_.batteryLevelPercent}  " f"USB: {Hub_.diskSpacePercent}  " f"Temp: {Hub_.temperature}")
+SendParameters(Hub_)
 
 i_scan = 0
 for CurrentScanner in listScannerconfigs:
