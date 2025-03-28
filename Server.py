@@ -4,8 +4,10 @@ Fonctions qui encapsulent l'API du serveur Web
 
 import os
 import sys
+from dataclasses import dataclass, asdict
 from subprocess import run, SubprocessError
 import json
+from ConfigApp import getConfigHubFile, getScanorhizeServer, getConnectTimeout, getMaxTime
 from Miscellaneous import WriteTimeLogfile
 from Campaign import RemoveTempImage, CreateTempImage
 from OSUtils import get_os
@@ -13,44 +15,36 @@ from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 
 
-# SCANORHIZE_SERVER = "scan.arditi.net"
-SCANORHIZE_SERVER = "scanorhize.duckdns.org"
-CONFIG_PATH = "ConfigFile/Scanner"
-CONFIG_HUB = "Hub.json"
-CONNECT_TIMEOUT = 10  # Temps d'attente pour la connexion au serveur
-MAX_TIME = 300  # Temps max pour faire le POST
-
-
+@dataclass
 class HubData:
     """Gestion des paramètres du Raspberry et de la carte SIM"""
 
-    def __init__(self):
-        self.apn = ""
-        self.user = ""
-        self.password = ""
-        self.address = ""
-        self.ping = 0
-        self.token = "token_bidon"
-        self.batteryLevelPercent = 0
-        self.diskSpacePercent = 0
-        self.temperature = 0
-
-    def printHub(self):
-        for name, value in self.__dict__.items():
-            print(f"{name}: {value}")
-
+    apn: str = ""
+    user: str = ""
+    password: str = ""
+    address: str = ""
+    ping: int = 0
+    token: str = "token_bidon"
+    batteryLevelPercent: int = 0
+    diskSpacePercent: int = 0
+    temperature: float = 0
 
     def WriteConfig(self):
-        fullpath = os.path.join(CONFIG_PATH, CONFIG_HUB)
+        fullpath = getConfigHubFile()
         try:
             with open(fullpath, "w", encoding="utf-8") as openfile:
-                json.dump(self.__dict__, openfile, sort_keys=True, ensure_ascii=False, indent=4)
+                json.dump(
+                    self.__dict__,
+                    openfile,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    indent=4,
+                )
         except (FileNotFoundError, ValueError):
             WriteTimeLogfile(f"No file: {fullpath}")
 
-
     def ReadConfig(self):
-        fullpath = os.path.join(CONFIG_PATH, CONFIG_HUB)
+        fullpath = getConfigHubFile()
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)  # Load JSON into a dictionary
@@ -59,8 +53,13 @@ class HubData:
         else:
             self.__dict__.update(data)
         finally:
-            self.printHub()
+            self.print()
         return self
+
+    def print(self):
+        """Print all dataclass attributes"""
+        for name, value in asdict(self).items():
+            print(f"{name}: {value}")
 
 
 def updateServer(server: HubData):
@@ -107,35 +106,34 @@ def getTokens():
     serial_dict = {}
     num_scan = 0
     for num_scan, serial in enumerate(scanner_serials, 1):
-        serial_dict[f'port{num_scan}'] = serial
+        serial_dict[f"port{num_scan}"] = serial
     # num_scan contient le nombre de scanners
 
-    json_data = {
-        'macAddress': getHwAddr(),
-        'serialNumbers': serial_dict
-    }
+    json_data = {"macAddress": getHwAddr(), "serialNumbers": serial_dict}
 
-    cmdPost = f'''curl -i --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X POST "https://{SCANORHIZE_SERVER}/auth/devices" \
+    cmdPost = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
+-X POST "https://{getScanorhizeServer()}/auth/devices" \
 -H "accept: */*" -H "Content-Type: application/json" \
---data '{json.dumps(json_data)}' '''
+--data '{json.dumps(json_data)}' """
 
     WriteTimeLogfile(cmdPost)
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     if result.returncode != 0:
-        WriteTimeLogfile(f"Post auth/devices: return: {result.returncode} error: {result.stderr}")
+        WriteTimeLogfile(
+            f"Post auth/devices: return: {result.returncode} error: {result.stderr}"
+        )
         return 1
 
     # Parse headers and body from response
     try:
-        response_parts = result.stdout.split('\n\n', 1)
+        response_parts = result.stdout.split("\n\n", 1)
         headers = response_parts[0]
-        body = response_parts[1] if len(response_parts) > 1 else ''
+        body = response_parts[1] if len(response_parts) > 1 else ""
 
         # Get status code from first line of headers
-        status_line = headers.split('\n')[0]
+        status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
         WriteTimeLogfile(f"Response status code: {status_code}")
@@ -150,14 +148,14 @@ def getTokens():
             Hub_.ReadConfig()
             Hub_.token = results["accessTokenHub"]
             Hub_.WriteConfig()
-            for i in range(1, num_scan+1):
+            for i in range(1, num_scan + 1):
                 # Initialisation de l'objet Scanner
                 Scanner_ = ScannerData()
                 Scanner_.ReadScannerConfig(f"{i}-Scanner.json")
                 # On met à jour les valeurs
                 Scanner_.token = results["accessTokenScanners"][f"port{i}"]
                 Scanner_.projectId = results["projectId"]
-                Scanner_.sampleIds = results["sampleIds"][f"port{i}"]
+                Scanner_.sampleId = results["sampleIds"][f"port{i}"]
                 # On sauve le tout
                 Scanner_.WriteScannerConfig(f"{i}-Scanner.json")
         return 0
@@ -168,8 +166,8 @@ def getTokens():
 
 
 def ReadConfigFromServer(ScannerObj: ScannerData):
-    cmdRead = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X GET "https://{SCANORHIZE_SERVER}/api/scanner/configuration" \
+    cmdRead = f'curl --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
+-X GET "https://{getScanorhizeServer()}/api/scanner/configuration" \
 -H "accept: application/json" -H "scanner:{ScannerObj.token}"'
     print(cmdRead)
     result = run(
@@ -205,8 +203,8 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
 
 
 def SendConfigToServer(ScannerObj: ScannerData):
-    cmdPost = f'curl --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X POST "https://{SCANORHIZE_SERVER}/api/scanner/configuration" \
+    cmdPost = f'curl --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
+-X POST "https://{getScanorhizeServer()}/api/scanner/configuration" \
 -H "accept: application/json" -H "scanner:{ScannerObj.token}" \
 -H "Content-Type: application/json" \
 -d {ScannerObj.json()}'
@@ -220,8 +218,8 @@ def PostImageToServer(ScannerObj: ScannerData):
     token = ScannerObj.token
     ImagePath = CreateTempImage(ScannerObj)
 
-    cmdPost = f'curl -i --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X POST "https://{SCANORHIZE_SERVER}/api/scanner/image" \
+    cmdPost = f'curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
+-X POST "https://{getScanorhizeServer()}/api/scanner/image" \
 -H "accept: */*" -H "scanner: {token}" \
 -H "Content-Type: multipart/form-data" \
 -F "date={Date}" -F "dpi={Resolution}" \
@@ -271,28 +269,30 @@ def SendParameters(Hub_: HubData):
         "availableMemoryGB": Hub_.diskSpacePercent,
     }
 
-    cmdPUT = f'''curl -i --connect-timeout {CONNECT_TIMEOUT} --max-time {MAX_TIME} \
--X PATCH "https://{SCANORHIZE_SERVER}/hub-device" \
+    cmdPUT = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
+-X PATCH "https://{getScanorhizeServer()}/hub-device" \
 -H "Authorization: Bearer {Hub_.token}" \
 -H "Content-Type: application/json" \
---data '{json.dumps(json_data)}' '''
+--data '{json.dumps(json_data)}' """
 
     WriteTimeLogfile(cmdPUT)
     result = run(
         cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     if result.returncode != 0:
-        WriteTimeLogfile(f"Post hub-device: return: {result.returncode} error: {result.stderr}")
+        WriteTimeLogfile(
+            f"Post hub-device: return: {result.returncode} error: {result.stderr}"
+        )
         return 1
 
     # Parse headers and body from response
     try:
-        response_parts = result.stdout.split('\n\n', 1)
+        response_parts = result.stdout.split("\n\n", 1)
         headers = response_parts[0]
-        body = response_parts[1] if len(response_parts) > 1 else ''
+        body = response_parts[1] if len(response_parts) > 1 else ""
 
         # Get status code from first line of headers
-        status_line = headers.split('\n')[0]
+        status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
         WriteTimeLogfile(f"Response status code: {status_code}")
@@ -312,7 +312,6 @@ def SendParameters(Hub_: HubData):
     except (IndexError, ValueError, json.JSONDecodeError) as e:
         WriteTimeLogfile(f"SendParameters: Error parsing response: {str(e)}")
         return 1
-
 
 
 def GetWifiSSID():
@@ -364,7 +363,7 @@ def pingAPI(address):
 if __name__ == "__main__":
     # pylint: disable=duplicate-code
     getTokens()
-    sys.exit(0)
+    # sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     scan_num = 0

@@ -10,6 +10,9 @@ from time import sleep
 
 from DateUtils import GetCurrentDate
 from WittyPython import is_WittyPi_3
+from ConfigApp import WriteTimeLogfile, getLogger, getBatteryFile, getDisplayFile
+from ConfigApp import getUhubctl, getUsbDir
+from ConfigApp import getNextDateFile, getLogDir
 
 from OSUtils import is_raspberry_pi, has_MEGA4
 
@@ -26,14 +29,6 @@ else:
     sys.modules["smbus"] = fake_rpi.smbus
     from RPi import GPIO
 
-LOG_DIR = "Log"
-CONFIG_DIR = "ConfigFile"
-NEXT_DATE_FILE = CONFIG_DIR + "/NextStartDate.json"
-DISPLAY_FILE = LOG_DIR + "/Display.txt"
-BATTERY_FILE = LOG_DIR + "/Batterie.txt"
-UHUBCTL = "/usr/sbin/uhubctl"
-USB_DIR = "/media/pi/Image"
-LOG_DIR = "Log"
 
 # Pour le mode config
 # Bouton poussoir config
@@ -89,22 +84,9 @@ def checkchaine(chaine, valueerror):
     return valueerror
 
 
-def WriteLogFile(data):
-    print(data)
-    try:
-        now = datetime.datetime.utcnow()
-        filename = now.strftime(LOG_DIR + "/Scanorhize_%Y-%m-%d.txt")
-        with open(filename, "a", encoding="utf-8") as f:
-            f.write(data + "\n")
-    except IOError as e:
-        print(f"IOError: {e}")
-        return 1
-    return 0
-
-
 def initDisplayFile():
     try:
-        with open(DISPLAY_FILE, "w", encoding="utf-8") as f:
+        with open(getDisplayFile(), "w", encoding="utf-8") as f:
             f.write("")
     except IOError as e:
         print(f"IOError: {e}")
@@ -116,7 +98,7 @@ def WriteDisplayFile(data, time):
     try:
         # print(data)
         text = time + " : " + str(data)
-        with open(DISPLAY_FILE, "a", encoding="utf-8") as f:
+        with open(getDisplayFile(), "a", encoding="utf-8") as f:
             f.write(text)
             f.write("\n")
     except IOError as e:
@@ -125,29 +107,19 @@ def WriteDisplayFile(data, time):
     return 0
 
 
-def WriteTimeLogfile(data):
-    date = GetCurrentDate()
-    try:
-        Time = date + " : " + str(data)
-        WriteLogFile(Time)
-        WriteDisplayFile(data, date)
-    except ValueError:
-        return 1
-    return date
-
-
 def WriteBatterieFile(Volt, Cap):
     print(Volt, " ", Cap)
     try:
         date = GetCurrentDate()
         text = date + ": " + str(Volt) + " " + str(Cap)
-        with open(BATTERY_FILE, "a", encoding="utf-8") as f:
+        with open(getBatteryFile(), "a", encoding="utf-8") as f:
             f.write(text)
             f.write("\r\n")
     except IOError as e:
         print(f"IOError: {e}")
         return 1
     return 0
+
 
 def EndGPIO():
     if not is_raspberry_pi():
@@ -180,7 +152,7 @@ def TurnUsbOn(i_scan, time):
     if has_MEGA4():
         # On utilise le Hub 1-1
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
-        cmd = f"{UHUBCTL} -a on -p {i_scan + 1} -l 1-1"
+        cmd = f"{getUhubctl()} -a on -p {i_scan + 1} -l 1-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
         if is_raspberry_pi():
             sleep(time)
@@ -204,7 +176,7 @@ def TurnUsbOff(i_scan, delay=0):
     sleep(delay)
     if has_MEGA4():
         # Les ports USB sont numérotés à partir de 1 avec uhubctl
-        cmd = f"{UHUBCTL} -a off -p {i_scan + 1} -l 1-1"
+        cmd = f"{getUhubctl()} -a off -p {i_scan + 1} -l 1-1"
         run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     else:
         try:
@@ -215,7 +187,8 @@ def TurnUsbOff(i_scan, delay=0):
             GPIO.output(realpin, GPIO.LOW)
             # Pour l'ancienne carte Relai
             # GPIO.output(realpin, GPIO.HIGH)
-        except IOError:
+        except IOError as e:
+            getLogger().warning("IOError: %s", e)
             return 1
     return 0
 
@@ -227,11 +200,10 @@ def ReadGPIOConfig():
         GPIO.setup(ConfigPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         state_ = GPIO.input(ConfigPin)
     except IOError as e:
-        print(f"IOError: {e}")
+        getLogger().warning("IOError: %s", e)
         state_ = 1
 
-    print(f"Etat GPIO {ConfigPin}: {state_}")
-    WriteTimeLogfile(f"Etat GPIO {ConfigPin}: {state_}")
+    getLogger().warning("Etat GPIO %d: %d", ConfigPin, state_)
     return state_
 
 
@@ -243,10 +215,10 @@ def WriteStartDateConfig(NextStartDate):
     }
     try:
         json_object = json.dumps(data, indent=len(data))
-        with open(NEXT_DATE_FILE, "w", encoding="utf-8") as outfile:
+        with open(getNextDateFile(), "w", encoding="utf-8") as outfile:
             outfile.write(json_object)
     except ValueError:
-        print("Error in write config file: ", NEXT_DATE_FILE)
+        WriteTimeLogfile(f"Error writing file: {getNextDateFile()}")
         return 1
 
     return 0
@@ -259,10 +231,10 @@ def ReadStartDateConfig():
         "2025-01-01T00:05:00Z",
     ]
     try:
-        with open(NEXT_DATE_FILE, "r", encoding="utf-8") as openfile:
+        with open(getNextDateFile(), "r", encoding="utf-8") as openfile:
             data = json.load(openfile)
     except FileNotFoundError:
-        WriteTimeLogfile("Error reading file: " + NEXT_DATE_FILE)
+        WriteTimeLogfile(f"Error reading file: {getNextDateFile()}")
 
     else:
         NextStartDate[0] = data["NextStartDate1"]
@@ -272,17 +244,9 @@ def ReadStartDateConfig():
     return NextStartDate
 
 
-def CopyLog():
-    # copy log folder to USB
-    cmd = "sudo cp -r " + LOG_DIR + " " + USB_DIR
-    # print(cmd)
-    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-    # print(result.returncode,result.stdout,result.stderr)
-
-
 if __name__ == "__main__":
     print("Test unitaire Miscellaneous")
-    print(f"{NEXT_DATE_FILE}: {ReadStartDateConfig()}")
+    print(f"{getNextDateFile()}: {ReadStartDateConfig()}")
     InitGPIO()
     ReadGPIOConfig()
     initDisplayFile()
