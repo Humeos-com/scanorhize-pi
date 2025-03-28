@@ -5,8 +5,9 @@ Utilise le pattern Singleton pour stocker la configuration
 
 import os
 import platform
-import logging
 import usb.core
+
+from ConfigApp import getLogger
 
 
 # Carte UUGEAR MEGA4
@@ -16,11 +17,13 @@ def get_MEGA4():
     try:
         dev = usb.core.find(idVendor=0x2109, idProduct=0x2817)
         if dev is None:
-            print("Pas de carte MEGA4")
             with_MEGA4 = False
     except usb.core.NoBackendError:
-        print("Pas de carte MEGA4")
         with_MEGA4 = False
+    if with_MEGA4:
+        getLogger().warning("Carte MEGA4 détectée")
+    else:
+        getLogger().warning("Pas de carte MEGA4 détectée")
     return with_MEGA4
 
 
