@@ -9,8 +9,6 @@ from ConfigApp import getLogger
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Server import (
-    HubData,
-    SendParameters,
     PostImageToServer,
     ReadConfigFromServer,
 )
@@ -20,7 +18,7 @@ from Miscellaneous import (
     ReadStartDateConfig,
     initDisplayFile,
 )
-from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
+from Campaign import CreateFolderImage, CopyImageToUSB
 from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
 
 DateStart = GetCurrentDate()
