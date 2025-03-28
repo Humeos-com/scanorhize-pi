@@ -7,7 +7,7 @@ import sys
 from dataclasses import dataclass, asdict
 from subprocess import run, SubprocessError
 import json
-from ConfigApp import getConfigHubFile, getScanorhizeServer, getConnectTimeout, getMaxTime
+from ConfigApp import getConfigHubFile, getScanorhizeServer, getConnectTimeout, getMaxTime, getLogger
 from Miscellaneous import WriteTimeLogfile
 from Campaign import RemoveTempImage, CreateTempImage
 from OSUtils import get_os
@@ -49,7 +49,7 @@ class HubData:
             with open(fullpath, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)  # Load JSON into a dictionary
         except (FileNotFoundError, ValueError):
-            WriteTimeLogfile(f"No file: {fullpath}")
+            getLogger().error("No file: %s", fullpath)
         else:
             self.__dict__.update(data)
         finally:
@@ -116,13 +116,13 @@ def getTokens():
 -H "accept: */*" -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' """
 
-    WriteTimeLogfile(cmdPost)
+    getLogger().warning(cmdPost)
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     if result.returncode != 0:
-        WriteTimeLogfile(
-            f"Post auth/devices: return: {result.returncode} error: {result.stderr}"
+        getLogger().error(
+            "Post auth/devices: return: %s  error: %s", result.returncode, result.stderr
         )
         return 1
 
@@ -136,10 +136,10 @@ def getTokens():
         status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
-        WriteTimeLogfile(f"Response status code: {status_code}")
+        getLogger().warning("Response status code: %s", status_code)
 
         if not 200 <= status_code < 300:
-            WriteTimeLogfile(f"Error: HTTP {status_code}")
+            getLogger().error("Error: HTTP %s", status_code)
             return 1
 
         if body.strip():
