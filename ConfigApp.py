@@ -43,12 +43,9 @@ class ConfigApp:
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
     logger = logging.getLogger("MainLogger")
-
-
-
 
     def __new__(cls):
         if cls._instance is None:
@@ -63,7 +60,7 @@ class ConfigApp:
         # Setup logging dans un fichier avec timestamp
         log_file = os.path.join(
             os.path.expanduser(cls._instance.log_dir),
-            f"Scanorhize_{datetime.now():%Y-%m-%d}.log"
+            f"Scanorhize_{datetime.now():%Y-%m-%d}.log",
         )
         fh = logging.FileHandler(log_file)
         formatter = logging.Formatter(
@@ -84,7 +81,9 @@ class ConfigApp:
                 for key, value in data.items():
                     setattr(cls._instance, key, value)
         except (FileNotFoundError, ValueError):
-            cls._instance.logger.error("Problem with the config file: %s", cls._instance.config_app_file)
+            cls._instance.logger.error(
+                "Problem with the config file: %s", cls._instance.config_app_file
+            )
 
         # Environment overrides
         if os.path.exists("DEV") or os.environ.get("DEV", False):
@@ -100,7 +99,9 @@ class ConfigApp:
         else:
             logging.getLogger().setLevel(logging.INFO)
 
-        cls._instance.logger.warning("Read configuration from: %s", cls._instance.config_app_file)
+        cls._instance.logger.warning(
+            "Read configuration from: %s", cls._instance.config_app_file
+        )
         return cls
 
     @classmethod

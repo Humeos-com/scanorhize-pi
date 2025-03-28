@@ -7,7 +7,13 @@ import sys
 from dataclasses import dataclass, asdict
 from subprocess import run, SubprocessError
 import json
-from ConfigApp import getConfigHubFile, getScanorhizeServer, getConnectTimeout, getMaxTime, getLogger
+from ConfigApp import (
+    getConfigHubFile,
+    getScanorhizeServer,
+    getConnectTimeout,
+    getMaxTime,
+    getLogger,
+)
 from Miscellaneous import WriteTimeLogfile
 from Campaign import RemoveTempImage, CreateTempImage
 from OSUtils import get_os

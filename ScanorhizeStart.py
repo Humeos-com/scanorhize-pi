@@ -18,7 +18,6 @@ from Server import HubData, SendParameters
 from Campaign import USBSpace
 
 
-
 getLogger().warning("ScanorhizeStart.py")
 
 res = InitGPIO()
@@ -79,7 +78,7 @@ for CurrentScanner in listScannerconfigs:
     )
     NextStartDates[i_scan] = nextDate
     NextStartseconds[i_scan] = nextDateS
-    getLogger().warning("Scanner-%s: Next start date: %s", i_scan+1, nextDate)
+    getLogger().warning("Scanner-%s: Next start date: %s", i_scan + 1, nextDate)
     i_scan += 1
 
 # Quand la carte WittyPi n'a plus de batterie, son heure interne est aléatoire.
@@ -151,7 +150,9 @@ SendParameters(Hub_)
 # Etape 4 #############################################
 # On éteint le Raspberry Pi et le WittyPi
 if is_dev():
-    getLogger().warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
+    getLogger().warning(
+        "Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé"
+    )
     sys.exit(0)
 
 cmdeject = "sudo eject /dev/sda"
