@@ -76,7 +76,7 @@ def getHwAddr(ifname=IFACE):
     s = socket(AF_INET, SOCK_DGRAM)
     # Convert ifname name to bytes using `.encode()`
     return ":".join(
-        "%02x" % b
+        f"{b:02x}"
         for b in ioctl(
             s.fileno(),
             0x8927,  # SIOCGIFHWADDR (Get MAC Address)

@@ -3,7 +3,6 @@ Fonctions qui encapsulent l'API du serveur Web
 """
 
 import os
-import sys
 from dataclasses import dataclass, asdict
 from subprocess import run, SubprocessError
 import json
@@ -317,7 +316,7 @@ def SendParameters(Hub_: HubData):
 
     except (IndexError, ValueError, json.JSONDecodeError) as e:
         WriteTimeLogfile(f"SendParameters: Error parsing response: {str(e)}")
-        return 1
+    return 1
 
 
 def GetWifiSSID():

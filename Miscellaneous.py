@@ -2,7 +2,6 @@
 
 import sys
 import json
-import datetime
 from subprocess import run
 from time import sleep
 
@@ -11,8 +10,8 @@ from time import sleep
 from DateUtils import GetCurrentDate
 from WittyPython import is_WittyPi_3
 from ConfigApp import WriteTimeLogfile, getLogger, getBatteryFile, getDisplayFile
-from ConfigApp import getUhubctl, getUsbDir
-from ConfigApp import getNextDateFile, getLogDir
+from ConfigApp import getUhubctl
+from ConfigApp import getNextDateFile
 
 from OSUtils import is_raspberry_pi, has_MEGA4
 

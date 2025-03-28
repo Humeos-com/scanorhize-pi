@@ -19,7 +19,7 @@ from Server import (
     GetWifiSSID,
     GetIP,
     updateServer,
-    ServerData,
+    HubData,
 )
 from Miscellaneous import WriteTimeLogfile, chaineIntwitherror, InitGPIO
 from OSUtils import is_raspberry_pi
@@ -30,7 +30,7 @@ from OSUtils import is_raspberry_pi
 LOG_DIR = "Log"
 DISPLAY_FILE = LOG_DIR + "/Display.txt"
 
-Server = ServerData()
+Server = HubData()
 
 WriteTimeLogfile("Start Scanorhize.py")
 
