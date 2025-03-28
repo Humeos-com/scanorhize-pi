@@ -7,7 +7,13 @@ from time import sleep
 
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
-from Server import HubData, getTokens, SendParameters, PostImageToServer, ReadConfigFromServer
+from Server import (
+    HubData,
+    getTokens,
+    SendParameters,
+    PostImageToServer,
+    ReadConfigFromServer,
+)
 from Miscellaneous import (
     WriteTimeLogfile,
     InitGPIO,
@@ -50,7 +56,11 @@ Hub_.diskSpacePercent = USBSpace()[0]
 Hub_.temperature = ReadTemp()
 Hub_.WriteConfig()
 
-WriteTimeLogfile(f"Bat: {Hub_.batteryLevelPercent}  " f"USB: {Hub_.diskSpacePercent}  " f"Temp: {Hub_.temperature}")
+WriteTimeLogfile(
+    f"Bat: {Hub_.batteryLevelPercent}  "
+    f"USB: {Hub_.diskSpacePercent}  "
+    f"Temp: {Hub_.temperature}"
+)
 SendParameters(Hub_)
 
 i_scan = 0

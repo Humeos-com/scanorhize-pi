@@ -69,7 +69,9 @@ SetNextStartDate(NextDate)
 cmd = "python3 ScanorhizeProcess.py"
 WriteTimeLogfile(cmd)
 try:
-    result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=True)
+    result = run(
+        cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+    )
 except CalledProcessError as exc:
     WriteTimeLogfile(exc.stderr)
 
@@ -107,7 +109,6 @@ if is_dev():
     WriteTimeLogfile("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
     sys.exit(0)
 
-# CopyLog()
 cmdeject = "sudo eject /dev/sda"
 result = run(
     cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False

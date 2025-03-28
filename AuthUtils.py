@@ -8,12 +8,14 @@ from socket import socket, inet_ntoa, AF_INET, SOCK_DGRAM
 from struct import pack
 from os import walk
 from OSUtils import is_raspberry_pi
+
 # from Scanner import ScannerData, listConfigScanner, extract_serial
 
 if is_raspberry_pi():
-    IFACE="eth0"
+    IFACE = "eth0"
 else:
-    IFACE="en0"
+    IFACE = "en0"
+
 
 class AuthenticationData:
     """Singleton class to store authentication data"""
@@ -66,17 +68,21 @@ class AuthenticationData:
         """Set initialization status"""
         self.__initialized = value
 
+
 def getHwAddr(ifname=IFACE):
     if not is_raspberry_pi():
         return "0A:0B:0C:0D:0E:0F"
 
     s = socket(AF_INET, SOCK_DGRAM)
     # Convert ifname name to bytes using `.encode()`
-    return ':'.join('%02x' % b for b in ioctl(
-        s.fileno(),
-        0x8927,  # SIOCGIFHWADDR (Get MAC Address)
-        pack('256s', ifname[:15].encode("utf-8"))  # Convert to bytes
-    )[18:24])
+    return ":".join(
+        "%02x" % b
+        for b in ioctl(
+            s.fileno(),
+            0x8927,  # SIOCGIFHWADDR (Get MAC Address)
+            pack("256s", ifname[:15].encode("utf-8")),  # Convert to bytes
+        )[18:24]
+    )
 
 
 def getIPAddr(ifname=IFACE):
@@ -92,7 +98,6 @@ def getIPAddr(ifname=IFACE):
         print(f"IOError: {e}")
         return None
     return inet_ntoa(info[20:24])
-
 
 
 if __name__ == "__main__":
