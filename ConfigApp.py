@@ -12,7 +12,7 @@ from datetime import datetime
 
 
 # CONFIG_PATH = "ConfigFile/Scanner"
-CONFIG_APP = "~/scanorhize.json"
+CONFIG_APP_FILE = "~/scanorhize.json"
 
 
 @dataclass
@@ -20,6 +20,7 @@ class ConfigApp:
     """Class to hold configuration data"""
 
     _instance = None  # Class variable to store the single instance
+    config_app_file = os.path.expanduser(CONFIG_APP_FILE)
     environment: str = "PROD"
     log_level: str = "INFO"
     log_dir: str = "Log"
@@ -35,8 +36,19 @@ class ConfigApp:
     max_time: int = 300
 
     # Start to setup formatter
-    logging.config.fileConfig("logging.conf")
+    logging_conf = os.path.join(config_path, "logging.conf")
+    if os.path.exists(logging_conf):
+        logging.config.fileConfig(logging_conf)
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
     logger = logging.getLogger("MainLogger")
+
+
+
 
     def __new__(cls):
         if cls._instance is None:
@@ -48,29 +60,31 @@ class ConfigApp:
     def _load_config(cls):
         """Load config from environment variables or config.json"""
 
-        # Setup logging, first
-        fh = logging.FileHandler("{:%Y-%m-%d}.log".format(datetime.now()))
+        # Setup logging dans un fichier avec timestamp
+        log_file = os.path.join(
+            os.path.expanduser(cls._instance.log_dir),
+            f"Scanorhize_{datetime.now():%Y-%m-%d}.log"
+        )
+        fh = logging.FileHandler(log_file)
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s"
         )
+        formatter.default_msec_format = None
         fh.setFormatter(formatter)
-
         cls._instance.logger.addHandler(fh)
-        cls._instance.logger.debug("TEST")
 
-        fullpath = os.path.expanduser(CONFIG_APP)
-        if not os.path.exists(fullpath):
-            cls._instance.logger.warning("No file: %s", fullpath)
+        if not os.path.exists(cls._instance.config_app_file):
+            cls._instance.logger.error("No file: %s", cls._instance.config_app_file)
             return cls
 
         try:
-            with open(fullpath, "r", encoding="utf-8") as openfile:
+            with open(cls._instance.config_app_file, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)
                 # Use setattr instead of updating __dict__
                 for key, value in data.items():
                     setattr(cls._instance, key, value)
         except (FileNotFoundError, ValueError):
-            cls._instance.logger.warning("Problem with the config file: %s", fullpath)
+            cls._instance.logger.error("Problem with the config file: %s", cls._instance.config_app_file)
 
         # Environment overrides
         if os.path.exists("DEV") or os.environ.get("DEV", False):
@@ -86,7 +100,7 @@ class ConfigApp:
         else:
             logging.getLogger().setLevel(logging.INFO)
 
-        cls._instance.logger.warning("Read configuration from: %s", fullpath)
+        cls._instance.logger.warning("Read configuration from: %s", cls._instance.config_app_file)
         return cls
 
     @classmethod
@@ -153,21 +167,32 @@ def getNextDateFile():
         os.path.expanduser(ConfigApp().config_path), ConfigApp().next_date_file
     )
 
+
 def getConfigHubFile():
     return os.path.join(
         os.path.expanduser(ConfigApp().config_path), ConfigApp().config_hub_file
     )
 
+
 def getConfigPath():
     return os.path.expanduser(ConfigApp().config_path)
+
+
 def getScanorhizeServer():
     return ConfigApp().scanorhize_server
+
+
 def getConnectTimeout():
     return ConfigApp().connect_timeout
+
+
 def getMaxTime():
     return ConfigApp().max_time
+
+
 def getConfigFile():
-    return os.path.expanduser(CONFIG_APP)
+    return ConfigApp().config_app_file
+
 
 def getLogDir():
     return ConfigApp().log_dir

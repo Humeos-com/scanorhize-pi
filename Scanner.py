@@ -11,7 +11,8 @@ from subprocess import run
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, WriteTimeLogfile
 from DateUtils import SecondsToDate, DateToSeconds
-from OSUtils import is_raspberry_pi, is_dev
+from OSUtils import is_raspberry_pi
+from ConfigApp import is_dev
 
 X_MAX = 216
 Y_MAX = 297
@@ -29,6 +30,7 @@ CONFIG_PATH = "ConfigFile/Scanner/"
 DISPLAY_FILE = "Log/Display.txt"
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
+
 
 @dataclasses.dataclass
 class ZoneRectangle:
@@ -61,7 +63,7 @@ class ScannerData:
     LastImgFile = ""
     ZoneAcq = ZoneRectangle(0, 0, X_MAX, Y_MAX)
     quality = 5
-    device = "NoScannerDetected"  # le device au sens SANE usb+fabricant+série
+    device = "NoScannerDetected"  # le device au sens SANE usb+fabricant+#série
     token = "token_bidon"
     projectId = ""
     sampleId = ""
@@ -174,6 +176,7 @@ class ScannerData:
 # Initialisation de l'objet Scanner
 Scanner = ScannerData()
 
+
 def extract_serial(device_string: str) -> str:
     """Extract serial number from device string
 
@@ -184,7 +187,7 @@ def extract_serial(device_string: str) -> str:
         str: Serial number part after the colon, or empty string if invalid format
     """
     try:
-        parts = device_string.split(':')
+        parts = device_string.split(":")
         return parts[1] if len(parts) > 1 else ""
     except (IndexError, AttributeError):
         return ""
@@ -419,6 +422,7 @@ def listScannerSerials():
     WriteTimeLogfile(listserials)
     return listserials
 
+
 def listConfigScanner():
     try:
         # de la forme 1-Scanner.json
@@ -452,4 +456,3 @@ if __name__ == "__main__":
 
     # WriteScannerConfig(Scanner, "1-Scanner.json")
     sys.exit(0)
-
