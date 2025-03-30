@@ -58,7 +58,7 @@ def CreateFolderImage(Name, i_scan):
     try:
         USBfolder = getUsbDir()
         scannum = "Scanner" + str(i_scan + 1)
-        FolderImage = USBfolder + "/" + Name + "/" + scannum + "/"
+        FolderImage = path.join(USBfolder, Name, scannum)
         data = "Folder Image: " + FolderImage
         if not os.path.exists(FolderImage):
             os.makedirs(FolderImage)
@@ -75,14 +75,14 @@ def CopyImageToUSB(Scanner, FolderImage_):
     try:
         date = Scanner.LastImgTime
         fileName = date.replace(":", "-")
-        imagejpg2000 = fileName + ".jp2"
-        jp2Path = FolderImage_ + imagejpg2000
-        print(jp2Path)
+        imagejpg2000 = f"image_{fileName}.jp2"
+        jp2Path = path.join(FolderImage_, imagejpg2000)
         # Check if source file exists
         if not os.path.exists(Scanner.LastImgFile):
             getLogger().error("Source file not found: %s", Scanner.LastImgFile)
             return 1
         # Use shutil.copy2 instead of shell command
+        getLogger().warning("Copy %s to %s", Scanner.LastImgFile, jp2Path)
         shutil.copy2(Scanner.LastImgFile, jp2Path)
         return 0
 
