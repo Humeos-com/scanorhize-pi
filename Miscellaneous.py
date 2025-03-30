@@ -55,6 +55,18 @@ Ch3Pin = 22  # Scanner3
 Ch4Pin = 27  # Clé 4G
 PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
+# Pour l'alimentation de la carte WittyPi L3V7
+# # BCM
+CHRG_PIN = 5    # input to detect charging status
+STDBY_PIN = 6   # input to detect standby status
+# chrg=$(gpio -g read $CHRG_PIN)
+# if [ "$chrg" == "1" ] && [ "$stdby" == "1" ]; then
+#       voltages+=" (discharging battery...)"
+#      elif [ "$chrg" == "0" ] && [ "$stdby" == "1" ]; then
+#        voltages+=" (charging battery...)"
+#      fi
+
+
 
 def getChPin(i_scan: int):
     if 0 <= i_scan < 4:
@@ -118,6 +130,12 @@ def WriteBatterieFile(Volt, Cap):
         print(f"IOError: {e}")
         return 1
     return 0
+
+def getPowerMode():
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(CHRG_PIN, GPIO.IN)
+    return GPIO.input(CHRG_PIN)
 
 
 def EndGPIO():
@@ -249,6 +267,7 @@ if __name__ == "__main__":
     InitGPIO()
     ReadGPIOConfig()
     initDisplayFile()
+    print(f"Power mode: {getPowerMode()}")
     WriteTimeLogfile("Test unitaire main de Miscellaneous")
     value = input("Voulez-vous modifier l'état des GPIO ? [Non=Entrée, sinon, Oui=o]: ")
     if not value:
