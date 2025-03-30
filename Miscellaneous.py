@@ -8,7 +8,15 @@ from time import sleep
 # import logging
 
 from DateUtils import GetCurrentDate
-from WittyPython import is_WittyPi_3, is_WittyPi_4_L3V7, get_input_voltage, get_input_voltage, get_output_voltage, get_output_current, get_power_mode
+from WittyPython import (
+    is_WittyPi_3,
+    is_WittyPi_4_L3V7,
+    get_input_voltage,
+    get_input_voltage,
+    get_output_voltage,
+    get_output_current,
+    get_power_mode,
+)
 from ConfigApp import WriteTimeLogfile, getLogger, getBatteryFile, getDisplayFile
 from ConfigApp import getUhubctl
 from ConfigApp import getNextDateFile
@@ -58,9 +66,8 @@ PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 # Pour l'alimentation de la carte WittyPi L3V7
 # Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
 # Pins BCM
-CHRG_PIN = 5    # input to detect charging status
-STDBY_PIN = 6   # input to detect standby status
-
+CHRG_PIN = 5  # input to detect charging status
+STDBY_PIN = 6  # input to detect standby status
 
 
 def getChPin(i_scan: int):
@@ -68,7 +75,7 @@ def getChPin(i_scan: int):
         # print(f"getChPin: {i_scan} => {PinArray[i_scan]}")
         return PinArray[i_scan]
 
-    print(f"La valeur passee doit être comprise entre 0 et 4, ici: {i_scan}")
+    getLogger().error("La valeur passee doit être comprise entre 0 et 4, ici: %d", i_scan)
     return -1
 
 
@@ -95,7 +102,7 @@ def initDisplayFile():
         with open(getDisplayFile(), "w", encoding="utf-8") as f:
             f.write("")
     except IOError as e:
-        print(f"IOError: {e}")
+        getLogger().error("IOError: %s", e)
         return 1
     return 0
 
@@ -122,7 +129,7 @@ def WriteBatterieFile(Volt, Cap):
             f.write(text)
             f.write("\r\n")
     except IOError as e:
-        print(f"IOError: {e}")
+        getLogger().error("IOError: %s", e)
         return 1
     return 0
 
@@ -133,7 +140,7 @@ def getChargingStatus():
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(CHRG_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        return(GPIO.input(CHRG_PIN))
+        return GPIO.input(CHRG_PIN)
     return 0
 
 
@@ -143,7 +150,7 @@ def getStandbyStatus():
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(STDBY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        return(GPIO.input(STDBY_PIN))
+        return GPIO.input(STDBY_PIN)
     return 0
 
 
@@ -160,6 +167,9 @@ def isWittyPiCharging():
 
 
 def ReadBatVoltCap():
+
+    if not is_raspberry_pi():
+        return(5.0, 99.0)
 
     if get_power_mode():
         # On est dans le cas d'un batterie interne
@@ -196,7 +206,7 @@ def InitGPIO():
                 print(f"Initialisation du GPIO: {PinArray[i]}")
                 GPIO.output(PinArray[i], GPIO.LOW)
     except IOError as e:
-        print(f"IOError: {e}")
+        getLogger().error("IOError: %s", e)
         return 1
     return 0
 

@@ -19,7 +19,7 @@ else:
 
 WITTY_PI_3_I2C_ADDRESS = 0x69
 WITTY_PI_4_I2C_ADDRESS = 0x8
-WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37 # 55 en décimal
+WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37  # 55 en décimal
 
 
 class WittyPi:
@@ -70,15 +70,15 @@ class WittyPi:
             print("Aucune carte Witty Py trouvee.")
         return self.firmware_id
 
-
     def get_input_voltage(self):
 
         if self.get_power_mode() != 0:
-            self.input_voltage = self.read_register(0x01) + self.read_register(0x02) / 100
+            self.input_voltage = (
+                self.read_register(0x01) + self.read_register(0x02) / 100
+            )
         else:
             self.input_voltage = 0.0
         return self.input_voltage
-
 
     def get_output_voltage(self):
 
