@@ -17,10 +17,7 @@ from ConfigApp import is_dev
 X_MAX = 216
 Y_MAX = 297
 TIME_USB_READY = 40
-TIME_AFTER_SCAN = 10
-if is_dev():
-    TIME_USB_READY = 10
-    TIME_AFTER_SCAN = 10
+TIME_AFTER_SCAN = 12
 if not is_raspberry_pi():
     TIME_USB_READY = 0
     TIME_AFTER_SCAN = 0
