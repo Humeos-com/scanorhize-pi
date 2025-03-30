@@ -173,6 +173,7 @@ def ReadBatVoltCap():
 
     if get_power_mode():
         # On est dans le cas d'un batterie interne
+        # La formule provient de l'ancienne application...
         Volt = get_input_voltage()
         Cap = round((Volt - 2.7) / 1.49 * 100, 2)
         return (Volt, Cap)

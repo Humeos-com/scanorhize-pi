@@ -24,9 +24,6 @@ from Server import (
 from Miscellaneous import WriteTimeLogfile, chaineIntwitherror, InitGPIO
 from OSUtils import is_raspberry_pi
 
-# from Campaign import CreateFolderImage, CopyImageToUSB, USBSpace
-# from I2C import ReadBatVoltCap
-
 LOG_DIR = "Log"
 DISPLAY_FILE = LOG_DIR + "/Display.txt"
 

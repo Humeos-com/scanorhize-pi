@@ -4,12 +4,13 @@ import sys
 from subprocess import run, CalledProcessError
 
 from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
-from WittyPython import ReadBatVoltCap, ReadTemp
+from WittyPython import ReadTemp
 from Miscellaneous import (
     InitGPIO,
     EndGPIO,
     TurnUsbOn,
     ReadGPIOConfig,
+    ReadBatVoltCap
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds, CalculNextStartDate
 from ConfigApp import is_dev, getLogger
@@ -119,10 +120,14 @@ except CalledProcessError as exc:
 ## import ScanorhizeProcess
 
 # Etape 3 #############################################
-# Peut-être à mettre dans un sous programme au cas où il y aurait des plantages
-# On échange avec la plateforme Web pour envoyer les images et les paramètres
-
 # On allume la clé 4G et on attend d'avoir le réseau
+#
+# Etape 4 #############################################
+# On lance un sous programme qui met à jour toutes les données sur la plateforme
+# On échange avec la plateforme Web pour envoyer les images et les paramètres
+cmd = "python3 Server.py"
+
+
 
 
 # Paramètres à envoyer au début du process

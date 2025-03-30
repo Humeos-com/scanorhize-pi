@@ -223,8 +223,6 @@ def updateScanParameters(scanner: ScannerData):
 
 ScanNumber = 3
 imagetiff = "imagescan.tiff"
-# imagepathtiff = "/home/pi/Scanorhize/static/" + imagetiff
-# imagepath = "/home/pi/Scanorhize/static/"
 imagepathtiff = "static/" + imagetiff
 imagepath = "static/"
 imagepathjp2000 = imagepath + "imagejp2000.jp2"

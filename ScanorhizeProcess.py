@@ -4,6 +4,7 @@ Main process for Scanorhize: fait l'acquisition,
 """
 
 from time import sleep
+from os import path
 
 from ConfigApp import getLogger
 from Scanner import listConfigScanner, scanAcq, ScannerData
@@ -18,7 +19,7 @@ from Miscellaneous import (
     ReadStartDateConfig,
     initDisplayFile,
 )
-from Campaign import CreateFolderImage, CopyImageToUSB
+from Campaign import CopyImageToUSB,CreateFolderOnUSB
 from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
 
 DateStart = GetCurrentDate()
@@ -75,8 +76,9 @@ for CurrentScanner in listScannerconfigs:
         scanning = 1
         if Scanner.error == 0:
             getLogger().warning("Image acquisition Ok")
-            sleep(5)
-            FolderImage = CreateFolderImage(Scanner.Campaign, i_scan)
+            sleep(5) # Voir si on peut réduire ce timer
+            FolderImage = CreateFolderOnUSB(Scanner.projectId)
+            FolderImage = CreateFolderOnUSB(path.join(FolderImage, Scanner.sampleId))
             copyerror = CopyImageToUSB(Scanner, FolderImage)
             if copyerror == 0:
                 getLogger().warning("Image copied to USB")
