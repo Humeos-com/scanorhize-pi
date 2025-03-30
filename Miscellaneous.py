@@ -8,7 +8,7 @@ from time import sleep
 # import logging
 
 from DateUtils import GetCurrentDate
-from WittyPython import is_WittyPi_3
+from WittyPython import is_WittyPi_3, is_WittyPi_4_L3V7, get_input_voltage, get_input_voltage, get_output_voltage, get_output_current, get_power_mode
 from ConfigApp import WriteTimeLogfile, getLogger, getBatteryFile, getDisplayFile
 from ConfigApp import getUhubctl
 from ConfigApp import getNextDateFile
@@ -56,15 +56,10 @@ Ch4Pin = 27  # Clé 4G
 PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
 
 # Pour l'alimentation de la carte WittyPi L3V7
-# # BCM
+# Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
+# Pins BCM
 CHRG_PIN = 5    # input to detect charging status
 STDBY_PIN = 6   # input to detect standby status
-# chrg=$(gpio -g read $CHRG_PIN)
-# if [ "$chrg" == "1" ] && [ "$stdby" == "1" ]; then
-#       voltages+=" (discharging battery...)"
-#      elif [ "$chrg" == "0" ] && [ "$stdby" == "1" ]; then
-#        voltages+=" (charging battery...)"
-#      fi
 
 
 
@@ -131,11 +126,52 @@ def WriteBatterieFile(Volt, Cap):
         return 1
     return 0
 
-def getPowerMode():
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(CHRG_PIN, GPIO.IN)
-    return GPIO.input(CHRG_PIN)
+
+def getChargingStatus():
+    """for the WittyPi L3V7"""
+    if is_WittyPi_4_L3V7():
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(CHRG_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        return(GPIO.input(CHRG_PIN))
+    return 0
+
+
+def getStandbyStatus():
+    """for the WittyPi L3V7"""
+    if is_WittyPi_4_L3V7():
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(STDBY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        return(GPIO.input(STDBY_PIN))
+    return 0
+
+
+def isWittyPiCharging():
+    if is_WittyPi_4_L3V7():
+        chrg = getChargingStatus()
+        stdby = getStandbyStatus()
+        if not chrg and stdby:
+            # Charging battery
+            return 1
+        # Discharging battery
+        return 0
+    return 1
+
+
+def ReadBatVoltCap():
+
+    if get_power_mode():
+        # On est dans le cas d'un batterie interne
+        Volt = get_input_voltage()
+        Cap = round((Volt - 2.7) / 1.49 * 100, 2)
+        return (Volt, Cap)
+
+    # On est dans le cas d'une alimentation USB (Power Bank ou alimentation)
+    # La power bank a un redresseur 5V, donc on ne connaît pas son voltage interne
+    Volt = get_output_voltage()
+    Cap = 100.0
+    return (Volt, Cap)
 
 
 def EndGPIO():
@@ -267,7 +303,8 @@ if __name__ == "__main__":
     InitGPIO()
     ReadGPIOConfig()
     initDisplayFile()
-    print(f"Power mode: {getPowerMode()}")
+    print(f"Is charging? {isWittyPiCharging()}")
+    print(f"Volts: {ReadBatVoltCap()[0]} Capacity: {ReadBatVoltCap()[1]}")
     WriteTimeLogfile("Test unitaire main de Miscellaneous")
     value = input("Voulez-vous modifier l'état des GPIO ? [Non=Entrée, sinon, Oui=o]: ")
     if not value:

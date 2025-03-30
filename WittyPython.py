@@ -19,6 +19,7 @@ else:
 
 WITTY_PI_3_I2C_ADDRESS = 0x69
 WITTY_PI_4_I2C_ADDRESS = 0x8
+WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37 # 55 en décimal
 
 
 class WittyPi:
@@ -49,11 +50,11 @@ class WittyPi:
             self.firmware_revision = 0
 
             self.get_firmware_id()
+            self.get_power_mode()
             self.get_input_voltage()
             self.get_output_voltage()
             self.get_output_current()
             self.get_temperature()
-            self.get_power_mode()
             self.get_firmware_revision()
 
             self.initialized = True  # Mark as initialized
@@ -69,10 +70,15 @@ class WittyPi:
             print("Aucune carte Witty Py trouvee.")
         return self.firmware_id
 
+
     def get_input_voltage(self):
 
-        self.input_voltage = self.read_register(0x01) + self.read_register(0x02) / 100
+        if self.get_power_mode() != 0:
+            self.input_voltage = self.read_register(0x01) + self.read_register(0x02) / 100
+        else:
+            self.input_voltage = 0.0
         return self.input_voltage
+
 
     def get_output_voltage(self):
 
@@ -129,6 +135,10 @@ class WittyPi:
 
         return self.i2c_address == WITTY_PI_4_I2C_ADDRESS
 
+    def is_WittyPi_4_L3V7(self):
+
+        return self.firmware_id == WITTY_PI_4_L3V7_FIRMWARE_ID
+
     def __str__(self):
 
         if self.is_WittyPi_3():
@@ -161,11 +171,29 @@ def is_WittyPi_4():
     return WittyPi().is_WittyPi_4()
 
 
-def ReadBatVoltCap():
+def is_WittyPi_4_L3V7():
 
-    Volt = WittyPi().get_input_voltage()
-    Cap = round((Volt - 2.7) / 1.49 * 100, 2)
-    return (Volt, Cap)
+    return WittyPi().is_WittyPi_4_L3V7()
+
+
+def get_input_voltage():
+
+    return WittyPi().get_input_voltage()
+
+
+def get_output_voltage():
+
+    return WittyPi().get_output_voltage()
+
+
+def get_output_current(self):
+
+    return WittyPi().get_output_current()
+
+
+def get_power_mode():
+
+    return WittyPi().get_power_mode()
 
 
 def ReadTemp():
@@ -176,10 +204,11 @@ def ReadTemp():
 def main():
 
     print(WittyPi())
-    print(ReadBatVoltCap())
+    print(f"is_WittyPi_4_L3V7: {is_WittyPi_4_L3V7()}")
     print(ReadTemp())
 
-    for i in range(0, 5000):
+    # for i in range(0, 5000):
+    for i in range(0, 1):
         print(f"{i}:{WittyPi().get_output_current():.3f}", flush=True)
         sleep(1)
 
