@@ -235,7 +235,7 @@ def InitGPIO():
             # On arrête les scanners
             for i_pin in range(0, 3):
                 print(f"Initialisation du GPIO: {PinArray[i_pin]}")
-                GPIO.setup(i_pin, GPIO.OUT)
+                GPIO.setup(PinArray[i_pin], GPIO.OUT)
                 GPIO.output(PinArray[i_pin], GPIO.LOW)
     except IOError as e:
         getLogger().error("IOError: %s", e)
