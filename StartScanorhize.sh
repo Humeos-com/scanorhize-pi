@@ -8,5 +8,5 @@ then
     echo "DEBUG mode: on mesure le courant."
     python3 WittyPython.py > Log/courant_$DATE.log &
 fi
-sudo python3 ScanorhizeStart.py >> Log/ScanorhizeStart.log 2>&1 &
+python3 ScanorhizeStart.py >> Log/ScanorhizeStart.log 2>&1 &
 
