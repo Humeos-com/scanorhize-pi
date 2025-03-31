@@ -12,7 +12,7 @@ from subprocess import run
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, WriteTimeLogfile
 from DateUtils import SecondsToDate, DateToSeconds
 from OSUtils import is_raspberry_pi
-from ConfigApp import is_dev
+from ConfigApp import getDisplayFile, getConfigPath
 
 X_MAX = 216
 Y_MAX = 297
@@ -23,8 +23,8 @@ if not is_raspberry_pi():
     TIME_AFTER_SCAN = 0
 
 
-CONFIG_PATH = "ConfigFile/Scanner/"
-DISPLAY_FILE = "Log/Display.txt"
+CONFIG_PATH = getConfigPath()
+DISPLAY_FILE = getDisplayFile()
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
 
