@@ -393,14 +393,14 @@ if __name__ == "__main__":
     getTokens()
     print(pingAPI("www.google.com"))
     # print(pingAPI("192.168.73.1"))
-    syncImageFiles()
+    # syncImageFiles()
     sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     scan_num = 0
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
-        PostImageToServer(Scanner)
+    #    PostImageToServer(Scanner)
         scan_num += 1
 
     # WriteScannerConfig(Scanner, "1-Scanner.json")
