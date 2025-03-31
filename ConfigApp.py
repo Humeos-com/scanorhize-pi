@@ -57,6 +57,7 @@ class ConfigApp:
         self.usb_dir = "/media/pi/Image"
         self.scanorhize_server = "scanorhize.duckdns.org"
         self.connect_timeout = 10
+        self.max_time = 300
         self.logger = logging.getLogger("ConfigApp")
 
         # Setup basic logging with defaults

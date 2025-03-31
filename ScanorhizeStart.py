@@ -176,3 +176,7 @@ setNextShutdownDate(date_new)
 
 # lance le poweroff du Raspberry et éteint le WittyPi
 doShutdown()
+cmd = "sudo poweroff"
+result = run(
+    cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+)
