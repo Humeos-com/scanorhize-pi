@@ -103,13 +103,11 @@ def CopyFromJson(ScannerObj: ScannerData, data):
         ScannerObj.quality = data["quality"]
     return ScannerObj
 
-def syncImageFiles():
+def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
     # On envoie les fichiers images
     # On envoie les fichiers JSON
-    Hub_ = HubData()
-    Hub_.ReadConfig()
-    src = path.join(getUsbDir(), Hub_.projectId)
+    src = path.join(getUsbDir(), hub_.projectId)
     cmd = f"s3cmd sync {src} s3://scanorhize-images-prod"
     try:
         result = run(

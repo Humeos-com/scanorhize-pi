@@ -148,7 +148,7 @@ try:
         Hub_.temperature,
     )
     SendParameters(Hub_)
-    syncImageFiles()
+    syncImageFiles(Hub_)
 
 except RuntimeError as exc:
     getLogger().error(exc)
