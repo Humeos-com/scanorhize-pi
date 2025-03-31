@@ -1,5 +1,5 @@
 # Specific Sanorhize
-ConfigFile/Scanner/NextStartDate.json
+ConfigFile/*
 .DS_Store
 Log/
 static/*.jp2
