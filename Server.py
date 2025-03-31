@@ -108,12 +108,21 @@ def syncImageFiles(hub_: HubData):
     # On envoie les fichiers images
     # On envoie les fichiers JSON
     src = path.join(getUsbDir(), hub_.projectId)
-    cmd = f"s3cmd sync {src} s3://scanorhize-images-prod"
+    cmd = f"s3cmd --no-check-md5 --quiet sync {src} s3://scanorhize-images-prod"
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
         getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
+        # on supprime les images de l'arboresence
+        # find src -name \*.jp2 -o -name \*.json -print0 | xargs -0 -n rm
+        # def remove_files_in_directory(path):
+        # if os.path.exists(path):
+        #     for root, dirs, files in os.walk(path, topdown=False):
+        #         for name in files:
+        #             file_path = os.path.join(root, name)
+        #             os.remove(file_path)
+
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncImageFiles: %s", e)
 
