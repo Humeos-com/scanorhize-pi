@@ -114,6 +114,17 @@ try:
         getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
         raise RuntimeError("Pas de connectivité !")
 
+    # On synchronise l'horloge de la carte WittyPi avec le serveur
+    try:
+        cmd = "sudo ./TimeSynchronisation.sh"
+        getLogger().warning(cmd)
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+        )
+    except CalledProcessError as exc:
+        getLogger().error(exc.stderr)
+
+
     #
     # Etape 4 #############################################
     # On lance un sous programme qui met à jour toutes les données sur la plateforme
