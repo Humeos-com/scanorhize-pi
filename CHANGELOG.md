@@ -12,7 +12,7 @@ Créer un RAMDisk et modifier l'écriture des images
 Fin du travail de réécriture pour PyLint
 
 ### Added
-Addition du fichier de configuration Server.json pour les paramètres de la SIM
+Addition du fichier de configuration Hub.json pour les paramètres du Raspberry et de la carte SIM
 Création des modules pour séparer les imports
 Addition du menu "Server" dans l'application Flask
 Addition de méthodes main pour tests unitaires
