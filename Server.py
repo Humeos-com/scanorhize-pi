@@ -2,9 +2,10 @@
 Fonctions qui encapsulent l'API du serveur Web
 """
 
-import os
+import sys
+from os import path
 from dataclasses import dataclass, asdict
-from subprocess import run, SubprocessError
+from subprocess import run, SubprocessError, CalledProcessError
 import json
 from ConfigApp import (
     getConfigHubFile,
@@ -14,7 +15,7 @@ from ConfigApp import (
     getLogger,
 )
 from Miscellaneous import WriteTimeLogfile
-from Campaign import RemoveTempImage, CreateTempImage
+from Campaign import RemoveTempImage, CreateTempImage, getUsbDir
 from OSUtils import get_os
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
@@ -29,6 +30,7 @@ class HubData:
     password: str = ""
     address: str = ""
     ping: int = 0
+    projectId: str = ""
     token: str = "token_bidon"
     batteryLevelPercent: int = 0
     diskSpacePercent: int = 0
@@ -101,6 +103,23 @@ def CopyFromJson(ScannerObj: ScannerData, data):
         ScannerObj.quality = data["quality"]
     return ScannerObj
 
+def syncImageFiles():
+    """Synchronise les fichiers images et JSON sur le serveur"""
+    # On envoie les fichiers images
+    # On envoie les fichiers JSON
+    Hub_ = HubData()
+    Hub_.ReadConfig()
+    src = path.join(getUsbDir(), Hub_.projectId)
+    cmd = f"s3cmd sync {src} s3://scanorhize-images-prod"
+    try:
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+        )
+        getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
+    except (SubprocessError, CalledProcessError) as e:
+        getLogger().error("SyncImageFiles: %s", e)
+
+
 
 def getTokens():
 
@@ -152,6 +171,7 @@ def getTokens():
             Hub_ = HubData()
             Hub_.ReadConfig()
             Hub_.token = results["accessTokenHub"]
+            Hub_.projectId = results["projectId"]
             Hub_.WriteConfig()
             for i in range(1, num_scan + 1):
                 # Initialisation de l'objet Scanner
@@ -327,7 +347,7 @@ def GetWifiSSID():
         )
         # print(result.returncode, result.stdout, result.stderr)
         x = (result.stdout).split('"')
-    except SubprocessError as e:
+    except (SubprocessError, CalledProcessError) as e:
         print(f"Error: {e}")
         x = ["", "", ""]
     # print(x)
@@ -353,22 +373,30 @@ def GetIP():
 
 
 def pingAPI(address):
+    """Lance un ping unique. Le timeout par défaut sur Linux est de 10s
+
+    Args:
+        address (str): nom DNS ou IP
+
+    Returns:
+        int: 1 si le address répond, 0 en cas d'erreur
+    """
     try:
-        response = os.system("ping -c 1 " + address)
-        # print("address: ",address,"response : ",response)
-    except OSError as e:
-        WriteTimeLogfile(f"Ping Error: {e}")
-        response = 1
-    if response == 0:
-        print("Ping OK")
+        run(["ping", "-c 1", address], capture_output=True, text=True, check=True)
+        getLogger().warning("Ping OK: %s", address)
         return 1
+    except (SubprocessError, CalledProcessError) as e:
+        getLogger().error("Ping Error: %s", e)
     return 0
 
 
 if __name__ == "__main__":
     # pylint: disable=duplicate-code
     getTokens()
-    # sys.exit(0)
+    print(pingAPI("www.google.com"))
+    # print(pingAPI("192.168.73.1"))
+    syncImageFiles()
+    sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     scan_num = 0

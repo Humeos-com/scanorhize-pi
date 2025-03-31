@@ -12,9 +12,7 @@ from WittyPython import (
     is_WittyPi_3,
     is_WittyPi_4_L3V7,
     get_input_voltage,
-    get_input_voltage,
     get_output_voltage,
-    get_output_current,
     get_power_mode,
 )
 from ConfigApp import WriteTimeLogfile, getLogger, getBatteryFile, getDisplayFile
@@ -191,21 +189,54 @@ def EndGPIO():
     GPIO.cleanup()
     return
 
+def Start4G():
+    """Allume le port USB de la clé 4G
+    """
+    if not is_raspberry_pi():
+        return 0
+    try:
+        if not has_MEGA4():
+            GPIO.setwarnings(False)
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(PinArray[3], GPIO.OUT)
+            GPIO.output(PinArray[3], GPIO.HIGH)
+    except IOError as e:
+        getLogger().error("IOError: %s", e)
+        return 1
+    return 0
+
+
+def End4G():
+    """Eteint le port USB de la clé 4G
+    """
+    if not is_raspberry_pi():
+        return 0
+    try:
+        if not has_MEGA4():
+            GPIO.setwarnings(False)
+            GPIO.setmode(GPIO.BCM)
+            GPIO.output(PinArray[3], GPIO.LOW)
+            GPIO.cleanup(PinArray[3])
+    except IOError as e:
+        getLogger().error("IOError: %s", e)
+        return 1
+    return 0
+
 
 def InitGPIO():
+    """Fonction historique pour les port USB
+    """
     if not is_raspberry_pi():
         return 0
     try:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         if not has_MEGA4():
-            for i_pin in PinArray:
-                GPIO.setup(i_pin, GPIO.OUT)
-            # On n'arrête pas la clé 4G
-            GPIO.output(PinArray[3], GPIO.HIGH)
-            for i in range(0, 3):
+            # On arrête les scanners
+            for i_pin in range(0, 3):
                 print(f"Initialisation du GPIO: {PinArray[i]}")
-                GPIO.output(PinArray[i], GPIO.LOW)
+                GPIO.setup(i_pin, GPIO.OUT)
+                GPIO.output(PinArray[i_pin], GPIO.LOW)
     except IOError as e:
         getLogger().error("IOError: %s", e)
         return 1
@@ -322,7 +353,7 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         # On allume la clé 4G
-        TurnUsbOn(3, 5)
+        Start4G()
         for int_scan in [0, 1, 2]:
             value = input(
                 f"Basculer Scanner-{int_scan + 1} ? [Non=Entrée, sinon, Oui=o]: "
@@ -343,4 +374,5 @@ if __name__ == "__main__":
         EndGPIO()
         sys.exit(0)
 
+    End4G()
     EndGPIO()

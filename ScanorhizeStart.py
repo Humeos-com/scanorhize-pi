@@ -1,4 +1,6 @@
-"""Lance le scanner et programme le prochain réveil"""
+"""Lance le scanner et programme le prochain réveil"
+On gère les GPIO pour la carte 4G depuis ce programme
+"""
 
 import sys
 from subprocess import run, CalledProcessError
@@ -8,47 +10,23 @@ from WittyPython import ReadTemp
 from Miscellaneous import (
     InitGPIO,
     EndGPIO,
-    TurnUsbOn,
+    Start4G,
+    End4G,
     ReadGPIOConfig,
-    ReadBatVoltCap
+    ReadBatVoltCap,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds, CalculNextStartDate
-from ConfigApp import is_dev, getLogger
+from ConfigApp import is_dev, getLogger, getScanorhizeServer
 from Scanner import listConfigScanner, ScannerData
-from Server import HubData, SendParameters
-from Campaign import USBSpace
+from Server import HubData, SendParameters, pingAPI, syncImageFiles
 
+from Campaign import USBSpace
 
 getLogger().warning("ScanorhizeStart.py")
 
-res = InitGPIO()
-if res != 0:
-    getLogger().error("InitGPIOError")
-# On allume la clé 4G
-res = TurnUsbOn(3, 0)
-if res != 0:
-    getLogger().error("TurnUsbOnError")
-
-
+# On regaarde si on est en mode configuration
 config = ReadGPIOConfig()
 EndGPIO()
-
-# connexion réseau en parralèle pour optimiser le temps
-# res=0
-# iteration=0
-# while res==0 and iteration<12:
-# res=pingAPI("www.google.com")
-# if res==0:
-#   cmd="sudo ifconfig wlan0 down"
-#  WriteTimeLogfile(cmd)
-# subprocess.call(cmd,shell=True)
-# cmd="sudo ifconfig wlan0 up"
-# WriteTimeLogfile(cmd)
-# subprocess.call(cmd,shell=True)
-# sleep(20)
-# WriteTimeLogfile(str(res)+" "+str(iteration))
-# iteration=iteration+1
-
 
 if config == 0:
     # En mode config
@@ -121,13 +99,41 @@ except CalledProcessError as exc:
 
 # Etape 3 #############################################
 # On allume la clé 4G et on attend d'avoir le réseau
+
+Start4G()
+# Teste la connectivité
+res = 0
+MAX_ITERATION = 12
+iteration = 0
+while res == 0 and iteration < MAX_ITERATION:
+    res = pingAPI(getScanorhizeServer())
+    iteration += 1
+#    if res==0:
+#   cmd="sudo ifconfig wlan0 down"
+#  WriteTimeLogfile(cmd)
+# subprocess.call(cmd,shell=True)
+# cmd="sudo ifconfig wlan0 up"
+# WriteTimeLogfile(cmd)
+# subprocess.call(cmd,shell=True)
+# sleep(20)
+# WriteTimeLogfile(str(res)+" "+str(iteration))
+# iteration=iteration+1
+
+if iteration == 12:
+    # No connectivity, stop the process
+    getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
+    sys.exit(1)
+
+
+
 #
 # Etape 4 #############################################
 # On lance un sous programme qui met à jour toutes les données sur la plateforme
 # On échange avec la plateforme Web pour envoyer les images et les paramètres
-cmd = "python3 Server.py"
 
+syncImageFiles()
 
+# cmd = "python3 Server.py"
 
 
 # Paramètres à envoyer au début du process
@@ -148,6 +154,9 @@ getLogger().warning(
 )
 SendParameters(Hub_)
 
+End4G()
+
+
 # Ensuite on synchronise les images et les fichiers JSON
 # A faire
 
@@ -166,8 +175,8 @@ result = run(
 )
 getLogger().warning(cmdeject)
 
-# On fixe l'heure d'arrêt, car des fois le Witty ne s'eteint pas sur le doShutdown()
-# qui ne fait que le poweroff du Raspberry
+# On fixe l'heure d'arrêt dans 30 secondes,
+# car des fois le Witty ne s'eteint pas sur le doShutdown()
 date_now = GetCurrentDate()
 secs_now = DateToSeconds(date_now)
 date_new = SecondsToDate(secs_now + 30)
@@ -175,8 +184,12 @@ getLogger().warning("Next stop at: %s", date_new)
 setNextShutdownDate(date_new)
 
 # lance le poweroff du Raspberry et éteint le WittyPi
+# en principe le doShutdown() lance le shutdown -h now,
+# sauf s'il y a un fichier /boot/wittypi.lock
+# Donc on ajoute un poweroff en plus...
+getLogger().warning("doShutdown until: %s", nextStartDateValue)
 doShutdown()
 cmd = "sudo poweroff"
-result = run(
-    cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-)
+getLogger().warning(cmd)
+result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+sys.exit(0)
