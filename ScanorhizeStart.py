@@ -23,13 +23,13 @@ from Campaign import USBSpace
 
 getLogger().warning("ScanorhizeStart.py")
 
-# On regaarde si on est en mode configuration
+# On regarde si on est en mode configuration
 config = ReadGPIOConfig()
 EndGPIO()
 
 if config == 0:
     # En mode config
-    cmd = "sudo python3 Scanorhize.py &"
+    cmd = "python3 Scanorhize.py &"
     getLogger().warning(cmd)
     run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     sys.exit(0)
@@ -97,67 +97,54 @@ except CalledProcessError as exc:
 ## import ScanorhizeProcess
 
 # Etape 3 #############################################
-# On allume la clé 4G et on attend d'avoir le réseau
+# Transfert des données
 
-Start4G()
-# Teste la connectivité
-res = 0
-MAX_ITERATION = 12
-iteration = 0
-while res == 0 and iteration < MAX_ITERATION:
-    res = pingAPI(getScanorhizeServer())
-    iteration += 1
-#    if res==0:
-#   cmd="sudo ifconfig wlan0 down"
-#  WriteTimeLogfile(cmd)
-# subprocess.call(cmd,shell=True)
-# cmd="sudo ifconfig wlan0 up"
-# WriteTimeLogfile(cmd)
-# subprocess.call(cmd,shell=True)
-# sleep(20)
-# WriteTimeLogfile(str(res)+" "+str(iteration))
-# iteration=iteration+1
+try:
+    # On allume la clé 4G et on attend d'avoir le réseau
+    Start4G()
+    # Teste la connectivité
+    res = 0
+    MAX_ITERATION = 12
+    iteration = 0
+    while res == 0 and iteration < MAX_ITERATION:
+        res = pingAPI(getScanorhizeServer())
+        iteration += 1
+    if iteration == 12:
+        # No connectivity, stop the process
+        getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
+        raise RuntimeError("Pas de connectivité !")
 
-if iteration == 12:
-    # No connectivity, stop the process
-    getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
-    sys.exit(1)
+    #
+    # Etape 4 #############################################
+    # On lance un sous programme qui met à jour toutes les données sur la plateforme
+    # On échange avec la plateforme Web pour envoyer les images et les paramètres
+
+    # On syncrhonise l'horloge du Raspberry Pi avec le serveur
 
 
+    # Paramètres
+    Hub_ = HubData()
+    Hub_.ReadConfig()
+    volt, Hub_.batteryLevelPercent = ReadBatVoltCap()
+    Hub_.diskSpacePercent = USBSpace()[0]
+    Hub_.temperature = ReadTemp()
+    Hub_.WriteConfig()
 
-#
-# Etape 4 #############################################
-# On lance un sous programme qui met à jour toutes les données sur la plateforme
-# On échange avec la plateforme Web pour envoyer les images et les paramètres
+    getLogger().warning(
+        "Bat: %s  USB: %s  Temp: %s",
+        Hub_.batteryLevelPercent,
+        Hub_.diskSpacePercent,
+        Hub_.temperature,
+    )
+    SendParameters(Hub_)
+    syncImageFiles()
 
-syncImageFiles()
+except RuntimeError as exc:
+    getLogger().error(exc)
 
-# cmd = "python3 Server.py"
-
-
-# Paramètres à envoyer au début du process
-# A faire dans le serveur Flask pour initialiser les données
-# getTokens()
-Hub_ = HubData()
-Hub_.ReadConfig()
-volt, Hub_.batteryLevelPercent = ReadBatVoltCap()
-Hub_.diskSpacePercent = USBSpace()[0]
-Hub_.temperature = ReadTemp()
-Hub_.WriteConfig()
-
-getLogger().warning(
-    "Bat: %s  USB: %s  Temp: %s",
-    Hub_.batteryLevelPercent,
-    Hub_.diskSpacePercent,
-    Hub_.temperature,
-)
-SendParameters(Hub_)
-
-End4G()
-
-
-# Ensuite on synchronise les images et les fichiers JSON
-# A faire
+finally:
+    # On éteint la clé 4G
+    End4G()
 
 
 # Etape 4 #############################################
