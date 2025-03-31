@@ -234,7 +234,7 @@ def InitGPIO():
         if not has_MEGA4():
             # On arrête les scanners
             for i_pin in range(0, 3):
-                print(f"Initialisation du GPIO: {PinArray[i]}")
+                print(f"Initialisation du GPIO: {PinArray[i_pin]}")
                 GPIO.setup(i_pin, GPIO.OUT)
                 GPIO.output(PinArray[i_pin], GPIO.LOW)
     except IOError as e:
