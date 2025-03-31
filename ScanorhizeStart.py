@@ -8,7 +8,6 @@ from subprocess import run, CalledProcessError
 from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
 from WittyPython import ReadTemp
 from Miscellaneous import (
-    InitGPIO,
     EndGPIO,
     Start4G,
     End4G,
