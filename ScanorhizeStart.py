@@ -130,14 +130,15 @@ try:
     # On lance un sous programme qui met à jour toutes les données sur la plateforme
     # On échange avec la plateforme Web pour envoyer les images et les paramètres
 
-    # On syncrhonise l'horloge du Raspberry Pi avec le serveur
+    # On récupère les configs des scanners depuis la plateforme
+    # selon le flag Scanner.UseServer
 
 
     # Paramètres
     Hub_ = HubData()
     Hub_.ReadConfig()
     volt, Hub_.batteryLevelPercent = ReadBatVoltCap()
-    Hub_.diskSpacePercent = USBSpace()[0]
+    Hub_.diskSpacePercent = USBSpace()[0]/1000
     Hub_.temperature = ReadTemp()
     Hub_.WriteConfig()
 
@@ -149,6 +150,9 @@ try:
     )
     SendParameters(Hub_)
     syncImageFiles(Hub_)
+
+    # On recupère les configuration des Scanners en fonction de use_server
+    
 
 except RuntimeError as exc:
     getLogger().error(exc)

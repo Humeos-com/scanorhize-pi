@@ -84,13 +84,6 @@ for CurrentScanner in listScannerconfigs:
                 getLogger().warning("Image copied to USB")
             else:
                 getLogger().error("Error in copy to USB")
-
-            getLogger().warning("StartPostImage")
-            PostError = PostImageToServer(Scanner)
-            if PostError != 0:
-                getLogger().error("Post error")
-            else:
-                getLogger().warning("EndPost OK")
         else:
             getLogger().error("Image acquisition Error")
     # Prepare next StartDate for Scanner
