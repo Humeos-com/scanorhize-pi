@@ -245,7 +245,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     if scanner.device == "NoScannerDetected":
         option_device = ""
     else:
-        option_device = f' --device={scanner.device}'
+        option_device = f" --device={scanner.device}"
     # On n'utilise pas le device pour l'instant, car sinon, il faut respecter le cablage...
     option_device = ""
     command = (
@@ -298,8 +298,8 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
 
     commandconv = (
         f'gdal_translate -of JP2OpenJPEG -co "QUALITY={scanner.quality}" '
-        f'{imagepathtiff} '
-        f'{imagepathjp2000} | tee -a {DISPLAY_FILE}'
+        f"{imagepathtiff} "
+        f"{imagepathjp2000} | tee -a {DISPLAY_FILE}"
     )
     # print(commandconv)
     getLogger().warning("scanAcq: Start conversion jp2: %s", commandconv)
