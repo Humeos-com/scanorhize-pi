@@ -15,17 +15,16 @@ from ConfigApp import getDisplayFile, getConfigPath, getLogger, is_dev
 
 X_MAX = 216
 Y_MAX = 297
-TIME_USB_READY = 40
-TIME_AFTER_SCAN = 12
-if not is_raspberry_pi():
-    TIME_USB_READY = 0
-    TIME_AFTER_SCAN = 0
-
-
 CONFIG_PATH = getConfigPath()
 DISPLAY_FILE = getDisplayFile()
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
+
+imagetiff = "imagescan.tiff"
+imagepathtiff = "static/" + imagetiff
+imagepath = "static/"
+imagepathjp2000 = imagepath + "imagejp2000.jp2"
+
 
 
 @dataclasses.dataclass
@@ -50,24 +49,25 @@ class ScannerData:
     """
     Définition des paramètres du scanner
     """
-
-    # pylint: disable=too-many-instance-attributes
-    ScannerName = ""
-    mode = ColorList[0]
-    resolution = ResolutionList[0]
-    LastImgTime = ""
-    LastImgFile = ""
-    ZoneAcq = ZoneRectangle(0, 0, X_MAX, Y_MAX)
-    quality = 5
-    device = "NoScannerDetected"  # le device au sens SANE usb+fabricant+#série
-    token = "token_bidon"
-    projectId = ""
-    sampleId = ""
-    UseServer = 0
-    error = 0
-    Campaign = "CampaignName"
-    StartDate = "2025-01-01T08:00:00Z"  # next start
-    PeriodeS = 3600  # next start if UseServer=0
+    def __init__(self):
+        self.ScannerName = ""
+        self.mode = ColorList[0]
+        self.resolution = ResolutionList[0]
+        self.LastImgTime = ""
+        self.LastImgFile = ""
+        self.ZoneAcq = ZoneRectangle(0, 0, X_MAX, Y_MAX)
+        self.quality = 5
+        self.device = "NoScannerDetected"
+        self.token = "token_bidon"
+        self.projectId = ""
+        self.sampleId = ""
+        self.UseServer = 0
+        self.TimeBeforeScan = 0
+        self.TimeAfterScan = 0
+        self.error = 0
+        self.Campaign = "CampaignName"
+        self.StartDate = "2025-01-01T08:00:00Z"
+        self.PeriodeS = 3600
 
     def printScanner(self):
         for name, value in self.__dict__.items():
@@ -102,11 +102,14 @@ class ScannerData:
         except OSError as e:
             getLogger().error("WriteScannerConfig: OSError: %s", e)
             return 1
+
         return 0
 
     def json(self):
+        # Create a copy of the instance dictionary
+        data_dict = self.__dict__.copy()
         return json.dumps(
-            self,
+            data_dict,
             default=lambda o: o.__dict__,
             sort_keys=True,
             ensure_ascii=False,
@@ -116,7 +119,7 @@ class ScannerData:
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
         # on cherche le scanners pour enregistrer le nom du device
-        error = TurnUsbOn(i_scan, TIME_USB_READY)
+        error = TurnUsbOn(i_scan, self.TimeBeforeScan)
         if error != 0:
             self.error = 1
             return self
@@ -126,8 +129,8 @@ class ScannerData:
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
             cmd = (
-                "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L | tee -a "
-                + DISPLAY_FILE
+                f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L "
+                f"| tee -a {DISPLAY_FILE}"
             )
             print("i=", i)
             # print(cmd)
@@ -161,7 +164,7 @@ class ScannerData:
                 self.device = device[1 : len(device) - 1]
         else:
             self.device = "NoScannerDetected"
-        print("Scanner :", self.device)
+        print("Scanner: ", self.device)
         TurnUsbOff(i_scan)
         if self.error > 0:
             getLogger().error("error acquisition: %s, %s", result.stdout, result.stderr)
@@ -170,7 +173,7 @@ class ScannerData:
 
 
 # Initialisation de l'objet Scanner
-Scanner = ScannerData()
+# Scanner = ScannerData()
 
 
 def extract_serial(device_string: str) -> str:
@@ -209,6 +212,14 @@ def updateScanParameters(scanner: ScannerData):
         "quality": scanner.quality,
         "device": scanner.device,
         "token": scanner.token,
+        "TimeBeforeScan": scanner.TimeBeforeScan,
+        "TimeAfterScan": scanner.TimeAfterScan,
+        "projectId": scanner.projectId,
+        "sampleId": scanner.sampleId,
+        "error": scanner.error,
+        "imagepath": imagepath,
+        "imagepathtiff": imagepathtiff,
+        "imagepathjp2000": imagepathjp2000,
         "UseServer": scanner.UseServer,
         "Campaign": scanner.Campaign,
         "StartDate": scanner.StartDate,
@@ -216,12 +227,6 @@ def updateScanParameters(scanner: ScannerData):
     }
     return Scannerparam
 
-
-ScanNumber = 3
-imagetiff = "imagescan.tiff"
-imagepathtiff = "static/" + imagetiff
-imagepath = "static/"
-imagepathjp2000 = imagepath + "imagejp2000.jp2"
 
 
 def scanAcq(scanner: ScannerData, i_scan: int, date: str):
@@ -237,7 +242,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     """
 
     getLogger().warning("scanAcq: on allume le port USB: %s", i_scan + 1)
-    error = TurnUsbOn(i_scan, TIME_USB_READY)
+    error = TurnUsbOn(i_scan, scanner.TimeBeforeScan)
     if error != 0:
         scanner.error = 1
         return scanner
@@ -286,10 +291,10 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         i += 1
         # if res != 0:
         #    TurnUsbOff(i_scan)
-        #    TurnUsbOn(i_scan, TIME_USB_READY)
+        #    TurnUsbOn(i_scan, scanner.TimeBeforeScan)
     # On a un timer de manière à ce que le charriot des Canon LIDE 400
     # revienne à la position de départ
-    TurnUsbOff(i_scan, TIME_AFTER_SCAN)
+    TurnUsbOff(i_scan, scanner.TimeAfterScan)
     if scanner.error > 0:
         getLogger().error("error acquisition: " + result.stdout + result.stderr)
         return scanner
@@ -325,29 +330,27 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     return scanner
 
 
-def ScannerPreview(i_scan: int):
+def ScannerPreview(scanner: ScannerData, i_scan: int):
     image = f"{i_scan + 1}.jpg"
-    error = TurnUsbOn(i_scan, TIME_USB_READY)
+    error = TurnUsbOn(i_scan, scanner.TimeBeforeScan)
     if error != 0:
-        Scanner.error = 1
-        res = Scanner.error
+        scanner.error = 1
+        res = scanner.error
         return image, res
     #### file = imagepath + image
     # On ne passe pas le device, car on n'allume qu'un port USB
     # donc scanimage va trouver le seul scanner sous tension !
+    # ######: Il faudrait faire la conversion en JPEG !!!!
+    #        + " --format=jpeg >"
+    #        + file
     command = (
-        "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage --mode="
-        + Scanner.mode
-        + " --resolution=75"
-        + " --format=tiff >"
-        + imagepathtiff
-        + " | tee -a "
-        + DISPLAY_FILE
-        # ######: Il faudrait faire la conversion en JPEG !!!!
-        #        + " --format=jpeg >"
-        #        + file
+        f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage "
+        f"--mode={scanner.mode} "
+        f"--resolution=75 "
+        f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
+
     )
-    getLogger().warning("command:" + command)
+    getLogger().warning("Command: %s", command)
     res = 1
     i = 0
     while res != 0 and i < 2:
@@ -379,13 +382,13 @@ def listScannerSerials():
     Returns:
         list: les numéros de série des scanners
     """
-    Scanner_ = ScannerData()
+    scanner = ScannerData()
     listScannerconfigs_ = listConfigScanner()
     listserials = []
 
     for CurrentScanner_ in listScannerconfigs_:
-        Scanner_.ReadScannerConfig(CurrentScanner_)
-        serial = extract_serial(Scanner_.device)
+        scanner.ReadScannerConfig(CurrentScanner_)
+        serial = extract_serial(scanner.device)
         if serial:  # Only add non-empty serials
             listserials.append(serial)
 
@@ -421,7 +424,7 @@ if __name__ == "__main__":
         scan_num += 1
 
     if is_raspberry_pi():
-        result_ = ScannerPreview(0)
+        result_ = ScannerPreview(Scanner, 0)
         Scanner.LastImgFile = result_[0]
         Scanner.error = result_[1]
 
