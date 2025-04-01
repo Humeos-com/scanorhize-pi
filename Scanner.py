@@ -9,10 +9,9 @@ import dataclasses
 import json
 from subprocess import run
 
-from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, WriteTimeLogfile
-from DateUtils import SecondsToDate, DateToSeconds
+from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff
 from OSUtils import is_raspberry_pi
-from ConfigApp import getDisplayFile, getConfigPath
+from ConfigApp import getDisplayFile, getConfigPath, getLogger, is_dev
 
 X_MAX = 216
 Y_MAX = 297
@@ -67,7 +66,7 @@ class ScannerData:
     UseServer = 0
     error = 0
     Campaign = "CampaignName"
-    StartDate = "2024-11-15T09:45:00Z"  # next start if UseServer=1
+    StartDate = "2025-01-01T08:00:00Z"  # next start
     PeriodeS = 3600  # next start if UseServer=0
 
     def printScanner(self):
@@ -86,7 +85,7 @@ class ScannerData:
                     zone_data["l"], zone_data["t"], zone_data["x"], zone_data["y"]
                 )
         except (FileNotFoundError, ValueError):
-            WriteTimeLogfile(f"No file: {fullpath}")
+            getLogger().error("No file: %s", fullpath)
             ## self.WriteScannerConfig(file)
         else:
             self.__dict__.update(data)
@@ -101,7 +100,7 @@ class ScannerData:
             with open(fullpath, "w", encoding="utf-8") as outfile:
                 outfile.write(json_data)
         except OSError as e:
-            WriteTimeLogfile(f"WriteScannerConfig Error: {e}")
+            getLogger().error("WriteScannerConfig: OSError: %s", e)
             return 1
         return 0
 
@@ -165,7 +164,7 @@ class ScannerData:
         print("Scanner :", self.device)
         TurnUsbOff(i_scan)
         if self.error > 0:
-            WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
+            getLogger().error("error acquisition: %s, %s", result.stdout, result.stderr)
 
         return self
 
@@ -225,7 +224,7 @@ imagepath = "static/"
 imagepathjp2000 = imagepath + "imagejp2000.jp2"
 
 
-def scanAcq(scanner: ScannerData, i_scan: int, date):
+def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     """Lance le scanimage et convertit l'image en jp2000
 
     Args:
@@ -237,7 +236,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         _type_: _description_
     """
 
-    WriteTimeLogfile(f"scanAcq: on allume le port USB: {i_scan + 1}")
+    getLogger().warning("scanAcq: on allume le port USB: %s", i_scan + 1)
     error = TurnUsbOn(i_scan, TIME_USB_READY)
     if error != 0:
         scanner.error = 1
@@ -246,35 +245,25 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     if scanner.device == "NoScannerDetected":
         option_device = ""
     else:
-        option_device = ' --device="' + scanner.device + '"'
+        option_device = f' --device={scanner.device}'
     # On n'utilise pas le device pour l'instant, car sinon, il faut respecter le cablage...
     option_device = ""
     command = (
-        "sudo LD_LIBRARY_PATH=/usr/local/lib scanimage"
-        + option_device
-        + " --mode="
-        + scanner.mode
-        + " --resolution="
-        + str(scanner.resolution)
-        + " -l "
-        + str(scanner.ZoneAcq.l)
-        + " -t "
-        + str(scanner.ZoneAcq.t)
-        + " -x "
-        + str(scanner.ZoneAcq.x)
-        + " -y "
-        + str(scanner.ZoneAcq.y)
-        + " --format=tiff >"
-        + imagepathtiff
-        + " | tee -a "
-        + DISPLAY_FILE
+        f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage {option_device} "
+        f"--mode={scanner.mode} "
+        f"--resolution={scanner.resolution} "
+        f"-l {scanner.ZoneAcq.l} "
+        f"-t {scanner.ZoneAcq.t} "
+        f"-x {scanner.ZoneAcq.x} "
+        f"-y {scanner.ZoneAcq.y} "
+        f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
     )
-    WriteTimeLogfile("scanAcq: " + command)
+    getLogger().warning("scanAcq: %s", command)
     res = 1
     i = 0
     while res != 0 and i < 2:
         # print("i=",i)
-        WriteTimeLogfile("StartScan :" + str(i))
+        getLogger().warning("scanAcq: try %s", i + 1)
         if is_raspberry_pi():
             result = run(
                 command,
@@ -283,14 +272,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
                 shell=True,
                 check=False,
             )
-            WriteTimeLogfile(
-                "code: "
-                + str(result.returncode)
-                + "stdout :"
-                + str(result.stdout)
-                + "stderr :"
-                + str(result.stderr)
-            )
+            getLogger().warning("scanAcq: result %s", result)
             res = result.returncode
             if len(result.stderr) > 2:
                 res = 12
@@ -305,26 +287,22 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
         # if res != 0:
         #    TurnUsbOff(i_scan)
         #    TurnUsbOn(i_scan, TIME_USB_READY)
-
+    # On a un timer de manière à ce que le charriot des Canon LIDE 400
+    # revienne à la position de départ
     TurnUsbOff(i_scan, TIME_AFTER_SCAN)
     if scanner.error > 0:
-        WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
+        getLogger().error("error acquisition: " + result.stdout + result.stderr)
         return scanner
 
     scanner.quality = min(scanner.quality, 90)
 
     commandconv = (
-        'gdal_translate -of JP2OpenJPEG -co "QUALITY='
-        + str(scanner.quality)
-        + '" '
-        + imagepathtiff
-        + " "
-        + imagepathjp2000
-        + "| tee -a "
-        + DISPLAY_FILE
+        f'gdal_translate -of JP2OpenJPEG -co "QUALITY={scanner.quality}" '
+        f'{imagepathtiff} '
+        f'{imagepathjp2000} | tee -a {DISPLAY_FILE}'
     )
     # print(commandconv)
-    WriteTimeLogfile("scanAcq: Start conversion jp2: " + commandconv)
+    getLogger().warning("scanAcq: Start conversion jp2: %s", commandconv)
     result = run(
         commandconv,
         capture_output=True,
@@ -335,18 +313,15 @@ def scanAcq(scanner: ScannerData, i_scan: int, date):
     print(result.returncode, result.stdout, result.stderr)
     scanner.error = result.returncode
     if scanner.error > 0:
-        WriteTimeLogfile("Error conversion jp2")
+        getLogger().error("Error conversion jp2")
         scanner.error = 20
         return scanner
 
-    WriteTimeLogfile("EndConvTime")
-    # Pour s'assurer que 2 images n'est pas le même temps et donc nom
-    CurrentDateinS = DateToSeconds(date) + i_scan
-    date = SecondsToDate(CurrentDateinS)
+    getLogger().warning("scanAcq: End conversion jp2")
     scanner.LastImgTime = date
     # print("image time: ",scanner.LastImgTime)
     scanner.LastImgFile = imagepathjp2000
-    WriteTimeLogfile("scanAcq: end")
+    getLogger().warning("scanAcq: end")
     return scanner
 
 
@@ -372,7 +347,7 @@ def ScannerPreview(i_scan: int):
         #        + " --format=jpeg >"
         #        + file
     )
-    WriteTimeLogfile("command:" + command)
+    getLogger().warning("command:" + command)
     res = 1
     i = 0
     while res != 0 and i < 2:
@@ -391,9 +366,9 @@ def ScannerPreview(i_scan: int):
         i += 1
     TurnUsbOff(i_scan)
     if res > 0:
-        WriteTimeLogfile("error acquisition: " + result.stdout + result.stderr)
+        getLogger().error("error acquisition: " + result.stdout + result.stderr)
     else:
-        WriteTimeLogfile("Preview OK")
+        getLogger().warning("Preview OK")
 
     return image, res
 
@@ -414,7 +389,7 @@ def listScannerSerials():
         if serial:  # Only add non-empty serials
             listserials.append(serial)
 
-    WriteTimeLogfile(listserials)
+    getLogger().warning(str(listserials))
     return listserials
 
 
@@ -425,7 +400,7 @@ def listConfigScanner():
             f for f in os.listdir(CONFIG_PATH) if re.match(r"[0-9]-Scanner.json", f)
         ]
         listfile.sort(reverse=False)
-        WriteTimeLogfile(listfile)
+        getLogger().warning(str(listfile))
     except OSError:
         listfile = ["1-Scanner.json", "2-Scanner.json", "3-Scanner.json"]
     return listfile
@@ -441,7 +416,8 @@ if __name__ == "__main__":
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
         print(Scanner.scanSearch(scan_num))
-        Scanner.WriteScannerConfig(CurrentScanner)
+        if not is_dev():
+            Scanner.WriteScannerConfig(CurrentScanner)
         scan_num += 1
 
     if is_raspberry_pi():
