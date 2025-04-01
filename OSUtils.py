@@ -21,51 +21,50 @@ def get_MEGA4():
     except usb.core.NoBackendError:
         with_MEGA4 = False
     if with_MEGA4:
-        getLogger().warning("Carte MEGA4 détectée")
+        getLogger().warning("MEGA4 board detected")
     else:
-        getLogger().warning("Pas de carte MEGA4 détectée")
+        getLogger().warning("No MEGA4 board detected")
     return with_MEGA4
 
 
 class Config:
-    """Permet de connaitre l'environnement matériel du Hub"""
+    """Permet de connaitre l'environnement matériel du Hub
+    Utilise le pattern Singleton pour stocker la configuration
+    """
 
     _instance = None  # Class variable to store the single instance
-    platform: str = "Linux"
-    usb_mode: str = "GPIO"
+    platform: str
+    usb_mode: str
 
     def __new__(cls):
+        """Ensure only one instance is created (Singleton pattern)."""
         if cls._instance is None:
             cls._instance = super(Config, cls).__new__(cls)
-            cls._load_config()
+            cls._instance._load_config()
         return cls._instance
 
-    @classmethod
-    def _load_config(cls):
+    def _load_config(self):
+        """Load the configuration data (runs only once)."""
+        self.platform = "Linux"
+        self.usb_mode = "GPIO"
 
         if os.path.exists("/sys/firmware/devicetree/base/model"):
             with open(
                 "/sys/firmware/devicetree/base/model", "r", encoding="utf-8"
             ) as f:
                 if "Raspberry Pi" in f.read():
-                    cls.platform = "Raspberry"
+                    self.platform = "Raspberry"
 
         if get_MEGA4():
-            cls.usb_mode = "MEGA4"
+            self.usb_mode = "MEGA4"
         else:
-            cls.usb_mode = "GPIO"
+            self.usb_mode = "GPIO"
 
-    @classmethod
-    def is_raspberry_pi(cls):
-        if cls.platform == "Raspberry":
-            return True
-        return False
+    def is_raspberry_pi(self) -> bool:
+        return self.platform == "Raspberry"
 
-    @classmethod
-    def has_MEGA4(cls):
-        if cls.usb_mode == "MEGA4":
-            return True
-        return False
+    def has_MEGA4(self) -> bool:
+        return self.usb_mode == "MEGA4"
 
 
 def is_raspberry_pi():
