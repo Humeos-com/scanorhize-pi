@@ -3,6 +3,7 @@ Fonctions qui encapsulent l'API du serveur Web
 """
 
 import sys
+import os
 from os import path
 from dataclasses import dataclass, asdict
 from subprocess import run, SubprocessError, CalledProcessError
@@ -13,6 +14,7 @@ from ConfigApp import (
     getConnectTimeout,
     getMaxTime,
     getLogger,
+    getS3Bucket
 )
 from Miscellaneous import WriteTimeLogfile
 from Campaign import RemoveTempImage, CreateTempImage, getUsbDir
@@ -25,10 +27,10 @@ from AuthUtils import getHwAddr
 class HubData:
     """Gestion des paramètres du Raspberry et de la carte SIM"""
 
-    apn: str = ""
+    apn: str = ""   # Adresse de l'APN
     user: str = ""
     password: str = ""
-    address: str = ""
+    address: str = ""   # Adresse de l'APN
     ping: int = 0
     projectId: str = ""
     token: str = "token_bidon"
@@ -90,13 +92,13 @@ def CopyFromJson(ScannerObj: ScannerData, data):
     if "mode" in data:
         ScannerObj.mode = data["mode"]
     if "t" in data:
-        ScannerObj.ZoneAcq.t = data["t"]
+        ScannerObj.t = data["t"]
     if "l" in data:
-        ScannerObj.ZoneAcq.l = data["l"]
+        ScannerObj.l = data["l"]
     if "x" in data:
-        ScannerObj.ZoneAcq.x = data["x"]
+        ScannerObj.x = data["x"]
     if "y" in data:
-        ScannerObj.ZoneAcq.y = data["y"]
+        ScannerObj.y = data["y"]
     if "resolution" in data:
         ScannerObj.resolution = data["resolution"]
     if "quality" in data:
@@ -108,7 +110,7 @@ def syncImageFiles(hub_: HubData):
     # On envoie les fichiers images
     # On envoie les fichiers JSON
     src = path.join(getUsbDir(), hub_.projectId)
-    cmd = f"s3cmd --no-check-md5 --quiet sync {src} s3://scanorhize-images-prod"
+    cmd = f"s3cmd --no-check-md5 --quiet sync {src} {getS3Bucket()}"
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
@@ -116,12 +118,19 @@ def syncImageFiles(hub_: HubData):
         getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
         # on supprime les images de l'arboresence
         # find src -name \*.jp2 -o -name \*.json -print0 | xargs -0 -n rm
-        # def remove_files_in_directory(path):
-        # if os.path.exists(path):
-        #     for root, dirs, files in os.walk(path, topdown=False):
-        #         for name in files:
-        #             file_path = os.path.join(root, name)
-        #             os.remove(file_path)
+        getLogger().warning("SyncImageFiles remove images and json from %s", src)
+
+        if os.path.exists(src):
+            for root, _, files in os.walk(src, topdown=False):
+                for name in files:
+                    if name.endswith(".jp2") or name.endswith(".json"):
+                        file_path = os.path.join(root, name)
+                        try:
+                            os.remove(file_path)
+                        except (FileNotFoundError, PermissionError) as e:
+                            getLogger().error("Error removing file %s: %s", file_path, e)
+                        else:
+                            getLogger().warning("SyncImageFiles: removed %s", file_path)
 
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncImageFiles: %s", e)
@@ -234,6 +243,8 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
     return ScannerObj
 
 
+# Methode incomplete, reste à terminer !
+####################################################
 def SendConfigToServer(ScannerObj: ScannerData):
     cmdPost = f'curl --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
 -X POST "https://{getScanorhizeServer()}/api/scanner/configuration" \

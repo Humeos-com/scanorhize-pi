@@ -3,59 +3,43 @@ Gestion des Scanners
 """
 
 import os
+from os import path
 import sys
 import re
-import dataclasses
 import json
 from subprocess import run
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff
 from OSUtils import is_raspberry_pi
-from ConfigApp import getDisplayFile, getConfigPath, getLogger, is_dev
+from ConfigApp import getDisplayFile, getConfigDir, getLogger, is_dev, getImageDir
 
 X_MAX = 216
 Y_MAX = 297
-CONFIG_PATH = getConfigPath()
 DISPLAY_FILE = getDisplayFile()
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
 
-imagetiff = "imagescan.tiff"
-imagepathtiff = "static/" + imagetiff
-imagepath = "static/"
-imagepathjp2000 = imagepath + "imagejp2000.jp2"
-
-
-
-@dataclasses.dataclass
-class ZoneRectangle:
-    """
-    Rectangle
-    """
-
-    l: int
-    t: int
-    x: int
-    y: int
-
-    def __init__(self, l, t, x, y):
-        self.l = l
-        self.t = t
-        self.x = min(x, X_MAX)
-        self.y = min(y, Y_MAX)
+imagepathtiff = path.join(getImageDir(), "imagescan.tiff")
+imagepathjp2000 = path.join(getImageDir(), "imagejp2000.jp2")
 
 
 class ScannerData:
     """
     Définition des paramètres du scanner
     """
+
     def __init__(self):
         self.ScannerName = ""
         self.mode = ColorList[0]
         self.resolution = ResolutionList[0]
         self.LastImgTime = ""
         self.LastImgFile = ""
-        self.ZoneAcq = ZoneRectangle(0, 0, X_MAX, Y_MAX)
+        self.l = 0
+        self.t = 0
+        self.x = X_MAX
+        self.y = Y_MAX
+        self.x_max = X_MAX
+        self.y_max = Y_MAX
         self.quality = 5
         self.device = "NoScannerDetected"
         self.token = "token_bidon"
@@ -74,19 +58,12 @@ class ScannerData:
             print(f"{name}: {value}")
 
     def ReadScannerConfig(self, file=""):
-        fullpath = os.path.join(CONFIG_PATH, file)
+        fullpath = os.path.join(getConfigDir(), file)
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)  # Load JSON into a dictionary
-            # Convert ZoneAcq dict back to ZoneRectangle object
-            if "ZoneAcq" in data:
-                zone_data = data["ZoneAcq"]
-                data["ZoneAcq"] = ZoneRectangle(
-                    zone_data["l"], zone_data["t"], zone_data["x"], zone_data["y"]
-                )
-        except (FileNotFoundError, ValueError):
-            getLogger().error("No file: %s", fullpath)
-            ## self.WriteScannerConfig(file)
+        except (json.JSONDecodeError, FileNotFoundError, ValueError) as e:
+            getLogger().error("ReadScannerConfig: %s", e)
         else:
             self.__dict__.update(data)
         finally:
@@ -94,7 +71,7 @@ class ScannerData:
         return self
 
     def WriteScannerConfig(self, file):
-        fullpath = os.path.join(CONFIG_PATH, file)
+        fullpath = os.path.join(getConfigDir(), file)
         json_data = self.json()
         try:
             with open(fullpath, "w", encoding="utf-8") as outfile:
@@ -115,6 +92,35 @@ class ScannerData:
             ensure_ascii=False,
             indent=4,
         )
+
+    def scanDumpMeta(self, file: str):
+        """Dump les paramètres du scanner au format JSON dans le fichier file
+        """
+
+        data = {
+            "resolution": self.resolution,
+            "quality": self.quality,
+            "mode": self.mode,
+            "l": self.l,
+            "t": self.t,
+            "x": self.x,
+            "y": self.y,
+        }
+        json_data = json.dumps(
+            data,
+            default=lambda o: o.__dict__,
+            sort_keys=False,
+            ensure_ascii=False,
+            indent=4,
+        )
+        try:
+            with open(file, "w", encoding="utf-8") as outfile:
+                outfile.write(json_data)
+        except OSError as e:
+            getLogger().error("scanDumpMeta: OSError: %s", e)
+            return 1
+
+        return 0
 
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
@@ -205,10 +211,12 @@ def updateScanParameters(scanner: ScannerData):
         "resolution3": ResolutionList[2],
         "LastImgTime": scanner.LastImgTime,
         "LastImgFile": scanner.LastImgFile,
-        "l": scanner.ZoneAcq.l,
-        "t": scanner.ZoneAcq.t,
-        "x": scanner.ZoneAcq.x,
-        "y": scanner.ZoneAcq.y,
+        "l": scanner.l,
+        "t": scanner.t,
+        "x": scanner.x,
+        "y": scanner.y,
+        "x_max": scanner.x_max,
+        "y_max": scanner.y_max,
         "quality": scanner.quality,
         "device": scanner.device,
         "token": scanner.token,
@@ -217,7 +225,6 @@ def updateScanParameters(scanner: ScannerData):
         "projectId": scanner.projectId,
         "sampleId": scanner.sampleId,
         "error": scanner.error,
-        "imagepath": imagepath,
         "imagepathtiff": imagepathtiff,
         "imagepathjp2000": imagepathjp2000,
         "UseServer": scanner.UseServer,
@@ -228,14 +235,10 @@ def updateScanParameters(scanner: ScannerData):
     return Scannerparam
 
 
-
 def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     """Lance le scanimage et convertit l'image en jp2000
-
-    Args:
-        scanner (ScannerData): l'objet Scanner en cours
-        i_scan (int): de 0 à 2 pour les 3 scanners
-        date (_type_):
+    cree également le fichier JSON avec les attributs de l'image
+    et les paramètres du scanner
 
     Returns:
         _type_: _description_
@@ -257,10 +260,10 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage {option_device} "
         f"--mode={scanner.mode} "
         f"--resolution={scanner.resolution} "
-        f"-l {scanner.ZoneAcq.l} "
-        f"-t {scanner.ZoneAcq.t} "
-        f"-x {scanner.ZoneAcq.x} "
-        f"-y {scanner.ZoneAcq.y} "
+        f"-l {scanner.l} "
+        f"-t {scanner.t} "
+        f"-x {scanner.x} "
+        f"-y {scanner.y} "
         f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
     )
     getLogger().warning("scanAcq: %s", command)
@@ -327,6 +330,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     # print("image time: ",scanner.LastImgTime)
     scanner.LastImgFile = imagepathjp2000
     getLogger().warning("scanAcq: end")
+
     return scanner
 
 
@@ -348,7 +352,6 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
         f"--mode={scanner.mode} "
         f"--resolution=75 "
         f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
-
     )
     getLogger().warning("Command: %s", command)
     res = 1
@@ -400,7 +403,7 @@ def listConfigScanner():
     try:
         # de la forme 1-Scanner.json
         listfile = [
-            f for f in os.listdir(CONFIG_PATH) if re.match(r"[0-9]-Scanner.json", f)
+            f for f in os.listdir(getConfigDir()) if re.match(r"[0-9]-Scanner.json", f)
         ]
         listfile.sort(reverse=False)
         getLogger().warning(str(listfile))

@@ -110,13 +110,13 @@ def ScannerPage(scan_num_str: str):
 
         tmp = request.form["l"]
         # print("tmp=",tmp,"tmp type: ",type(tmp),"l type: ",type(Scanner.l))
-        Scanner.ZoneAcq.l = chaineIntwitherror(tmp, Scanner.ZoneAcq.l, 0, 216.7)
+        Scanner.l = chaineIntwitherror(tmp, Scanner.l, 0, 216.7)
         tmp = form["t"]
-        Scanner.ZoneAcq.t = chaineIntwitherror(tmp, Scanner.ZoneAcq.t, 0, 297.5)
+        Scanner.t = chaineIntwitherror(tmp, Scanner.t, 0, 297.5)
         tmp = form["x"]
-        Scanner.ZoneAcq.x = chaineIntwitherror(tmp, Scanner.ZoneAcq.x, 0, 216.7)
+        Scanner.x = chaineIntwitherror(tmp, Scanner.x, 0, 216.7)
         tmp = form["y"]
-        Scanner.ZoneAcq.y = chaineIntwitherror(tmp, Scanner.ZoneAcq.y, 0, 297.5)
+        Scanner.y = chaineIntwitherror(tmp, Scanner.y, 0, 297.5)
         tmp = form["quality"]
         Scanner.quality = chaineIntwitherror(tmp, Scanner.quality, 0, 90)
         tmp = form["token"]  # token vide pour non utilisation du scanner
