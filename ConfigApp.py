@@ -10,66 +10,51 @@ import logging.config
 from datetime import datetime
 
 
-# CONFIG_PATH = "ConfigFile/Scanner"
 # Path to the config file
 CONFIG_APP_FILE = os.path.expanduser("~/scanorhize.json")
 
 
 class ConfigApp:
     """Class to hold configuration data"""
-
-    _instance = None  # Class variable to store the single instance
-
-    config_app_file = CONFIG_APP_FILE
-    environment: str
-    log_level: str
-    log_dir: str
-    config_path: str
-    next_date_file: str
-    config_hub_file: str
-    display_file: str
-    battery_file: str
-    uhubctl: str
-    usb_dir: str
-    scanorhize_server: str
-    connect_timeout: int
-    max_time: int
-    logger: logging.Logger  # Define logger attribute
+    _instance = None
 
     def __new__(cls):
-        """Ensure only one instance is created (Singleton pattern)."""
         if cls._instance is None:
             cls._instance = super(ConfigApp, cls).__new__(cls)
-            cls._instance._initialize()  # Initialize instance variables
         return cls._instance
 
-    def _initialize(self):
-        """Initialize default values (runs only once)."""
-        self.environment = "PROD"
-        self.log_level = "INFO"
-        self.log_dir = "Log"
-        self.config_path = "ConfigFile"
-        self.next_date_file = "NextStartDate.json"
-        self.config_hub_file = "Hub.json"
-        self.display_file = "Log/Display.txt"
-        self.battery_file = "Log/Battery.txt"
-        self.uhubctl = "/usr/sbin/uhubctl"
-        self.usb_dir = "/media/pi/Image"
-        self.scanorhize_server = "scanorhize.duckdns.org"
-        self.connect_timeout = 10
-        self.max_time = 300
+    def __init__(self):
+        """Initialize the instance if not already initialized."""
+        if hasattr(self, "initialized"):  # Skip if already initialized
+            return
+
+        # Type hints for required attributes
+        self.config_app_file: str = CONFIG_APP_FILE
+        self.environment: str = "PROD"
+        self.log_level: str = "INFO"
+        self.log_dir: str = "Log"
+        self.config_dir: str = "ConfigFile"
+        self.next_date_file: str = "NextStartDate.json"
+        self.config_hub_file: str = "Hub.json"
+        self.display_file: str = "Display.txt"
+        self.battery_file: str = "Battery.txt"
+        self.uhubctl: str = "/usr/sbin/uhubctl"
+        self.usb_dir: str = "/media/pi/Image"
+        self.image_dir: str = "static"
+        self.s3_bucket: str = "s3://scanorhize-images-prod"
+        self.scanorhize_server: str = "scanorhize.duckdns.org"
+        self.connect_timeout: int = 10
+        self.max_time: int = 300
+
+        # Initialize logger
         self.logger = logging.getLogger("ConfigApp")
 
-        # Setup basic logging with defaults
+        # Setup logging and load config
         self.setup_basic_logging()
-
-        # Load configuration
         self.load_config()
-
-        # Update logging with final config
         self.setup_final_logging()
 
-        # Log the configuration load
+        self.initialized = True  # Mark as initialized
         self.logger.warning("Read configuration from: %s", self.config_app_file)
 
     def setup_basic_logging(self):
@@ -87,7 +72,7 @@ class ConfigApp:
         logging.getLogger().handlers.clear()
 
         # Check for logging.conf
-        logging_conf = os.path.join(self.config_path, "logging.conf")
+        logging_conf = os.path.join(self.config_dir, "logging.conf")
         if os.path.exists(logging_conf):
             logging.config.fileConfig(logging_conf)
             self.logger = logging.getLogger("MainLogger")
@@ -116,11 +101,7 @@ class ConfigApp:
         self.logger.setLevel(log_level)
 
     def load_config(self):
-        """Load config from environment variables or config.json"""
-
-        # Clear existing handlers to avoid duplicate log lines
-        self.logger.handlers.clear()
-
+        """Load config and update attributes dynamically"""
         if not os.path.exists(self.config_app_file):
             self.logger.error("No file: %s", self.config_app_file)
             return self
@@ -128,13 +109,14 @@ class ConfigApp:
         try:
             with open(self.config_app_file, "r", encoding="utf-8") as openfile:
                 data = json.load(openfile)
-                # Use setattr instead of updating __dict__
+                # Update attributes from JSON, including any new ones
                 for key, value in data.items():
-                    setattr(self, key, value)
+                    if key != "logger":  # Skip logger to maintain logging setup
+                        setattr(self, key, value)
         except (FileNotFoundError, ValueError):
-            self.logger.error("Problem with the config file: %s", self.config_app_file)
+            self.logger.error("Problem with config file: %s", self.config_app_file)
 
-        # Environment overrides
+        # Handle environment overrides
         if os.path.exists("DEV") or os.environ.get("DEV", False):
             self.environment = "DEV"
         if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
@@ -159,6 +141,29 @@ class ConfigApp:
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
         logging.info("Logging initialized at level: %s", self.log_level)
+
+    def json(self):
+        """Convert object to JSON, excluding special attributes"""
+        data = {
+            key: value
+            for key, value in self.__dict__.items()
+            if not key.startswith("_")
+            and key != "logger"
+            and key != "config_app_file"
+            and key != "initialized"
+        }
+        return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=4)
+
+    def save_config(self):
+        """Save the current configuration to a JSON file."""
+        json_data = self.json()
+        try:
+            with open(self.config_app_file, "w", encoding="utf-8") as outfile:
+                outfile.write(json_data)
+                return 0
+        except OSError as e:
+            getLogger().error("save_config: OSError: %s", e)
+            return 1
 
     def is_dev(self) -> bool:
         """Returns True if environment is set to DEV."""
@@ -191,11 +196,15 @@ def getLogger():
 
 
 def getDisplayFile():
-    return ConfigApp().display_file
+    return os.path.join(
+        os.path.expanduser(ConfigApp().log_dir), ConfigApp().display_file
+    )
 
 
 def getBatteryFile():
-    return ConfigApp().battery_file
+    return os.path.join(
+        os.path.expanduser(ConfigApp().log_dir), ConfigApp().battery_file
+    )
 
 
 def getUhubctl():
@@ -206,20 +215,28 @@ def getUsbDir():
     return ConfigApp().usb_dir
 
 
+def getImageDir():
+    return ConfigApp().image_dir
+
+
 def getNextDateFile():
     return os.path.join(
-        os.path.expanduser(ConfigApp().config_path), ConfigApp().next_date_file
+        os.path.expanduser(ConfigApp().config_dir), ConfigApp().next_date_file
     )
 
 
 def getConfigHubFile():
     return os.path.join(
-        os.path.expanduser(ConfigApp().config_path), ConfigApp().config_hub_file
+        os.path.expanduser(ConfigApp().config_dir), ConfigApp().config_hub_file
     )
 
 
-def getConfigPath():
-    return os.path.expanduser(ConfigApp().config_path)
+def getConfigDir():
+    return os.path.expanduser(ConfigApp().config_dir)
+
+
+def getS3Bucket():
+    return ConfigApp().s3_bucket
 
 
 def getScanorhizeServer():
@@ -247,4 +264,5 @@ if __name__ == "__main__":
     print(f"Dev: {is_dev()}")
     print(f"Debug: {is_debug()}")
     getLogger().warning("getLogger warning test")
+    ConfigApp().save_config()
     WriteTimeLogfile("WriteTimeLogfile test")
