@@ -8,7 +8,7 @@ from os import path
 # import sys
 import shutil
 from OSUtils import is_raspberry_pi
-from ConfigApp import getLogger, getUsbDir
+from ConfigApp import getLogger, getUsbDir, getImageDir
 
 # Define base folders for different platforms
 if is_raspberry_pi():
@@ -72,16 +72,21 @@ def CreateFolderImage(Name, i_scan):
 
 
 def CopyImageToUSB(Scanner, FolderImage_):
+    """copie l'image et le fichier JSON sur la clé USB
+    """
     try:
         date = Scanner.LastImgTime
         fileName = date.replace(":", "-")
-        imagejpg2000 = f"image_{fileName}.jp2"
-        jp2Path = path.join(FolderImage_, imagejpg2000)
+        jp2Path = path.join(FolderImage_, f"image_{fileName}.jp2")
+        jp2JSONPath = path.join(FolderImage_, f"image_{fileName}.json")
         # Check if source file exists
         if not os.path.exists(Scanner.LastImgFile):
             getLogger().error("Source file not found: %s", Scanner.LastImgFile)
             return 1
-        # Use shutil.copy2 instead of shell command
+        # Create the JSON file
+        if Scanner.scanDumpMeta(jp2JSONPath):
+            getLogger().error("Error creating JSON file: %s", jp2JSONPath)
+            return 1
         getLogger().warning("Copy %s to %s", Scanner.LastImgFile, jp2Path)
         shutil.copy2(Scanner.LastImgFile, jp2Path)
         return 0
@@ -93,15 +98,15 @@ def CopyImageToUSB(Scanner, FolderImage_):
 
 def CreateTempImage(Scanner):
     try:
-        imagepath = "static/"
+        image_dir = getImageDir()
         Date = (Scanner.LastImgTime).replace(":", "-")
         Imagejp2000Path = Scanner.LastImgFile
-        jp2Path = imagepath + Date + ".jp2"
+        jp2Path = f"{path.join(image_dir, Date)}.jp2"
 
         # Check if source file exists
         if not os.path.exists(Imagejp2000Path):
             getLogger().error("Source file not found: %s", Imagejp2000Path)
-            return "static/error.jp2"
+            return path.join(image_dir, "error.jp2")
 
         # Use shutil.copy2 instead of shell command
         shutil.copy2(Imagejp2000Path, jp2Path)
@@ -109,7 +114,7 @@ def CreateTempImage(Scanner):
 
     except (IOError, OSError) as err:
         getLogger().error("Error in CreateTempImage: %s", err)
-        return "static/error.jp2"
+        return path.join(image_dir, "error.jp2")
 
 
 def RemoveTempImage(Image):
