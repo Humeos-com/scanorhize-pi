@@ -15,7 +15,7 @@ from WittyPython import (
     get_output_voltage,
     get_power_mode,
 )
-from ConfigApp import WriteTimeLogfile, getLogger, getBatteryFile, getDisplayFile
+from ConfigApp import getLogger, getBatteryFile, getDisplayFile
 from ConfigApp import getUhubctl
 from ConfigApp import getNextDateFile
 
@@ -283,7 +283,7 @@ def TurnUsbOff(i_scan, delay=0):
             # Pour l'ancienne carte Relai
             # GPIO.output(realpin, GPIO.HIGH)
         except IOError as e:
-            getLogger().warning("IOError: %s", e)
+            getLogger().error("IOError: %s", e)
             return 1
     return 0
 
@@ -295,7 +295,7 @@ def ReadGPIOConfig():
         GPIO.setup(ConfigPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         state_ = GPIO.input(ConfigPin)
     except IOError as e:
-        getLogger().warning("IOError: %s", e)
+        getLogger().error("IOError: %s", e)
         state_ = 1
 
     getLogger().warning("Etat GPIO %d: %d", ConfigPin, state_)
@@ -312,8 +312,8 @@ def WriteStartDateConfig(NextStartDate):
         json_object = json.dumps(data, indent=len(data))
         with open(getNextDateFile(), "w", encoding="utf-8") as outfile:
             outfile.write(json_object)
-    except ValueError:
-        WriteTimeLogfile(f"Error writing file: {getNextDateFile()}")
+    except ValueError as e:
+        getLogger().error("Error writing file: %s, error: %s", getNextDateFile(), e)
         return 1
 
     return 0
@@ -328,8 +328,8 @@ def ReadStartDateConfig():
     try:
         with open(getNextDateFile(), "r", encoding="utf-8") as openfile:
             data = json.load(openfile)
-    except FileNotFoundError:
-        WriteTimeLogfile(f"Error reading file: {getNextDateFile()}")
+    except FileNotFoundError as e:
+        getLogger().error("File not found: %s, error: %s", getNextDateFile(), e)
 
     else:
         NextStartDate[0] = data["NextStartDate1"]
@@ -347,7 +347,6 @@ if __name__ == "__main__":
     initDisplayFile()
     print(f"Is charging? {isWittyPiCharging()}")
     print(f"Volts: {ReadBatVoltCap()[0]} Capacity: {ReadBatVoltCap()[1]}")
-    WriteTimeLogfile("Test unitaire main de Miscellaneous")
     value = input("Voulez-vous modifier l'état des GPIO ? [Non=Entrée, sinon, Oui=o]: ")
     if not value:
         sys.exit(0)

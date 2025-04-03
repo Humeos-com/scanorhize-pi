@@ -21,15 +21,13 @@ from Server import (
     updateServer,
     HubData,
 )
-from Miscellaneous import WriteTimeLogfile, chaineIntwitherror, InitGPIO
+from ConfigApp import getLogger, getDisplayFile
+from Miscellaneous import chaineIntwitherror, InitGPIO
 from OSUtils import is_raspberry_pi
-
-LOG_DIR = "Log"
-DISPLAY_FILE = LOG_DIR + "/Display.txt"
 
 Server = HubData()
 
-WriteTimeLogfile("Start Scanorhize.py")
+getLogger().warning("Start Scanorhize.py")
 
 # res=""
 # while res!="Scanorhize" :
@@ -41,14 +39,14 @@ while res == 0:
     if is_raspberry_pi():
         sleep(5)
 
-WriteTimeLogfile("Launch Web app")
+getLogger().warning("Launch Web app")
 app = Flask(__name__)
 
 # init
 SSID = GetWifiSSID()
-WriteTimeLogfile(SSID)
+getLogger().warning("SSID: %s", SSID)
 IP = GetIP()
-WriteTimeLogfile(IP)
+getLogger().warning("IP: %s", IP)
 listScannerconfigs = listConfigScanner()
 
 
@@ -80,7 +78,7 @@ def index():
 @app.route("/stream")
 def stream():
     def generate():
-        with open(DISPLAY_FILE, "r", encoding="utf-8") as f:
+        with open(getDisplayFile(), "r", encoding="utf-8") as f:
             while True:
                 yield f.read()
                 sleep(1)

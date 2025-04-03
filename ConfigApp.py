@@ -176,7 +176,8 @@ class ConfigApp:
         """Prints the current configuration."""
         print("Current Configuration:")
         for key, value in self.__dict__.items():
-            print(f"{key}: {value}")
+            if key != "initialized":
+                print(f"{key}: {value}")
 
 
 def is_dev():
@@ -185,10 +186,6 @@ def is_dev():
 
 def is_debug():
     return ConfigApp().is_debug()
-
-
-def WriteTimeLogfile(data):
-    ConfigApp().logger.warning("%s", data)
 
 
 def getLogger():
@@ -265,4 +262,3 @@ if __name__ == "__main__":
     print(f"Debug: {is_debug()}")
     getLogger().warning("getLogger warning test")
     ConfigApp().save_config()
-    WriteTimeLogfile("WriteTimeLogfile test")
