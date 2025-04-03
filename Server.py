@@ -5,7 +5,6 @@ Fonctions qui encapsulent l'API du serveur Web
 import sys
 import os
 from os import path
-from dataclasses import dataclass, asdict
 from subprocess import run, SubprocessError, CalledProcessError
 import json
 from ConfigApp import (
@@ -16,41 +15,66 @@ from ConfigApp import (
     getLogger,
     getS3Bucket
 )
-from Miscellaneous import WriteTimeLogfile
-from Campaign import RemoveTempImage, CreateTempImage, getUsbDir
+from Campaign import RemoveTempImage, CreateTempImage, getUsbDir, USBSpace
+from Miscellaneous import ReadBatVoltCap
 from OSUtils import get_os
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
+from WittyPython import ReadTemp
 
 
-@dataclass
 class HubData:
     """Gestion des paramètres du Raspberry et de la carte SIM"""
 
-    apn: str = ""   # Adresse de l'APN
-    user: str = ""
-    password: str = ""
-    address: str = ""   # Adresse de l'APN
-    ping: int = 0
-    projectId: str = ""
-    token: str = "token_bidon"
-    batteryLevelPercent: int = 0
-    diskSpacePercent: int = 0
-    temperature: float = 0
+    _instance = None  # Class variable to store the single instance
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(HubData, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        """Initialize the instance if not already initialized."""
+        if hasattr(self, "initialized"):  # Skip if already initialized
+            return
+
+        self.apn: str = ""   # Adresse de l'APN
+        self.user: str = ""
+        self.password: str = ""
+        self.address: str = ""   # Adresse de l'APN
+        self.ping: int = 0
+        self.projectId: str = ""
+        self.macAddress: str = "00:00:00:00:00:00"
+        self.token: str = "token_bidon"
+        self.batteryLevelPercent: int = 0
+        self.diskSpacePercent: int = 0
+        self.temperature: float = 0
+
+        self.initialized = True  # Mark as initialized
+        self.ReadConfig()
+        self.macAddress = getHwAddr()
+
+
+    def json(self):
+        """Convert object to JSON, excluding special attributes"""
+        data = {
+            key: value
+            for key, value in self.__dict__.items()
+            if not key.startswith("_")
+            and key != "initialized"
+        }
+        return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=4)
 
     def WriteConfig(self):
-        fullpath = getConfigHubFile()
+        """Save the current configuration to a JSON file."""
+        json_data = self.json()
         try:
-            with open(fullpath, "w", encoding="utf-8") as openfile:
-                json.dump(
-                    self.__dict__,
-                    openfile,
-                    sort_keys=True,
-                    ensure_ascii=False,
-                    indent=4,
-                )
-        except (FileNotFoundError, ValueError):
-            WriteTimeLogfile(f"No file: {fullpath}")
+            with open(getConfigHubFile(), "w", encoding="utf-8") as outfile:
+                outfile.write(json_data)
+                return 0
+        except OSError as e:
+            getLogger().error("save_config: OSError: %s", e)
+            return 1
 
     def ReadConfig(self):
         fullpath = getConfigHubFile()
@@ -66,9 +90,12 @@ class HubData:
         return self
 
     def print(self):
-        """Print all dataclass attributes"""
-        for name, value in asdict(self).items():
-            print(f"{name}: {value}")
+        """Prints the current configuration."""
+        print("Current Configuration:")
+        for key, value in self.__dict__.items():
+            if key != "initialized":
+                print(f"{key}: {value}")
+
 
 
 def updateServer(server: HubData):
@@ -105,6 +132,7 @@ def CopyFromJson(ScannerObj: ScannerData, data):
         ScannerObj.quality = data["quality"]
     return ScannerObj
 
+
 def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
     # On envoie les fichiers images
@@ -136,7 +164,6 @@ def syncImageFiles(hub_: HubData):
         getLogger().error("SyncImageFiles: %s", e)
 
 
-
 def getTokens():
 
     # Get list of scanner serials
@@ -149,7 +176,9 @@ def getTokens():
         serial_dict[f"port{num_scan}"] = serial
     # num_scan contient le nombre de scanners
 
-    json_data = {"macAddress": getHwAddr(), "serialNumbers": serial_dict}
+    Hub_ = HubData()
+
+    json_data = {"macAddress": Hub_.macAddress, "serialNumbers": serial_dict}
 
     cmdPost = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
 -X POST "https://{getScanorhizeServer()}/auth/devices" \
@@ -184,8 +213,6 @@ def getTokens():
 
         if body.strip():
             results = json.loads(body)
-            Hub_ = HubData()
-            Hub_.ReadConfig()
             Hub_.token = results["accessTokenHub"]
             Hub_.projectId = results["projectId"]
             Hub_.WriteConfig()
@@ -202,7 +229,7 @@ def getTokens():
         return 0
 
     except (IndexError, ValueError, json.JSONDecodeError) as e:
-        WriteTimeLogfile(f"getTokens: Error parsing response: {str(e)}")
+        getLogger().error("getTokens: Error parsing response: %s", e)
         return 1
 
 
@@ -210,15 +237,14 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
     cmdRead = f'curl --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
 -X GET "https://{getScanorhizeServer()}/api/scanner/configuration" \
 -H "accept: application/json" -H "scanner:{ScannerObj.token}"'
-    print(cmdRead)
+    getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    print(result.returncode, result.stdout, result.stderr)
 
     if result.returncode != 0:
-        WriteTimeLogfile(
-            f"ReadConfigFromServer: return: {result.returncode} error: {result.stderr}"
+        getLogger().error(
+            "ReadConfigFromServer: return: %s  error: %s", result.returncode, result.stderr
         )
         error = 1
     else:
@@ -229,17 +255,14 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
                 error = 0
             else:
                 # reponse vide
-                WriteTimeLogfile("ReadConfigFromServer: aucune donnée reçue")
+                getLogger().error("ReadConfigFromServer: aucune donnée reçue")
                 error = 1
-        except json.JSONDecodeError as e:
-            WriteTimeLogfile(f"JSON decode error: {str(e)}")
-            error = 1
-        except AttributeError as e:
-            WriteTimeLogfile(f"Error reading json, error: {str(e)}")
+        except (AttributeError, json.JSONDecodeError) as e:
+            getLogger().error("Error reading json, error: %s", str(e))
             error = 1
 
         if not error:
-            WriteTimeLogfile("ReadConfigFromServer: OK")
+            getLogger().warning("ReadConfigFromServer: OK")
     return ScannerObj
 
 
@@ -251,7 +274,7 @@ def SendConfigToServer(ScannerObj: ScannerData):
 -H "accept: application/json" -H "scanner:{ScannerObj.token}" \
 -H "Content-Type: application/json" \
 -d {ScannerObj.json()}'
-    WriteTimeLogfile(cmdPost)
+    getLogger().warning(cmdPost)
 
 
 def PostImageToServer(ScannerObj: ScannerData):
@@ -268,14 +291,14 @@ def PostImageToServer(ScannerObj: ScannerData):
 -F "date={Date}" -F "dpi={Resolution}" \
 -F "file=@{ImagePath}"'
 
-    WriteTimeLogfile(cmdPost)
+    getLogger().warning(cmdPost)
     result = run(
         cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
     if result.returncode != 0:
-        WriteTimeLogfile(
-            f"PostImageToServer: return: {result.returncode} error: {result.stderr}"
+        getLogger().error(
+            "PostImageToServer: return: %s error: %s", result.returncode, result.stderr
         )
         error = 1
     else:
@@ -283,22 +306,18 @@ def PostImageToServer(ScannerObj: ScannerData):
             if result.stdout.strip():  # Check if stdout is not empty
                 results = json.loads(result.stdout)
                 if results["status"] != 200:  # 200 = OK
-                    WriteTimeLogfile(
-                        f"Post error: {results['status']}: {results['message']}"
-                    )
+                    getLogger().error(
+                        "PostImageToServer: error: %s message: %s", results['status'], results['message']
+                 )
                     error = 1
             else:
                 # reponse vide = reponse normale sur le post des images
                 error = 0
-        except json.JSONDecodeError as e:
-            WriteTimeLogfile(f"JSON decode error: {str(e)}")
+        except (AttributeError, json.JSONDecodeError) as e:
+            getLogger().error("Error reading json, error: %s", str(e))
             error = 1
-        except AttributeError as e:
-            WriteTimeLogfile(f"Error reading json, error: {str(e)}")
-            error = 1
-
         if not error:
-            WriteTimeLogfile("PostImageToServer: OK")
+            getLogger().warning("PostImageToServer: OK")
 
     RemoveTempImage(ImagePath)
     return error
@@ -318,13 +337,13 @@ def SendParameters(Hub_: HubData):
 -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' """
 
-    WriteTimeLogfile(cmdPUT)
+    getLogger().warning(cmdPUT)
     result = run(
         cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     if result.returncode != 0:
-        WriteTimeLogfile(
-            f"Post hub-device: return: {result.returncode} error: {result.stderr}"
+        getLogger().error(
+            "SendParameters: return: %s error: %s", result.returncode, result.stderr
         )
         return 1
 
@@ -338,22 +357,24 @@ def SendParameters(Hub_: HubData):
         status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
-        WriteTimeLogfile(f"Response status code: {status_code}")
+        getLogger().warning("SendParameters: status: %s", status_code)
 
         if not 200 <= status_code < 300:
-            WriteTimeLogfile(f"Error: HTTP {status_code}")
+            getLogger().error(
+                "SendParameters: error: %s", status_code
+            )
             return 1
 
         if body.strip():
             results = json.loads(body)
             if results["message"] == "Status updated":
-                WriteTimeLogfile("Parameters sent to server: OK")
+                getLogger().warning("SendParameters: OK")
                 return 0
-            WriteTimeLogfile(f"Error: {results['message']}")
+            getLogger().error("SendParameters: error: %s", results['message'])
             return 1
 
     except (IndexError, ValueError, json.JSONDecodeError) as e:
-        WriteTimeLogfile(f"SendParameters: Error parsing response: {str(e)}")
+        getLogger().error("SendParameters: error: %s", e)
     return 1
 
 
@@ -414,6 +435,12 @@ if __name__ == "__main__":
     print(pingAPI("www.google.com"))
     # print(pingAPI("192.168.73.1"))
     # syncImageFiles()
+    Hub = HubData()
+    # Hub_.ReadConfig()
+    volt, Hub.batteryLevelPercent = ReadBatVoltCap()
+    Hub.diskSpacePercent = USBSpace()[0]/1000
+    Hub.temperature = ReadTemp()
+    Hub.WriteConfig()
     sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
