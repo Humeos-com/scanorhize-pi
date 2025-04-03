@@ -130,7 +130,8 @@ try:
     # On lance un sous programme qui met à jour toutes les données sur la plateforme
     # On échange avec la plateforme Web pour envoyer les images et les paramètres
 
-    # On récupère les configs des scanners depuis la plateforme
+    # On récupère les configs des scanners depuis la plateforme / le S3 ??
+    # avec la TODO liste
     # selon le flag Scanner.UseServer
 
 
@@ -148,11 +149,11 @@ try:
         Hub_.diskSpacePercent,
         Hub_.temperature,
     )
-    SendParameters(Hub_)
+    SendParameters(Hub_) ## Plutôt envoie les paramètres au S3 ??
     syncImageFiles(Hub_)
 
     # On recupère les configuration des Scanners en fonction de use_server
-    
+
 
 except RuntimeError as exc:
     getLogger().error(exc)

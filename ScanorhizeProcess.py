@@ -10,7 +10,6 @@ from ConfigApp import getLogger
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Server import (
-    PostImageToServer,
     ReadConfigFromServer,
 )
 from Miscellaneous import (
