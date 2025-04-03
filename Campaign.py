@@ -21,6 +21,7 @@ else:
 DOCUMENTS_DIR = path.join(BASE_DIR, "Documents")
 FOLDER_IMAGE = DOCUMENTS_DIR  # Default folder for images
 
+
 def CreateFolderOnUSB(directory: str):
     """Create folder on USB device, on failure use /home/pi/Documents
 
@@ -72,8 +73,7 @@ def CreateFolderImage(Name, i_scan):
 
 
 def CopyImageToUSB(Scanner, FolderImage_):
-    """copie l'image et le fichier JSON sur la clé USB
-    """
+    """copie l'image et le fichier JSON sur la clé USB"""
     try:
         date = Scanner.LastImgTime
         fileName = date.replace(":", "-")

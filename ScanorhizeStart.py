@@ -124,7 +124,6 @@ try:
     except CalledProcessError as exc:
         getLogger().error(exc.stderr)
 
-
     #
     # Etape 4 #############################################
     # On lance un sous programme qui met à jour toutes les données sur la plateforme
@@ -134,12 +133,11 @@ try:
     # avec la TODO liste
     # selon le flag Scanner.UseServer
 
-
     # Paramètres
     Hub_ = HubData()
     Hub_.ReadConfig()
     volt, Hub_.batteryLevelPercent = ReadBatVoltCap()
-    Hub_.diskSpacePercent = USBSpace()[0]/1000
+    Hub_.diskSpacePercent = USBSpace()[0] / 1000
     Hub_.temperature = ReadTemp()
     Hub_.WriteConfig()
 
@@ -149,7 +147,7 @@ try:
         Hub_.diskSpacePercent,
         Hub_.temperature,
     )
-    SendParameters(Hub_) ## Plutôt envoie les paramètres au S3 ??
+    SendParameters(Hub_)  ## Plutôt envoie les paramètres au S3 ??
     syncImageFiles(Hub_)
 
     # On recupère les configuration des Scanners en fonction de use_server

@@ -18,7 +18,7 @@ from Miscellaneous import (
     ReadStartDateConfig,
     initDisplayFile,
 )
-from Campaign import CopyImageToUSB,CreateFolderOnUSB
+from Campaign import CopyImageToUSB, CreateFolderOnUSB
 from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
 
 DateStart = GetCurrentDate()
@@ -75,7 +75,7 @@ for CurrentScanner in listScannerconfigs:
         scanning = 1
         if Scanner.error == 0:
             getLogger().warning("Image acquisition Ok")
-            sleep(5) # Voir si on peut réduire ce timer
+            sleep(5)  # Voir si on peut réduire ce timer
             FolderImage = CreateFolderOnUSB(Scanner.projectId)
             FolderImage = CreateFolderOnUSB(path.join(FolderImage, Scanner.sampleId))
             copyerror = CopyImageToUSB(Scanner, FolderImage)

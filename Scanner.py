@@ -94,8 +94,7 @@ class ScannerData:
         )
 
     def scanDumpMeta(self, file: str):
-        """Dump les paramètres du scanner au format JSON dans le fichier file
-        """
+        """Dump les paramètres du scanner au format JSON dans le fichier file"""
 
         data = {
             "resolution": self.resolution,

@@ -73,7 +73,9 @@ def getChPin(i_scan: int):
         # print(f"getChPin: {i_scan} => {PinArray[i_scan]}")
         return PinArray[i_scan]
 
-    getLogger().error("La valeur passee doit être comprise entre 0 et 4, ici: %d", i_scan)
+    getLogger().error(
+        "La valeur passee doit être comprise entre 0 et 4, ici: %d", i_scan
+    )
     return -1
 
 
@@ -167,7 +169,7 @@ def isWittyPiCharging():
 def ReadBatVoltCap():
 
     if not is_raspberry_pi():
-        return(5.0, 99.0)
+        return (5.0, 99.0)
 
     if get_power_mode():
         # On est dans le cas d'un batterie interne
@@ -189,9 +191,9 @@ def EndGPIO():
     GPIO.cleanup()
     return
 
+
 def Start4G():
-    """Allume le port USB de la clé 4G
-    """
+    """Allume le port USB de la clé 4G"""
     if not is_raspberry_pi():
         return 0
     try:
@@ -207,8 +209,7 @@ def Start4G():
 
 
 def End4G():
-    """Eteint le port USB de la clé 4G
-    """
+    """Eteint le port USB de la clé 4G"""
     if not is_raspberry_pi():
         return 0
     try:
@@ -224,8 +225,7 @@ def End4G():
 
 
 def InitGPIO():
-    """Fonction historique pour les port USB
-    """
+    """Fonction historique pour les port USB"""
     if not is_raspberry_pi():
         return 0
     try:

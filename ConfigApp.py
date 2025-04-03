@@ -16,6 +16,7 @@ CONFIG_APP_FILE = os.path.expanduser("~/scanorhize.json")
 
 class ConfigApp:
     """Class to hold configuration data"""
+
     _instance = None
 
     def __new__(cls):

@@ -13,7 +13,7 @@ from ConfigApp import (
     getConnectTimeout,
     getMaxTime,
     getLogger,
-    getS3Bucket
+    getS3Bucket,
 )
 from Campaign import RemoveTempImage, CreateTempImage, getUsbDir, USBSpace
 from Miscellaneous import ReadBatVoltCap
@@ -38,10 +38,10 @@ class HubData:
         if hasattr(self, "initialized"):  # Skip if already initialized
             return
 
-        self.apn: str = ""   # Adresse de l'APN
+        self.apn: str = ""  # Adresse de l'APN
         self.user: str = ""
         self.password: str = ""
-        self.address: str = ""   # Adresse de l'APN
+        self.address: str = ""  # Adresse de l'APN
         self.ping: int = 0
         self.projectId: str = ""
         self.macAddress: str = "00:00:00:00:00:00"
@@ -54,14 +54,12 @@ class HubData:
         self.ReadConfig()
         self.macAddress = getHwAddr()
 
-
     def json(self):
         """Convert object to JSON, excluding special attributes"""
         data = {
             key: value
             for key, value in self.__dict__.items()
-            if not key.startswith("_")
-            and key != "initialized"
+            if not key.startswith("_") and key != "initialized"
         }
         return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=4)
 
@@ -95,7 +93,6 @@ class HubData:
         for key, value in self.__dict__.items():
             if key != "initialized":
                 print(f"{key}: {value}")
-
 
 
 def updateServer(server: HubData):
@@ -156,7 +153,9 @@ def syncImageFiles(hub_: HubData):
                         try:
                             os.remove(file_path)
                         except (FileNotFoundError, PermissionError) as e:
-                            getLogger().error("Error removing file %s: %s", file_path, e)
+                            getLogger().error(
+                                "Error removing file %s: %s", file_path, e
+                            )
                         else:
                             getLogger().warning("SyncImageFiles: removed %s", file_path)
 
@@ -244,7 +243,9 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
 
     if result.returncode != 0:
         getLogger().error(
-            "ReadConfigFromServer: return: %s  error: %s", result.returncode, result.stderr
+            "ReadConfigFromServer: return: %s  error: %s",
+            result.returncode,
+            result.stderr,
         )
         error = 1
     else:
@@ -307,8 +308,10 @@ def PostImageToServer(ScannerObj: ScannerData):
                 results = json.loads(result.stdout)
                 if results["status"] != 200:  # 200 = OK
                     getLogger().error(
-                        "PostImageToServer: error: %s message: %s", results['status'], results['message']
-                 )
+                        "PostImageToServer: error: %s message: %s",
+                        results["status"],
+                        results["message"],
+                    )
                     error = 1
             else:
                 # reponse vide = reponse normale sur le post des images
@@ -360,9 +363,7 @@ def SendParameters(Hub_: HubData):
         getLogger().warning("SendParameters: status: %s", status_code)
 
         if not 200 <= status_code < 300:
-            getLogger().error(
-                "SendParameters: error: %s", status_code
-            )
+            getLogger().error("SendParameters: error: %s", status_code)
             return 1
 
         if body.strip():
@@ -370,7 +371,7 @@ def SendParameters(Hub_: HubData):
             if results["message"] == "Status updated":
                 getLogger().warning("SendParameters: OK")
                 return 0
-            getLogger().error("SendParameters: error: %s", results['message'])
+            getLogger().error("SendParameters: error: %s", results["message"])
             return 1
 
     except (IndexError, ValueError, json.JSONDecodeError) as e:
@@ -438,7 +439,7 @@ if __name__ == "__main__":
     Hub = HubData()
     # Hub_.ReadConfig()
     volt, Hub.batteryLevelPercent = ReadBatVoltCap()
-    Hub.diskSpacePercent = USBSpace()[0]/1000
+    Hub.diskSpacePercent = USBSpace()[0] / 1000
     Hub.temperature = ReadTemp()
     Hub.WriteConfig()
     sys.exit(0)
@@ -447,7 +448,7 @@ if __name__ == "__main__":
     scan_num = 0
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
-    #    PostImageToServer(Scanner)
+        #    PostImageToServer(Scanner)
         scan_num += 1
 
     # WriteScannerConfig(Scanner, "1-Scanner.json")
