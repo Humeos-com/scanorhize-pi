@@ -186,7 +186,7 @@ def get_output_voltage():
     return WittyPi().get_output_voltage()
 
 
-def get_output_current(self):
+def get_output_current():
 
     return WittyPi().get_output_current()
 
