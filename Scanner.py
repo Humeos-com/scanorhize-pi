@@ -132,8 +132,8 @@ class ScannerData:
         # check that the scanner is plugged in, turned on and detected by the
         # sane-find-scanner tool (if appropriate). Please read the documentation
         # which came with this software (README, FAQ, manpages).
-        # ~/Scanorhize $ 
-        # 
+        # ~/Scanorhize $
+        #
         # Soit il y a un scanner et on reçoit le message:
         # ~/Scanorhize $ LD_LIBRARY_PATH=/usr/local/lib scanimage -L
         # device `pixma:04A91912_43C7A6' is a CANON CanoScan LiDE 400 multi-function peripheral
@@ -191,7 +191,9 @@ class ScannerData:
         # TurnUsbOff(i_scan, self.TimeAfterScan)
         TurnUsbOff(i_scan, 0)
         if self.error > 0:
-            getLogger().error("scanSearch: error acquisition: %s, %s", result.stdout, result.stderr)
+            getLogger().error(
+                "scanSearch: error acquisition: %s, %s", result.stdout, result.stderr
+            )
 
         return self
 
