@@ -66,8 +66,6 @@ class ScannerData:
             getLogger().error("ReadScannerConfig: %s", e)
         else:
             self.__dict__.update(data)
-        finally:
-            self.printScanner()
         return self
 
     def WriteScannerConfig(self, file):
@@ -123,24 +121,43 @@ class ScannerData:
 
     def scanSearch(self, i_scan: int):
         # function to find scanner with sane
-        # on cherche le scanners pour enregistrer le nom du device
-        error = TurnUsbOn(i_scan, self.TimeBeforeScan)
+        # on regarde le port USB pour enregistrer le #serie du scanner
+        #
+        # "scanimage -L" renvoie toujour 0
+        #
+        # Soit il n'y a pas de scanner et on reçoit les message:
+        # ~/Scanorhize $ LD_LIBRARY_PATH=/usr/local/lib scanimage -L
+        #
+        # No scanners were identified. If you were expecting something different,
+        # check that the scanner is plugged in, turned on and detected by the
+        # sane-find-scanner tool (if appropriate). Please read the documentation
+        # which came with this software (README, FAQ, manpages).
+        # ~/Scanorhize $ 
+        # 
+        # Soit il y a un scanner et on reçoit le message:
+        # ~/Scanorhize $ LD_LIBRARY_PATH=/usr/local/lib scanimage -L
+        # device `pixma:04A91912_43C7A6' is a CANON CanoScan LiDE 400 multi-function peripheral
+        # ~/Scanorhize $
+        #
+
+        error = TurnUsbOn(i_scan, 5)
+        # error = TurnUsbOn(i_scan, self.TimeBeforeScan)
         if error != 0:
             self.error = 1
             return self
 
         res = 1
         i = 0
+        # attribut par défaut si on ne trouve rien
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
-            cmd = (
-                f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage -L "
+            command = (
+                f"LD_LIBRARY_PATH=/usr/local/lib scanimage -L "
                 f"| tee -a {DISPLAY_FILE}"
             )
-            print("i=", i)
-            # print(cmd)
+            getLogger().warning("scanAcq: %s", command)
             result = run(
-                cmd,
+                command,
                 capture_output=True,
                 universal_newlines=True,
                 shell=True,
@@ -149,7 +166,6 @@ class ScannerData:
             # print(result.returncode, result.stdout, result.stderr)
             res = result.returncode
             scanimage_message = result.stdout
-            print(res, scanimage_message)
             x = (scanimage_message).split()
             # print(x)
             if x[0] == "No":
@@ -162,6 +178,7 @@ class ScannerData:
 
         self.device = "NoScannerDetected"
         if res == 0:
+            self.error = 0
             for line in scanimage_message.splitlines():
                 x = (line).split("'")
                 x = (line).split()
@@ -169,10 +186,12 @@ class ScannerData:
                 self.device = device[1 : len(device) - 1]
         else:
             self.device = "NoScannerDetected"
-        print("Scanner: ", self.device)
-        TurnUsbOff(i_scan)
+
+        getLogger().warning("scanAcq: device %s", self.device)
+        # TurnUsbOff(i_scan, self.TimeAfterScan)
+        TurnUsbOff(i_scan, 0)
         if self.error > 0:
-            getLogger().error("error acquisition: %s, %s", result.stdout, result.stderr)
+            getLogger().error("scanSearch: error acquisition: %s, %s", result.stdout, result.stderr)
 
         return self
 
@@ -369,7 +388,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
         if len(result.stderr) > 2:
             res = 12
         i += 1
-    TurnUsbOff(i_scan)
+    TurnUsbOff(i_scan, scanner.TimeAfterScan)
     if res > 0:
         getLogger().error("error acquisition: " + result.stdout + result.stderr)
     else:
@@ -411,22 +430,31 @@ def listConfigScanner():
     return listfile
 
 
+def setupScanners():
+    """Recupère les numeros de série des scanners"""
+    scanner = ScannerData()
+    listScannerconfigs = listConfigScanner()
+    scan_num = 0
+    for CurrentScanner in listScannerconfigs:
+        scanner.ReadScannerConfig(CurrentScanner)
+        scanner.scanSearch(scan_num)
+        if is_raspberry_pi():
+            scanner.WriteScannerConfig(CurrentScanner)
+        scan_num += 1
+
+
 if __name__ == "__main__":
     # pylint: disable=duplicate-code
     InitGPIO()
-    Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     listScannerSerials()
-    scan_num = 0
-    for CurrentScanner in listScannerconfigs:
-        Scanner.ReadScannerConfig(CurrentScanner)
-        print(Scanner.scanSearch(scan_num))
-        if not is_dev():
-            Scanner.WriteScannerConfig(CurrentScanner)
-        scan_num += 1
+    setupScanners()
 
     if is_raspberry_pi():
-        result_ = ScannerPreview(Scanner, 0)
+        Scanner = ScannerData()
+        scan_num = 0  # on prend le premier
+        Scanner.ReadScannerConfig(listScannerconfigs[scan_num])
+        result_ = ScannerPreview(Scanner, scan_num)
         Scanner.LastImgFile = result_[0]
         Scanner.error = result_[1]
 
