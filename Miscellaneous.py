@@ -374,4 +374,5 @@ if __name__ == "__main__":
         sys.exit(0)
 
     End4G()
-    EndGPIO()
+    # le EndGPIO remet les GPIO dans l'état d'origine, il éteint donc les relais
+    ## EndGPIO()
