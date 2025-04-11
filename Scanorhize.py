@@ -1,6 +1,6 @@
 """Application Web pour configurer les scanners"""
 
-import subprocess
+from subprocess import run, CalledProcessError
 from time import sleep
 
 from flask import Flask, render_template, request, redirect, url_for
@@ -21,23 +21,31 @@ from Server import (
     updateServer,
     HubData,
 )
-from ConfigApp import getLogger, getDisplayFile
+from ConfigApp import getLogger, getDisplayFile, is_debug, getConfigDir, getImageDir, getLogDir
 from Miscellaneous import chaineIntwitherror, InitGPIO
 from OSUtils import is_raspberry_pi
 
-Server = HubData()
-
 getLogger().warning("Start Scanorhize.py")
 
-# res=""
-# while res!="Scanorhize" :
-#   res=GetWifiSSID()
-#  sleep(10)
-res = 0
-while res == 0:
-    res = pingAPI("www.google.com")
+has_internet = False
+tries = 0
+while tries <= 10:
+    if pingAPI("www.google.com"):
+        has_internet = True
+        break
     if is_raspberry_pi():
         sleep(5)
+    tries += 1
+
+if tries > 10:
+    getLogger().error("No internet connection")
+    has_internet = False
+else:
+    getLogger().warning("Internet connection OK.")
+    has_internet = True
+
+Server = HubData()
+
 
 getLogger().warning("Launch Web app")
 app = Flask(__name__)
@@ -62,7 +70,12 @@ def add_header(response):
 def index():
     if request.method == "POST":
         cmd = "sudo pkill -f ScanorhizeProcess.py"
-        subprocess.call(cmd, shell=True)
+        run(cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=False
+        )
 
     return render_template(
         "index.html",
@@ -151,7 +164,7 @@ def action(actionName: str, scan_num_str: str):
     print("action : ", actionName)
     if actionName == "acqimg":
         InitGPIO()
-        result = ScannerPreview(i_scan)
+        result = ScannerPreview(Scanner, i_scan)
         Scanner.LastImgFile = result[0]
         Scanner.error = result[1]
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
@@ -195,8 +208,59 @@ def ServerPage():
         Server.WriteConfig()
         Server.print()
 
-    return render_template("Server.html", **updateServer(Server))
+    # Format Hub configuration for display
+    hub_config = f"""MAC Address: {Server.macAddress}
+Project ID: {Server.projectId}
+Battery Level: {Server.batteryLevelPercent}%
+Disk Space: {Server.diskSpacePercent} GB
+Temperature: {Server.temperature}°C
+Ping: {Server.ping}"""
+
+    if is_debug():
+        hub_config += f"\nToken: {Server.token}"
+
+    return render_template("Server.html", **updateServer(Server), hub_config=hub_config)
+
+@app.route("/update_version", methods=["GET"])
+def update_version():
+    # Format Hub configuration for display
+    hub_config = f"""MAC Address: {Server.macAddress}
+Project ID: {Server.projectId}
+Battery Level: {Server.batteryLevelPercent}%
+Disk Space: {Server.diskSpacePercent} GB
+Temperature: {Server.temperature}°C
+Ping: {Server.ping}"""
+
+    if is_debug():
+        hub_config += f"\nToken: {Server.token}"
+
+    if not is_raspberry_pi():
+        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output="No update, not on Raspberry Pi")
+    try:
+        getLogger().warning("Update version")
+        result = run(
+            "s3cmd sync s3://hub-2ccf6709b478/home/pi/Scanorhize/ /home/pi/Scanorhize/",
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output=result.stdout)
+    except CalledProcessError as e:
+        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output=f"Command failed: {e.stderr}")
+
+
+@app.route("/App", methods=["GET"])
+def AppPage():
+    # Format ConfigApp attributes for display
+    app_config = f"""Config Directory: {getConfigDir()}
+Image Directory: {getImageDir()}
+Log Directory: {getLogDir()}
+Display File: {getDisplayFile()}
+Debug Mode: {is_debug()}"""
+
+    return render_template("App.html", app_config=app_config)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=False)
+    app.run(host="0.0.0.0", port=8080, debug=is_debug())

@@ -11,7 +11,7 @@ from subprocess import run
 
 from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff
 from OSUtils import is_raspberry_pi
-from ConfigApp import getDisplayFile, getConfigDir, getLogger, is_dev, getImageDir
+from ConfigApp import getDisplayFile, getConfigDir, getLogger, getImageDir
 
 X_MAX = 216
 Y_MAX = 297
@@ -147,7 +147,6 @@ class ScannerData:
             return self
 
         res = 1
-        i = 0
         # attribut par défaut si on ne trouve rien
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
@@ -435,14 +434,14 @@ def listConfigScanner():
 def setupScanners():
     """Recupère les numeros de série des scanners"""
     scanner = ScannerData()
-    listScannerconfigs = listConfigScanner()
-    scan_num = 0
-    for CurrentScanner in listScannerconfigs:
+    listScannerconfigs_ = listConfigScanner()
+    i_scan = 0
+    for CurrentScanner in listScannerconfigs_:
         scanner.ReadScannerConfig(CurrentScanner)
-        scanner.scanSearch(scan_num)
+        scanner.scanSearch(i_scan)
         if is_raspberry_pi():
             scanner.WriteScannerConfig(CurrentScanner)
-        scan_num += 1
+        i_scan += 1
 
 
 if __name__ == "__main__":
