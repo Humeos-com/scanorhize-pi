@@ -3,7 +3,9 @@ de la carte Raspberry Pi
 """
 
 from time import sleep
+from logging import getLogger
 from OSUtils import is_raspberry_pi
+
 
 # pylint: disable=ungrouped-imports
 # pylint: disable=import-error
@@ -39,7 +41,11 @@ class WittyPi:
     def __init__(self):
         """Initialize the instance if not already initialized."""
         if not hasattr(self, "initialized"):  # Prevent re-initialization
-            self.i2c_bus = SMBus(1)
+            try:
+                self.i2c_bus = SMBus(1)
+            except FileNotFoundError:
+                self.i2c_bus = None
+                getLogger().error("I2C bus not available")
             self.i2c_address = WITTY_PI_3_I2C_ADDRESS
             self.firmware_id = 0
             self.input_voltage = 0.0
@@ -50,6 +56,9 @@ class WittyPi:
             self.firmware_revision = 0
 
             self.get_firmware_id()
+            if self.firmware_id is None:
+                self.initialized = True
+                return
             self.get_power_mode()
             self.get_input_voltage()
             self.get_output_voltage()
@@ -63,15 +72,18 @@ class WittyPi:
 
         self.firmware_id = self.read_register(0x00)
         if self.firmware_id is None:
-            print(f"No Witty Pi board on address 0x{self.i2c_address:02X}")
+            msg = f"No Witty Pi board on address 0x{self.i2c_address:02X}"
+            getLogger().warning(msg)
             self.i2c_address = WITTY_PI_4_I2C_ADDRESS
         self.firmware_id = self.read_register(0x00)
         if self.firmware_id is None:
-            print("Aucune carte Witty Py trouvee.")
+            getLogger().error("Aucune carte Witty Py trouvee.")
         return self.firmware_id
 
     def get_input_voltage(self):
 
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0.0
         if self.get_power_mode() != 0:
             self.input_voltage = (
                 self.read_register(0x01) + self.read_register(0x02) / 100
@@ -82,21 +94,29 @@ class WittyPi:
 
     def get_output_voltage(self):
 
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0.0
         self.output_voltage = self.read_register(0x03) + self.read_register(0x04) / 100
         return self.output_voltage
 
     def get_output_current(self):
 
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0.0
         self.output_current = self.read_register(0x05) + self.read_register(0x06) / 100
         return self.output_current
 
     def get_power_mode(self):
 
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0
         self.power_mode = self.read_register(0x07)
         return self.power_mode
 
     def get_temperature(self):
 
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0.0
         data = self.read_register(50, 2)
         # Step 1: Swap bytes
         data = (((data & 0xFF) << 8) | ((data & 0xFF00) >> 8)) >> 5
@@ -108,7 +128,8 @@ class WittyPi:
         return self.temperature
 
     def get_firmware_revision(self):
-
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0
         self.firmware_revision = self.read_register(12)
         return self.firmware_revision
 
@@ -122,14 +143,20 @@ class WittyPi:
                 data = self.i2c_bus.read_word_data(self.i2c_address, register)
 
         except OSError as e:
-            print(f"Read error: {e}")
+            msg = f"read_register: Read error: {e}"
+            getLogger().error(msg)
             return None
 
         return data
 
     def is_WittyPi_3(self):
-
-        return self.i2c_address == WITTY_PI_3_I2C_ADDRESS
+        if self.i2c_bus is None or self.firmware_id is None:
+            return False
+        try:
+            return self.i2c_bus.read_byte_data(0x69, 0x00) == 0x11
+        except (OSError, IOError) as e:
+            getLogger().warning("Error reading WittyPi: %s", e)
+            return False
 
     def is_WittyPi_4(self):
 
@@ -141,13 +168,16 @@ class WittyPi:
 
     def __str__(self):
 
+        if self.firmware_id is None:
+            return "  Pas de carte WittyPi !\n"
         if self.is_WittyPi_3():
             s = "  Carte WittyPi: 3\n"
         else:
             if self.is_WittyPi_4():
                 s = "  Carte WittyPi: 4\n"
             else:
-                s = "  Pas de carte WittyPi !\n"
+                return "  Pas de carte WittyPi !\n"
+
         s += (
             f"  Firmware ID: {self.firmware_id:02X}\n"
             f"  Firmware revision: {self.firmware_revision}\n"
