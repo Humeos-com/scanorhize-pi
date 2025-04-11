@@ -12,7 +12,7 @@ from Scanner import (
     ResolutionList,
     ColorList,
 )
-from Server import (
+from Hub import (
     ReadConfigFromServer,
     SendConfigToServer,
     pingAPI,
@@ -44,7 +44,7 @@ else:
     getLogger().warning("Internet connection OK.")
     has_internet = True
 
-Server = HubData()
+Hub = HubData()
 
 
 getLogger().warning("Launch Web app")
@@ -99,6 +99,25 @@ def stream():
     return app.response_class(generate(), mimetype="text/plain")
 
 
+def parse_period(value):
+    """Parse period value that can be in seconds (s) or days (d) format"""
+    try:
+        if value.endswith('d'):
+            return int(float(value[:-1]) * 86400)  # Convert days to seconds
+        if value.endswith('s'):
+            return int(value[:-1])
+        return int(value)  # Default to seconds if no unit specified
+    except (ValueError, AttributeError):
+        return 0
+
+def format_period(seconds):
+    """Format period in seconds to display in days if greater than 21600s (6 hours)"""
+    if seconds is None or seconds == 0:
+        return "3600s"  # Default to 1 hour
+    if seconds >= 21600:  # Greater than or equal to 6 hours
+        return f"{seconds/86400:.1f}d"
+    return f"{seconds}s"
+
 @app.route("/Scanner/<scan_num_str>", methods=["POST", "GET"])
 def ScannerPage(scan_num_str: str):
     form = request.form
@@ -130,27 +149,32 @@ def ScannerPage(scan_num_str: str):
         Scanner.y = chaineIntwitherror(tmp, Scanner.y, 0, 297.5)
         tmp = form["quality"]
         Scanner.quality = chaineIntwitherror(tmp, Scanner.quality, 0, 90)
-        tmp = form["token"]  # token vide pour non utilisation du scanner
-        if tmp != "":
-            Scanner.token = tmp
+        if "token" in form:
+            tmp = form["token"]
+            if tmp != "":
+                Scanner.token = tmp
         tmp = form["UseServer"]
         Scanner.UseServer = chaineIntwitherror(tmp, Scanner.UseServer, 0, 1)
-        tmp = form["Campaign"]  # token vide pour non utilisation du scanner
-        if tmp != "":
-            Scanner.Campaign = tmp
         tmp = form["StartDate"]  # token vide pour non utilisation du scanner
         if tmp != "":
             Scanner.StartDate = tmp
         tmp = form["PeriodeS"]
-        Scanner.PeriodeS = chaineIntwitherror(tmp, Scanner.PeriodeS, 0, 360000)
+        Scanner.PeriodeS = parse_period(tmp)
+        tmp = form["TimeBeforeScan"]
+        Scanner.TimeBeforeScan = chaineIntwitherror(tmp, Scanner.TimeBeforeScan, 0, 60)
+        tmp = form["TimeAfterScan"]
+        Scanner.TimeAfterScan = chaineIntwitherror(tmp, Scanner.TimeAfterScan, 0, 60)
+        # Handle checkbox - if not in form, it means unchecked (0)
+        Scanner.enable = 1 if 'enable' in form else 0
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
+    # Format PeriodeS for display
+    Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
     print("Scanner n° : " + str(i_scan + 1))
     Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     print(filename)
-    # return render_template("image.html", form=form, imagename=filename)
     return render_template(
         "image.html", **Scannerparam, scan_num_str=scan_num_str, imagename=filename
     )
@@ -181,73 +205,74 @@ def action(actionName: str, scan_num_str: str):
 
 @app.route("/Hub", methods=["POST", "GET"])
 def HubPage():
-    Server.ReadConfig()
+    Hub.ReadConfig()
     if request.method == "POST":
         Sim = 0
         tmp = request.form["apn"]
         if tmp != "":
-            Server.apn = tmp
+            Hub.apn = tmp
             Sim = 1
         tmp = request.form["user"]
         if tmp != "":
-            Server.user = tmp
+            Hub.user = tmp
         tmp = request.form["password"]
         if tmp != "":
-            Server.password = tmp
+            Hub.password = tmp
         tmp = request.form["address"]
         # Api = 0
         if tmp != "":
-            Server.address = tmp
+            Hub.address = tmp
             # Api = 1
 
         if Sim == 1:  # modification paramètres SIM
             #### res = Connect4g()
             pass
         # if Api==1:
-        Server.ping = pingAPI(Server.address)
-        Server.WriteConfig()
-        Server.print()
+        Hub.ping = pingAPI(Hub.address)
+        Hub.WriteConfig()
+        Hub.print()
 
     # Format Hub configuration for display
-    hub_config = f"""MAC Address: {Server.macAddress}
-Project ID: {Server.projectId}
-Battery Level: {Server.batteryLevelPercent}%
-Disk Space: {Server.diskSpacePercent} GB
-Temperature: {Server.temperature}°C
-Ping: {Server.ping}"""
+    hub_config = f"""MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent} GB
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
 
     if is_debug():
-        hub_config += f"\nToken: {Server.token}"
+        hub_config += f"\nToken: {Hub.token}"
 
-    return render_template("Server.html", **updateServer(Server), hub_config=hub_config)
+    return render_template("Server.html", **updateServer(Hub), hub_config=hub_config)
 
 @app.route("/update_version", methods=["GET"])
 def update_version():
     # Format Hub configuration for display
-    hub_config = f"""MAC Address: {Server.macAddress}
-Project ID: {Server.projectId}
-Battery Level: {Server.batteryLevelPercent}%
-Disk Space: {Server.diskSpacePercent} GB
-Temperature: {Server.temperature}°C
-Ping: {Server.ping}"""
+    hub_config = f"""MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent} GB
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
 
     if is_debug():
-        hub_config += f"\nToken: {Server.token}"
+        hub_config += f"\nToken: {Hub.token}"
 
     if not is_raspberry_pi():
-        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output="No update, not on Raspberry Pi")
+        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output="No update, not on Raspberry Pi")
     try:
         getLogger().warning("Update version")
+        hub_id = Hub.macAddress.replace(":", "")
         result = run(
-            "s3cmd sync s3://hub-2ccf6709b478/home/pi/Scanorhize/ /home/pi/Scanorhize/",
+            f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
             shell=True,
             capture_output=True,
             text=True,
             check=False
         )
-        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output=result.stdout)
+        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output=result.stdout)
     except CalledProcessError as e:
-        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output=f"Command failed: {e.stderr}")
+        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output=f"Command failed: {e.stderr}")
 
 
 @app.route("/App", methods=["GET"])
@@ -265,21 +290,21 @@ Debug Mode: {is_debug()}"""
 @app.route("/write_config", methods=["GET"])
 def write_config():
     try:
-        Server.WriteConfig()
+        Hub.WriteConfig()
         # Format Hub configuration for display
-        hub_config = f"""MAC Address: {Server.macAddress}
-Project ID: {Server.projectId}
-Battery Level: {Server.batteryLevelPercent}%
-Disk Space: {Server.diskSpacePercent} GB
-Temperature: {Server.temperature}°C
-Ping: {Server.ping}"""
+        hub_config = f"""MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent} GB
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
 
         if is_debug():
-            hub_config += f"\nToken: {Server.token}"
+            hub_config += f"\nToken: {Hub.token}"
 
-        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output="Configuration written successfully")
-    except Exception as e:
-        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output=f"Error writing configuration: {str(e)}")
+        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output="Configuration written successfully")
+    except CalledProcessError as e:
+        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output=f"Error writing configuration: {str(e)}")
 
 
 if __name__ == "__main__":
