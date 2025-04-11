@@ -15,6 +15,13 @@ from ConfigApp import getDisplayFile, getConfigDir, getLogger, getImageDir
 
 X_MAX = 216
 Y_MAX = 297
+# Temps avant et après le scan pour les scanners Canon
+TIME_BEFORE_SCAN_PIXMA = 40
+TIME_AFTER_SCAN_PIXMA = 10
+# Temps avant et après le scan pour les scanners Epson
+TIME_BEFORE_SCAN_EPSON = 2
+TIME_AFTER_SCAN_EPSON = 2
+
 DISPLAY_FILE = getDisplayFile()
 ResolutionList = ["300", "600", "1200"]
 ColorList = ["Color", "Gray", "Lineart"]
@@ -49,7 +56,7 @@ class ScannerData:
         self.TimeBeforeScan = 0
         self.TimeAfterScan = 0
         self.error = 0
-        self.enable = False
+        self.enable = 0
         self.Campaign = "CampaignName"
         self.StartDate = "2025-01-01T08:00:00Z"
         self.PeriodeS = 3600
@@ -80,6 +87,14 @@ class ScannerData:
             return 1
 
         return 0
+
+    def is_pixma(self):
+        """Renvoie True si le scanner est un Canon Pixma"""
+        return self.device.startswith("pixma:")
+
+    def is_epson(self):
+        """Renvoie True si le scanner est un Epson"""
+        return self.device.startswith("epsonscan2:")
 
     def json(self):
         # Create a copy of the instance dictionary
@@ -122,26 +137,26 @@ class ScannerData:
         return 0
 
     def scanSearch(self, i_scan: int):
-        # function to find scanner with sane
-        # on regarde le port USB pour enregistrer le #serie du scanner
-        #
-        # "scanimage" renvoie toujour 0
-        # On utilise scanimage -f '%d' pour avoir uniquement le device !!!
-        #
-        # Soit il n'y a pas de scanner et on ne reçoit rien:
-        # ~/Scanorhize $ scanimage -f '%d'
-        # ~/Scanorhize $ echo $?
-        # 0
-        # ~/Scanorhize $
-        #
-        # Soit il y a un scanner et on reçoit le message:
-        # ~/Scanorhize $ scanimage -f '%d'
-        # Pour les scanners Canon LIDE 400 ou LIDE 300, on reçoit:
-        # pixma:04A91912_43C7A6
-        # Pour les scanners Epson, on reçoit:
-        # epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
-        # ~/Scanorhize $
-        #
+        """Recherche le scanner et enregistre le numéro de série
+        on regarde le port USB pour enregistrer le #serie du scanner
+
+        "scanimage" renvoie toujour 0
+        On utilise scanimage -f '%d' pour avoir uniquement le device !!!
+
+        Soit il n'y a pas de scanner et on ne reçoit rien:
+        ~/Scanorhize $ scanimage -f '%d'
+        ~/Scanorhize $ echo $?
+        0
+        ~/Scanorhize $
+
+        Soit il y a un scanner et on reçoit le message:
+        ~/Scanorhize $ scanimage -f '%d'
+        Pour les scanners Canon LIDE 400 ou LIDE 300, on reçoit:
+        pixma:04A91912_43C7A6
+        Pour les scanners Epson, on reçoit:
+        epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
+        ~/Scanorhize $
+        """
 
         error = TurnUsbOn(i_scan, 5)
         # error = TurnUsbOn(i_scan, self.TimeBeforeScan)
@@ -179,11 +194,11 @@ class ScannerData:
             # epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
 
         self.device = "NoScannerDetected"
-        self.enable = False
+        self.enable = 0
         if res == 0:
             self.error = 0
             self.device = scanimage_message
-            self.enable = True
+            self.enable = 1
 
         getLogger().warning("scanSearch: device %s", self.device)
         # TurnUsbOff(i_scan, self.TimeAfterScan)
@@ -211,8 +226,8 @@ def extract_serial(device_string: str) -> str:
         if len(parts) > 1:
             if parts[0] == "epsonscan2":
                 return parts[2] if len(parts) > 2 else ""
-            else:
-                return parts[1] if len(parts) > 1 else ""
+
+            return parts[1] if len(parts) > 1 else ""
         return ""
     except (IndexError, AttributeError):
         return ""
@@ -453,7 +468,7 @@ def setupScanners():
 
 def initScanners():
     """Operation à l'initialisation du Hub.
-    lorsqu'il n'y a aucun fichier de configuration.
+    Lorsqu'il n'y a aucun fichier de configuration.
     Brancher les scanners sur les ports USB et lancer
     l'initScanner. On va chercher les scanners sur les 3 ports
     et on va écrire leur configuration."""
@@ -464,14 +479,21 @@ def initScanners():
         scanner.ReadScannerConfig(CurrentScanner)
         scanner.scanSearch(i_scan)
         if scanner.error == 0:
-            scanner.enable = True
+            # initialisation des paramètres du scanner
+            scanner.enable = 1
+            scanner.TimeBeforeScan = (
+                TIME_BEFORE_SCAN_PIXMA if scanner.is_pixma() else TIME_BEFORE_SCAN_EPSON
+            )
+            scanner.TimeAfterScan = (
+                TIME_AFTER_SCAN_PIXMA if scanner.is_pixma() else TIME_AFTER_SCAN_EPSON
+            )
         else:
-            scanner.enable = False
+            scanner.enable = 0
         if is_raspberry_pi():
             scanner.WriteScannerConfig(CurrentScanner)
         i_scan += 1
     if i_scan == 0:
-        getLogger().warning("setupScanners: Aucun scanner trouvé")
+        getLogger().warning("initScanners: Aucun scanner trouvé")
 
 
 if __name__ == "__main__":
