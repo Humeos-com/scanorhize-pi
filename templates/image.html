@@ -4,6 +4,15 @@
 {%endblock%}
 {%block content%}
 
+<style>
+.small-text {
+    font-size: 0.8em;
+}
+.input-group-text span {
+    font-size: 0.8em;
+}
+</style>
+
 <form action = "#" method = "post">
 <div class="row">
        <div class="col-sm">
@@ -11,7 +20,7 @@
                      <div class="input-group-prepend">
                      <span class="input-group-text">Scanner</span>
                      </div>
-                     <input type="text" class="form-control" name="Scanner" value={{scannerName}} placeholder={{scannerName}}>
+                     <input type="text" class="form-control" name="Scanner" value={{scannerName}} placeholder={{scannerName}} readonly>
               </div>
        <div class="input-group mb-3">
               <div class="input-group-prepend">              
@@ -37,72 +46,74 @@
        </div>  
        <div class="input-group mb-3">
               <div class="input-group-prepend">
-              <span class="input-group-text">l(0..216.7mm)</span>
+              <span class="input-group-text">l<span>(0..216.7mm)</span></span>
               </div>
               <input type="text" class="form-control" name="l" placeholder={{l}}>
        </div>
        <div class="input-group mb-3">
               <div class="input-group-prepend">
-              <span class="input-group-text">t(0..297.5mm)</span>
+              <span class="input-group-text">t<span>(0..297.5mm)</span></span>
               </div>
               <input type="text" class="form-control" name="t" placeholder={{t}}>
        </div>
        <div class="input-group mb-3">
               <div class="input-group-prepend">
-              <span class="input-group-text">x(0..216.7mm)</span>
+              <span class="input-group-text">x<span>(0..216.7mm)</span></span>
               </div>
               <input type="text" class="form-control" name="x" placeholder={{x}}>
        </div>
               <div class="input-group mb-3">
                      <div class="input-group-prepend">
-                     <span class="input-group-text">y(0..297.5mm)</span>
+                     <span class="input-group-text">y<span>(0..297.5mm)</span></span>
                      </div>
                      <input type="text" class="form-control" name="y" placeholder={{y}}>
               </div>
        
               <div class="input-group mb-3">
                      <div class="input-group-prepend">
-                     <span class="input-group-text">Qualité Compression(0..100 no-loss)</span>
+                     <span class="input-group-text">Compression<span>(0..100 no-loss)</span></span>
                      </div>
                      <input type="text" class="form-control" name="quality" value={{quality}} placeholder={{quality}}>
               </div>
        </div>
        <div class="col-sm">
        <div class="input-group mb-3">
-			<div class="input-group-prepend">
-			<span class="input-group-text" >Token</span>
-			</div>
-			<input type="text" class="form-control" name="token" value={{token}} placeholder={{token}} readonly>
-       </div>
-       <div class="input-group mb-3">
               <div class="input-group-prepend">
-              <span class="input-group-text">Serial number</span>
-              </div>
-              <input type="text" class="form-control" name="device" value={{device}} placeholder={{device}} readonly>
-       </div>
-       <div class="input-group mb-3">
-              <div class="input-group-prepend">
-              <span class="input-group-text">UseServerConfig(0=No 1=Yes)</span>
+              <span class="input-group-text" data-toggle="tooltip" title="Download configuration from the platform after each scan">UseServer (0/1)</span>
               </div>
               <input type="text" class="form-control" name="UseServer" placeholder={{UseServer}}>
        </div>
        <div class="input-group mb-3">
 			<div class="input-group-prepend">
-			<span class="input-group-text" >Campaign</span>
-			</div>
-			<input type="text" class="form-control" name="Campaign" value={{Campaign}} placeholder={{Campaign}}>
-       </div>
-       <div class="input-group mb-3">
-			<div class="input-group-prepend">
-			<span class="input-group-text" >StartDate (YYYY-MM-DDTHH:mm:ssZ)</span>
+			<span class="input-group-text">StartDate<span>(YYYY-MM-DDTHH:mm:ssZ)</span></span>
 			</div>
 			<input type="text" class="form-control" name="StartDate" value={{StartDate}} placeholder={{StartDate}}>
        </div>
        <div class="input-group mb-3">
 			<div class="input-group-prepend">
-			<span class="input-group-text" >PeriodeS</span>
+			<span class="input-group-text" data-toggle="tooltip" title="Period between each scan. Can be in seconds or days. For example : 3600s or 0.5d">Period</span>
 			</div>
 			<input type="text" class="form-control" name="PeriodeS" value={{PeriodeS}} placeholder={{PeriodeS}}>
+       </div>
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text">TimeBeforeScan<span>(s)</span></span>
+			</div>
+			<input type="text" class="form-control" name="TimeBeforeScan" value={{TimeBeforeScan}} placeholder={{TimeBeforeScan}}>
+       </div>
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text">TimeAfterScan<span>(s)</span></span>
+			</div>
+			<input type="text" class="form-control" name="TimeAfterScan" value={{TimeAfterScan}} placeholder={{TimeAfterScan}}>
+       </div>
+       <div class="input-group mb-3">
+			<div class="input-group-prepend">
+			<span class="input-group-text" data-toggle="tooltip" title="If disabled, this scanner will not be used">Enable</span>
+			</div>
+			<div class="form-control d-flex align-items-center">
+				<input type="checkbox" name="enable" value="1" {% if enable == 1 %}checked{% endif %}>
+			</div>
        </div>
        </div>
 </form> 
@@ -113,6 +124,8 @@
        <a href="/Scanner/acqimg/{{scan_num_str}}" class="btn btn-primary">Image scan</a>
  
        <p>Last image time : {{LastImgTime}}</p> 
+       <p>Token : {{token[:24]}}</p>
+       <p>Device : {{device}}</p>
        <img src = " {{url_for('static', filename=imagename)}}"width="80%", alt="Take a scan"/>      
        </div>       
 
@@ -124,3 +137,8 @@
 {% endblock %}
       
    
+<script>
+$(document).ready(function(){
+    $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
