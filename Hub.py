@@ -15,7 +15,7 @@ from ConfigApp import (
     getLogger,
     getS3Bucket,
 )
-from Campaign import RemoveTempImage, CreateTempImage, getUsbDir, USBSpace
+from Campaign import getUsbDir, USBSpace
 from Miscellaneous import ReadBatVoltCap
 from OSUtils import get_os
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
@@ -233,9 +233,8 @@ def getTokens():
 
 
 def ReadConfigFromServer(ScannerObj: ScannerData):
-    cmdRead = f'curl --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
--X GET "https://{getScanorhizeServer()}/api/scanner/configuration" \
--H "accept: application/json" -H "scanner:{ScannerObj.token}"'
+    hub_id = getHwAddr().replace(":", "")
+    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -270,60 +269,25 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
 # Methode incomplete, reste à terminer !
 ####################################################
 def SendConfigToServer(ScannerObj: ScannerData):
-    cmdPost = f'curl --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
--X POST "https://{getScanorhizeServer()}/api/scanner/configuration" \
--H "accept: application/json" -H "scanner:{ScannerObj.token}" \
--H "Content-Type: application/json" \
--d {ScannerObj.json()}'
-    getLogger().warning(cmdPost)
+    hub_id = getHwAddr().replace(":", "")
+    cmdWrite = f"s3cmd sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
+    getLogger().warning(cmdWrite)
 
-
-def PostImageToServer(ScannerObj: ScannerData):
-    error = 0
-    Date = ScannerObj.LastImgTime
-    Resolution = ScannerObj.resolution
-    token = ScannerObj.token
-    ImagePath = CreateTempImage(ScannerObj)
-
-    cmdPost = f'curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
--X POST "https://{getScanorhizeServer()}/api/scanner/image" \
--H "accept: */*" -H "scanner: {token}" \
--H "Content-Type: multipart/form-data" \
--F "date={Date}" -F "dpi={Resolution}" \
--F "file=@{ImagePath}"'
-
-    getLogger().warning(cmdPost)
     result = run(
-        cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    # print(f"PostImageToServer: {result.returncode}, {result.stdout}, {result.stderr}")
+
     if result.returncode != 0:
         getLogger().error(
-            "PostImageToServer: return: %s error: %s", result.returncode, result.stderr
+            "SendConfigToServer: return: %s  error: %s",
+            result.returncode,
+            result.stderr,
         )
         error = 1
     else:
-        try:
-            if result.stdout.strip():  # Check if stdout is not empty
-                results = json.loads(result.stdout)
-                if results["status"] != 200:  # 200 = OK
-                    getLogger().error(
-                        "PostImageToServer: error: %s message: %s",
-                        results["status"],
-                        results["message"],
-                    )
-                    error = 1
-            else:
-                # reponse vide = reponse normale sur le post des images
-                error = 0
-        except (AttributeError, json.JSONDecodeError) as e:
-            getLogger().error("Error reading json, error: %s", str(e))
-            error = 1
-        if not error:
-            getLogger().warning("PostImageToServer: OK")
-
-    RemoveTempImage(ImagePath)
-    return error
+        getLogger().warning("SendConfigToServer: OK")
+        error = 0
+    return ScannerObj
 
 
 def SendParameters(Hub_: HubData):
@@ -448,7 +412,6 @@ if __name__ == "__main__":
     scan_num = 0
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
-        #    PostImageToServer(Scanner)
         scan_num += 1
 
     # WriteScannerConfig(Scanner, "1-Scanner.json")
