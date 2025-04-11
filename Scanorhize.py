@@ -21,7 +21,14 @@ from Hub import (
     updateServer,
     HubData,
 )
-from ConfigApp import getLogger, getDisplayFile, is_debug, getConfigDir, getImageDir, getLogDir
+from ConfigApp import (
+    getLogger,
+    getDisplayFile,
+    is_debug,
+    getConfigDir,
+    getImageDir,
+    getLogDir,
+)
 from Miscellaneous import chaineIntwitherror, InitGPIO
 from OSUtils import is_raspberry_pi
 
@@ -70,12 +77,7 @@ def add_header(response):
 def index():
     if request.method == "POST":
         cmd = "sudo pkill -f ScanorhizeProcess.py"
-        run(cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            check=False
-        )
+        run(cmd, shell=True, capture_output=True, text=True, check=False)
 
     return render_template(
         "index.html",
@@ -102,13 +104,14 @@ def stream():
 def parse_period(value):
     """Parse period value that can be in seconds (s) or days (d) format"""
     try:
-        if value.endswith('d'):
+        if value.endswith("d"):
             return int(float(value[:-1]) * 86400)  # Convert days to seconds
-        if value.endswith('s'):
+        if value.endswith("s"):
             return int(value[:-1])
         return int(value)  # Default to seconds if no unit specified
     except (ValueError, AttributeError):
         return 0
+
 
 def format_period(seconds):
     """Format period in seconds to display in days if greater than 21600s (6 hours)"""
@@ -117,6 +120,7 @@ def format_period(seconds):
     if seconds >= 21600:  # Greater than or equal to 6 hours
         return f"{seconds/86400:.1f}d"
     return f"{seconds}s"
+
 
 @app.route("/Scanner/<scan_num_str>", methods=["POST", "GET"])
 def ScannerPage(scan_num_str: str):
@@ -165,7 +169,7 @@ def ScannerPage(scan_num_str: str):
         tmp = form["TimeAfterScan"]
         Scanner.TimeAfterScan = chaineIntwitherror(tmp, Scanner.TimeAfterScan, 0, 60)
         # Handle checkbox - if not in form, it means unchecked (0)
-        Scanner.enable = 1 if 'enable' in form else 0
+        Scanner.enable = 1 if "enable" in form else 0
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
@@ -245,6 +249,7 @@ Ping: {Hub.ping}"""
 
     return render_template("Server.html", **updateServer(Hub), hub_config=hub_config)
 
+
 @app.route("/update_version", methods=["GET"])
 def update_version():
     # Format Hub configuration for display
@@ -259,7 +264,12 @@ Ping: {Hub.ping}"""
         hub_config += f"\nToken: {Hub.token}"
 
     if not is_raspberry_pi():
-        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output="No update, not on Raspberry Pi")
+        return render_template(
+            "Server.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            update_output="No update, not on Raspberry Pi",
+        )
     try:
         getLogger().warning("Update version")
         hub_id = Hub.macAddress.replace(":", "")
@@ -268,11 +278,21 @@ Ping: {Hub.ping}"""
             shell=True,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
-        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output=result.stdout)
+        return render_template(
+            "Server.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            update_output=result.stdout,
+        )
     except CalledProcessError as e:
-        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output=f"Command failed: {e.stderr}")
+        return render_template(
+            "Server.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            update_output=f"Command failed: {e.stderr}",
+        )
 
 
 @app.route("/App", methods=["GET"])
@@ -302,9 +322,19 @@ Ping: {Hub.ping}"""
         if is_debug():
             hub_config += f"\nToken: {Hub.token}"
 
-        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output="Configuration written successfully")
+        return render_template(
+            "Server.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            update_output="Configuration written successfully",
+        )
     except CalledProcessError as e:
-        return render_template("Server.html", **updateServer(Hub), hub_config=hub_config, update_output=f"Error writing configuration: {str(e)}")
+        return render_template(
+            "Server.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            update_output=f"Error writing configuration: {str(e)}",
+        )
 
 
 if __name__ == "__main__":

@@ -169,10 +169,7 @@ class ScannerData:
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
 
-            command = (
-                f"scanimage -f '%d' "
-                f"| tee -a {DISPLAY_FILE}"
-            )
+            command = f"scanimage -f '%d' " f"| tee -a {DISPLAY_FILE}"
             getLogger().warning("scanSearch: %s", command)
             result = run(
                 command,
@@ -204,9 +201,7 @@ class ScannerData:
         # TurnUsbOff(i_scan, self.TimeAfterScan)
         TurnUsbOff(i_scan, 0)
         if self.error > 0:
-            getLogger().error(
-                "scanSearch: error: %s, %s", result.stdout, result.stderr
-            )
+            getLogger().error("scanSearch: error: %s, %s", result.stdout, result.stderr)
 
         return self
 
