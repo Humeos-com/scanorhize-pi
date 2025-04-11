@@ -179,8 +179,8 @@ def action(actionName: str, scan_num_str: str):
     return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
 
 
-@app.route("/Server", methods=["POST", "GET"])
-def ServerPage():
+@app.route("/Hub", methods=["POST", "GET"])
+def HubPage():
     Server.ReadConfig()
     if request.method == "POST":
         Sim = 0
@@ -260,6 +260,26 @@ Display File: {getDisplayFile()}
 Debug Mode: {is_debug()}"""
 
     return render_template("App.html", app_config=app_config)
+
+
+@app.route("/write_config", methods=["GET"])
+def write_config():
+    try:
+        Server.WriteConfig()
+        # Format Hub configuration for display
+        hub_config = f"""MAC Address: {Server.macAddress}
+Project ID: {Server.projectId}
+Battery Level: {Server.batteryLevelPercent}%
+Disk Space: {Server.diskSpacePercent} GB
+Temperature: {Server.temperature}°C
+Ping: {Server.ping}"""
+
+        if is_debug():
+            hub_config += f"\nToken: {Server.token}"
+
+        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output="Configuration written successfully")
+    except Exception as e:
+        return render_template("Server.html", **updateServer(Server), hub_config=hub_config, update_output=f"Error writing configuration: {str(e)}")
 
 
 if __name__ == "__main__":
