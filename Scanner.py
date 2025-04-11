@@ -49,6 +49,7 @@ class ScannerData:
         self.TimeBeforeScan = 0
         self.TimeAfterScan = 0
         self.error = 0
+        self.enable = False
         self.Campaign = "CampaignName"
         self.StartDate = "2025-01-01T08:00:00Z"
         self.PeriodeS = 3600
@@ -92,7 +93,8 @@ class ScannerData:
         )
 
     def scanDumpMeta(self, file: str):
-        """Dump les paramètres du scanner au format JSON dans le fichier file"""
+        """Dump les paramètres du scanner au format JSON dans le fichier file
+        c'est le fichier qui accompagne les images"""
 
         data = {
             "resolution": self.resolution,
@@ -123,20 +125,21 @@ class ScannerData:
         # function to find scanner with sane
         # on regarde le port USB pour enregistrer le #serie du scanner
         #
-        # "scanimage -L" renvoie toujour 0
+        # "scanimage" renvoie toujour 0
+        # On utilise scanimage -f '%d' pour avoir uniquement le device !!!
         #
-        # Soit il n'y a pas de scanner et on reçoit les message:
-        # ~/Scanorhize $ LD_LIBRARY_PATH=/usr/local/lib scanimage -L
-        #
-        # No scanners were identified. If you were expecting something different,
-        # check that the scanner is plugged in, turned on and detected by the
-        # sane-find-scanner tool (if appropriate). Please read the documentation
-        # which came with this software (README, FAQ, manpages).
+        # Soit il n'y a pas de scanner et on ne reçoit rien:
+        # ~/Scanorhize $ scanimage -f '%d'
+        # ~/Scanorhize $ echo $?
+        # 0
         # ~/Scanorhize $
         #
         # Soit il y a un scanner et on reçoit le message:
-        # ~/Scanorhize $ LD_LIBRARY_PATH=/usr/local/lib scanimage -L
-        # device `pixma:04A91912_43C7A6' is a CANON CanoScan LiDE 400 multi-function peripheral
+        # ~/Scanorhize $ scanimage -f '%d'
+        # Pour les scanners Canon LIDE 400 ou LIDE 300, on reçoit:
+        # pixma:04A91912_43C7A6
+        # Pour les scanners Epson, on reçoit:
+        # epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
         # ~/Scanorhize $
         #
 
@@ -150,11 +153,12 @@ class ScannerData:
         # attribut par défaut si on ne trouve rien
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
+
             command = (
-                f"LD_LIBRARY_PATH=/usr/local/lib scanimage -L "
+                f"scanimage -f '%d' "
                 f"| tee -a {DISPLAY_FILE}"
             )
-            getLogger().warning("scanAcq: %s", command)
+            getLogger().warning("scanSearch: %s", command)
             result = run(
                 command,
                 capture_output=True,
@@ -165,54 +169,51 @@ class ScannerData:
             # print(result.returncode, result.stdout, result.stderr)
             res = result.returncode
             scanimage_message = result.stdout
-            x = (scanimage_message).split()
-            # print(x)
-            if x[0] == "No":
+            if len(scanimage_message) == 0:
                 res = 1
         else:
             # fake scanimage message
             res = 0
-            scanimage_message = """device `pixma:00000_ABABAB' \
- is a CANON CanoScan LiDE 400 multi-function peripheral"""
+            scanimage_message = """pixma:00000_ABABAB"""
+            # pour les Epson :
+            # epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
 
         self.device = "NoScannerDetected"
+        self.enable = False
         if res == 0:
             self.error = 0
-            for line in scanimage_message.splitlines():
-                x = (line).split("'")
-                x = (line).split()
-                device = x[1]
-                self.device = device[1 : len(device) - 1]
-        else:
-            self.device = "NoScannerDetected"
+            self.device = scanimage_message
+            self.enable = True
 
-        getLogger().warning("scanAcq: device %s", self.device)
+        getLogger().warning("scanSearch: device %s", self.device)
         # TurnUsbOff(i_scan, self.TimeAfterScan)
         TurnUsbOff(i_scan, 0)
         if self.error > 0:
             getLogger().error(
-                "scanSearch: error acquisition: %s, %s", result.stdout, result.stderr
+                "scanSearch: error: %s, %s", result.stdout, result.stderr
             )
 
         return self
-
-
-# Initialisation de l'objet Scanner
-# Scanner = ScannerData()
 
 
 def extract_serial(device_string: str) -> str:
     """Extract serial number from device string
 
     Args:
-        device_string (str): Device string in format 'pixma:SERIAL'
+        device_string (str): Device string in format 'pixma:SERIAL' or
+        epsonscan2:Epson Perfection V39II:SERIAL:esci2:usb:ES0283:319
 
     Returns:
         str: Serial number part after the colon, or empty string if invalid format
     """
     try:
         parts = device_string.split(":")
-        return parts[1] if len(parts) > 1 else ""
+        if len(parts) > 1:
+            if parts[0] == "epsonscan2":
+                return parts[2] if len(parts) > 2 else ""
+            else:
+                return parts[1] if len(parts) > 1 else ""
+        return ""
     except (IndexError, AttributeError):
         return ""
 
@@ -243,6 +244,7 @@ def updateScanParameters(scanner: ScannerData):
         "TimeAfterScan": scanner.TimeAfterScan,
         "projectId": scanner.projectId,
         "sampleId": scanner.sampleId,
+        "enable": scanner.enable,
         "error": scanner.error,
         "imagepathtiff": imagepathtiff,
         "imagepathjp2000": imagepathjp2000,
@@ -262,6 +264,9 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     Returns:
         _type_: _description_
     """
+    if not scanner.enable:
+        getLogger().warning("scanAcq: le scanner %s est désactivé", i_scan + 1)
+        return scanner
 
     getLogger().warning("scanAcq: on allume le port USB: %s", i_scan + 1)
     error = TurnUsbOn(i_scan, scanner.TimeBeforeScan)
@@ -276,7 +281,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     # On n'utilise pas le device pour l'instant, car sinon, il faut respecter le cablage...
     option_device = ""
     command = (
-        f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage {option_device} "
+        f"scanimage {option_device} "
         f"--mode={scanner.mode} "
         f"--resolution={scanner.resolution} "
         f"-l {scanner.l} "
@@ -367,7 +372,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
     #        + " --format=jpeg >"
     #        + file
     command = (
-        f"sudo LD_LIBRARY_PATH=/usr/local/lib scanimage "
+        f"scanimage "
         f"--mode={scanner.mode} "
         f"--resolution=75 "
         f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
@@ -442,6 +447,31 @@ def setupScanners():
         if is_raspberry_pi():
             scanner.WriteScannerConfig(CurrentScanner)
         i_scan += 1
+    if i_scan == 0:
+        getLogger().warning("setupScanners: Aucun scanner trouvé")
+
+
+def initScanners():
+    """Operation à l'initialisation du Hub.
+    lorsqu'il n'y a aucun fichier de configuration.
+    Brancher les scanners sur les ports USB et lancer
+    l'initScanner. On va chercher les scanners sur les 3 ports
+    et on va écrire leur configuration."""
+    scanner = ScannerData()
+    listScannerconfigs_ = ["1-Scanner.json", "2-Scanner.json", "3-Scanner.json"]
+    i_scan = 0
+    for CurrentScanner in listScannerconfigs_:
+        scanner.ReadScannerConfig(CurrentScanner)
+        scanner.scanSearch(i_scan)
+        if scanner.error == 0:
+            scanner.enable = True
+        else:
+            scanner.enable = False
+        if is_raspberry_pi():
+            scanner.WriteScannerConfig(CurrentScanner)
+        i_scan += 1
+    if i_scan == 0:
+        getLogger().warning("setupScanners: Aucun scanner trouvé")
 
 
 if __name__ == "__main__":
@@ -449,7 +479,7 @@ if __name__ == "__main__":
     InitGPIO()
     listScannerconfigs = listConfigScanner()
     listScannerSerials()
-    setupScanners()
+    initScanners()
 
     if is_raspberry_pi():
         Scanner = ScannerData()
