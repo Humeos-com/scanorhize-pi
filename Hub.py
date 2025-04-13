@@ -1,5 +1,6 @@
 """
-Fonctions qui encapsulent l'API du serveur Web
+Gestion du Hub et communication avec la plateforme Web
+C'est le Hub qui synchronise les fichiers images et JSON sur le serveur
 """
 
 import sys
@@ -130,37 +131,31 @@ def CopyFromJson(ScannerObj: ScannerData, data):
     return ScannerObj
 
 
+def remove_image_files(folder: str):
+    """Remove .jp2 and .json files from directory"""
+    if not os.path.exists(folder):
+        return
+    for root, _, files in os.walk(folder, topdown=False):
+        for name in files:
+            if name.endswith((".jp2", ".json")):
+                file_path = os.path.join(root, name)
+                try:
+                    os.remove(file_path)
+                    getLogger().warning("SyncImageFiles: removed %s", file_path)
+                except (FileNotFoundError, PermissionError) as e:
+                    getLogger().error("Error removing file %s: %s", file_path, e)
+
+
 def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
-    # On envoie les fichiers images
-    # On envoie les fichiers JSON
     src = path.join(getUsbDir(), hub_.projectId)
     cmd = f"s3cmd --no-check-md5 --quiet sync {src} {getS3Bucket()}"
     try:
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
-        )
+        result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=True)
         getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
-        # on supprime les images de l'arboresence
-        # find src -name \*.jp2 -o -name \*.json -print0 | xargs -0 -n rm
-        getLogger().warning("SyncImageFiles remove images and json from %s", src)
-
-        if os.path.exists(src):
-            for root, _, files in os.walk(src, topdown=False):
-                for name in files:
-                    if name.endswith(".jp2") or name.endswith(".json"):
-                        file_path = os.path.join(root, name)
-                        try:
-                            os.remove(file_path)
-                        except (FileNotFoundError, PermissionError) as e:
-                            getLogger().error(
-                                "Error removing file %s: %s", file_path, e
-                            )
-                        else:
-                            getLogger().warning("SyncImageFiles: removed %s", file_path)
-
+        remove_image_files(src)
     except (SubprocessError, CalledProcessError) as e:
-        getLogger().error("SyncImageFiles: %s", e)
+        getLogger().error("SyncImageFiles from %s: %s", src, e)
 
 
 def getTokens():
@@ -231,9 +226,16 @@ def getTokens():
         getLogger().error("getTokens: Error parsing response: %s", e)
         return 1
 
+def ReadScannerConfigFromServer(ScannerObj: ScannerData):
+    pass
 
-def ReadConfigFromServer(ScannerObj: ScannerData):
+
+def ReadHubConfigFromServer(HubObj: HubData):
     hub_id = getHwAddr().replace(":", "")
+    if hub_id == "":
+        getLogger().error("ReadHubConfigFromServer: macAddress is empty")
+        return 1
+
     cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
@@ -242,52 +244,38 @@ def ReadConfigFromServer(ScannerObj: ScannerData):
 
     if result.returncode != 0:
         getLogger().error(
-            "ReadConfigFromServer: return: %s  error: %s",
+            "ReadHubConfigFromServer: return: %s  error: %s",
             result.returncode,
             result.stderr,
         )
-        error = 1
-    else:
-        try:
-            if result.stdout.strip():  # Check if stdout is not empty
-                results = json.loads(result.stdout)
-                CopyFromJson(ScannerObj, results)
-                error = 0
-            else:
-                # reponse vide
-                getLogger().error("ReadConfigFromServer: aucune donnée reçue")
-                error = 1
-        except (AttributeError, json.JSONDecodeError) as e:
-            getLogger().error("Error reading json, error: %s", str(e))
-            error = 1
+        return 1
 
-        if not error:
-            getLogger().warning("ReadConfigFromServer: OK")
-    return ScannerObj
+    getLogger().warning("ReadHubConfigFromServer: OK")
+    return 0
 
 
-# Methode incomplete, reste à terminer !
-####################################################
-def SendConfigToServer(ScannerObj: ScannerData):
-    hub_id = getHwAddr().replace(":", "")
+def SendHubConfigToServer(HubObj: HubData):
+    hub_id = HubObj.macAddress.replace(":", "")
+    if hub_id == "":
+        getLogger().error("SendHubConfigToServer: macAddress is empty")
+        return 1
+
     cmdWrite = f"s3cmd sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().warning(cmdWrite)
-
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
     )
 
     if result.returncode != 0:
         getLogger().error(
-            "SendConfigToServer: return: %s  error: %s",
+            "SendHubConfigToServer: return: %s  error: %s",
             result.returncode,
             result.stderr,
         )
-        error = 1
-    else:
-        getLogger().warning("SendConfigToServer: OK")
-        error = 0
-    return ScannerObj
+        return 1
+
+    getLogger().warning("SendHubConfigToServer: OK")
+    return 0
 
 
 def SendParameters(Hub_: HubData):
@@ -406,6 +394,9 @@ if __name__ == "__main__":
     Hub.diskSpacePercent = USBSpace()[0] / 1000
     Hub.temperature = ReadTemp()
     Hub.WriteConfig()
+    SendHubConfigToServer(Hub)
+    ReadHubConfigFromServer(Hub)
+
     sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
