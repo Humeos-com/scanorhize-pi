@@ -361,7 +361,6 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
 
     getLogger().warning("scanAcq: End conversion jp2")
     scanner.LastImgTime = date
-    # print("image time: ",scanner.LastImgTime)
     scanner.LastImgFile = imagepathjp2000
     getLogger().warning("scanAcq: end")
 
