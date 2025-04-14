@@ -4,7 +4,6 @@ Utilise le pattern Singleton pour stocker le token JWT et les infos du boitier
 """
 
 from fcntl import ioctl
-import uuid
 from socket import socket, inet_ntoa, AF_INET, SOCK_DGRAM
 from struct import pack
 from os import walk
@@ -73,12 +72,22 @@ class AuthenticationData:
 
 
 def getHwAddr():
-    """Get the MAC address of the device"""
+    """Get the MAC address of eth0 interface"""
+    if not is_raspberry_pi():
+        return "0a:0b:0c:0d:0e:0f"
+
+    s = socket(AF_INET, SOCK_DGRAM)
     try:
-        mac = uuid.getnode()
-        mac = ":".join(("%012X" % mac)[i : i + 2] for i in range(0, 12, 2))
-        return mac.lower()
-    except (OSError, ValueError) as e:
+        macaddress = ":".join(
+            f"{b:02x}"
+            for b in ioctl(
+            s.fileno(),
+            0x8927,  # SIOCGIFHWADDR (Get MAC Address)
+            pack("256s", IFACE[:15].encode("utf-8")),
+            )[18:24]
+        )
+        return macaddress.lower()
+    except (OSError, IOError) as e:
         getLogger().error("getHwAddr: %s", e)
         return "00:00:00:00:00:00"
 
