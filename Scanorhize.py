@@ -9,6 +9,7 @@ from Scanner import (
     ScannerPreview,
     updateScanParameters,
     listConfigScanner,
+    initScanners,
     ResolutionList,
     ColorList,
 )
@@ -20,6 +21,7 @@ from Hub import (
     GetIP,
     updateServer,
     HubData,
+    getTokens,
 )
 from ConfigApp import (
     getLogger,
@@ -210,53 +212,28 @@ def action(actionName: str, scan_num_str: str):
 @app.route("/Hub", methods=["POST", "GET"])
 def HubPage():
     Hub.ReadConfig()
-    if request.method == "POST":
-        Sim = 0
-        tmp = request.form["apn"]
-        if tmp != "":
-            Hub.apn = tmp
-            Sim = 1
-        tmp = request.form["user"]
-        if tmp != "":
-            Hub.user = tmp
-        tmp = request.form["password"]
-        if tmp != "":
-            Hub.password = tmp
-        tmp = request.form["address"]
-        # Api = 0
-        if tmp != "":
-            Hub.address = tmp
-            # Api = 1
-
-        if Sim == 1:  # modification paramètres SIM
-            #### res = Connect4g()
-            pass
-        # if Api==1:
-        Hub.ping = pingAPI(Hub.address)
-        Hub.WriteConfig()
-        Hub.print()
-
     # Format Hub configuration for display
-    hub_config = f"""MAC Address: {Hub.macAddress}
+    hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
 Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent} GB
+Disk Space: {Hub.diskSpacePercent}%
 Temperature: {Hub.temperature}°C
 Ping: {Hub.ping}"""
 
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
 
-    return render_template("Server.html", **updateServer(Hub), hub_config=hub_config)
+    return render_template("Hub.html", **updateServer(Hub), hub_config=hub_config)
 
 
 @app.route("/update_version", methods=["GET"])
 def update_version():
-    # Format Hub configuration for display
-    hub_config = f"""MAC Address: {Hub.macAddress}
+    hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
 Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent} GB
+Disk Space: {Hub.diskSpacePercent}%
 Temperature: {Hub.temperature}°C
 Ping: {Hub.ping}"""
 
@@ -265,33 +242,33 @@ Ping: {Hub.ping}"""
 
     if not is_raspberry_pi():
         return render_template(
-            "Server.html",
+            "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            update_output="No update, not on Raspberry Pi",
+            output="No update, not on Raspberry Pi"
         )
     try:
         getLogger().warning("Update version")
         hub_id = Hub.macAddress.replace(":", "")
         result = run(
-            f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
+            f"s3cmd --no-check-md5 sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
             shell=True,
             capture_output=True,
             text=True,
             check=False,
         )
         return render_template(
-            "Server.html",
+            "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            update_output=result.stdout,
+            output=result.stdout
         )
     except CalledProcessError as e:
         return render_template(
-            "Server.html",
+            "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            update_output=f"Command failed: {e.stderr}",
+            output=f"Command failed: {e.stderr}"
         )
 
 
@@ -311,8 +288,8 @@ Debug Mode: {is_debug()}"""
 def write_config():
     try:
         Hub.WriteConfig()
-        # Format Hub configuration for display
-        hub_config = f"""MAC Address: {Hub.macAddress}
+        hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
 Battery Level: {Hub.batteryLevelPercent}%
 Disk Space: {Hub.diskSpacePercent} GB
@@ -323,18 +300,54 @@ Ping: {Hub.ping}"""
             hub_config += f"\nToken: {Hub.token}"
 
         return render_template(
-            "Server.html",
+            "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            update_output="Configuration written successfully",
+            output="Configuration written successfully"
         )
     except CalledProcessError as e:
         return render_template(
-            "Server.html",
+            "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            update_output=f"Error writing configuration: {str(e)}",
+            output=f"Error writing configuration: {str(e)}"
         )
+
+
+@app.route('/init-hub', methods=['GET'])
+def init_hub():
+    hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent}%
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
+
+    if is_debug():
+        hub_config += f"\nToken: {Hub.token}"
+
+    try:
+        # Run getTokens() to get authentication tokens
+        tokens_result = getTokens()
+        if tokens_result != 0:
+            return render_template("Hub.html",
+                                **updateServer(Hub),
+                                hub_config=hub_config,
+                                output="Failed to get tokens")
+
+        # Run initScanners() to initialize scanners
+        initScanners()
+
+        return render_template("Hub.html",
+                            **updateServer(Hub),
+                            hub_config=hub_config,
+                            output="Hub initialized successfully")
+    except (OSError, ValueError) as e:
+        return render_template("Hub.html",
+                            **updateServer(Hub),
+                            hub_config=hub_config,
+                            output=f"Error: {str(e)}")
 
 
 if __name__ == "__main__":
