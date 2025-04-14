@@ -18,7 +18,7 @@ from ConfigApp import (
 )
 from Campaign import getUsbDir, USBSpace
 from Miscellaneous import ReadBatVoltCap
-from OSUtils import get_os
+from OSUtils import get_os, get_model
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 from WittyPython import ReadTemp
@@ -39,10 +39,6 @@ class HubData:
         if hasattr(self, "initialized"):  # Skip if already initialized
             return
 
-        self.apn: str = ""  # Adresse de l'APN
-        self.user: str = ""
-        self.password: str = ""
-        self.address: str = ""  # Adresse de l'APN
         self.ping: int = 0
         self.projectId: str = ""
         self.macAddress: str = "00:00:00:00:00:00"
@@ -54,6 +50,7 @@ class HubData:
         self.initialized = True  # Mark as initialized
         self.ReadConfig()
         self.macAddress = getHwAddr()
+        self.model = get_model()
 
     def json(self):
         """Convert object to JSON, excluding special attributes"""
@@ -98,10 +95,7 @@ class HubData:
 
 def updateServer(server: HubData):
     server_param = {
-        "apn": server.apn,
-        "user": server.user,
-        "password": server.password,
-        "address": server.address,
+
         "ping": server.ping,
     }
     return server_param
@@ -112,30 +106,6 @@ def getHubId():
     if hub_id == "":
         getLogger().error("getHubId: macAddress is empty")
     return hub_id
-
-
-def CopyFromJson(ScannerObj: ScannerData, data):
-    if "name" in data:
-        ScannerObj.Campaign = data["name"]
-    if "startDate" in data:
-        ScannerObj.StartDate = data["startDate"]
-    if "periode" in data:
-        ScannerObj.PeriodeS = data["periode"]
-    if "mode" in data:
-        ScannerObj.mode = data["mode"]
-    if "t" in data:
-        ScannerObj.t = data["t"]
-    if "l" in data:
-        ScannerObj.l = data["l"]
-    if "x" in data:
-        ScannerObj.x = data["x"]
-    if "y" in data:
-        ScannerObj.y = data["y"]
-    if "resolution" in data:
-        ScannerObj.resolution = data["resolution"]
-    if "quality" in data:
-        ScannerObj.quality = data["quality"]
-    return ScannerObj
 
 
 def remove_image_files(folder: str):
@@ -242,7 +212,7 @@ def getTokens():
 
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     hub_id = getHubId()
-    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
+    cmdRead = f"s3cmd --no-check-md5 sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -262,7 +232,7 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
 
 def SendScannerConfigToServer(ScannerObj: ScannerData):
     hub_id = getHubId()
-    cmdWrite = f"s3cmd sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
+    cmdWrite = f"s3cmd --no-check-md5 sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -282,7 +252,7 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
 
 def ReadHubConfigFromServer():
     hub_id = getHubId()
-    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
+    cmdRead = f"s3cmd --no-check-md5 sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -302,7 +272,7 @@ def ReadHubConfigFromServer():
 
 def SendHubConfigToServer():
     hub_id = getHubId()
-    cmdWrite = f"s3cmd sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
+    cmdWrite = f"s3cmd --no-check-md5 sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().warning(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
