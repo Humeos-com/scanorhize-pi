@@ -3,7 +3,6 @@ Gestion du Hub et communication avec la plateforme Web
 C'est le Hub qui synchronise les fichiers images et JSON sur le serveur
 """
 
-import sys
 import os
 from os import path
 from subprocess import run, SubprocessError, CalledProcessError
@@ -15,6 +14,7 @@ from ConfigApp import (
     getMaxTime,
     getLogger,
     getS3Bucket,
+    getConfigDir,
 )
 from Campaign import getUsbDir, USBSpace
 from Miscellaneous import ReadBatVoltCap
@@ -105,6 +105,13 @@ def updateServer(server: HubData):
         "ping": server.ping,
     }
     return server_param
+
+
+def getHubId():
+    hub_id = HubData().macAddress.replace(":", "")
+    if hub_id == "":
+        getLogger().error("getHubId: macAddress is empty")
+    return hub_id
 
 
 def CopyFromJson(ScannerObj: ScannerData, data):
@@ -216,13 +223,13 @@ def getTokens():
 
             for i in range(1, num_scan + 1):
                 Scanner_ = ScannerData()
-                Scanner_.ReadScannerConfig(f"{i}-Scanner.json")
+                Scanner_.ReadScannerConfig(f"Scanner-{i}.json")
                 port_key = f"port{i}"
                 if port_key in results["accessTokenScanners"]:
                     Scanner_.token = results["accessTokenScanners"][port_key]
                     Scanner_.projectId = results["projectId"]
                     Scanner_.sampleId = results["sampleIds"][port_key]
-                    Scanner_.WriteScannerConfig(f"{i}-Scanner.json")
+                    Scanner_.WriteScannerConfig(f"Scanner-{i}.json")
                 else:
                     getLogger().error("Missing token for %s", port_key)
                     return 1
@@ -234,15 +241,47 @@ def getTokens():
 
 
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
-    pass
+    hub_id = getHubId()
+    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
+    getLogger().warning(cmdRead)
+    result = run(
+        cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
+    )
 
-
-def ReadHubConfigFromServer(HubObj: HubData):
-    hub_id = HubObj.macAddress.replace(":", "")
-    if hub_id == "":
-        getLogger().error("SendHubConfigToServer: macAddress is empty")
+    if result.returncode != 0:
+        getLogger().error(
+            "ReadScannerConfigFromServer: return: %s  error: %s",
+            result.returncode,
+            result.stderr,
+        )
         return 1
 
+    getLogger().warning("ReadScannerConfigFromServer: OK")
+    return 0
+
+
+def SendScannerConfigToServer(ScannerObj: ScannerData):
+    hub_id = getHubId()
+    cmdWrite = f"s3cmd sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
+    getLogger().warning(cmdWrite)
+    result = run(
+        cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
+    )
+
+    if result.returncode != 0:
+        getLogger().error(
+            "SendScannerConfigToServer: return: %s  error: %s",
+            result.returncode,
+            result.stderr,
+        )
+        return 1
+
+    getLogger().warning("SendScannerConfigToServer: OK")
+    return 0
+
+
+def ReadHubConfigFromServer():
+    hub_id = getHubId()
     cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
@@ -261,12 +300,8 @@ def ReadHubConfigFromServer(HubObj: HubData):
     return 0
 
 
-def SendHubConfigToServer(HubObj: HubData):
-    hub_id = HubObj.macAddress.replace(":", "")
-    if hub_id == "":
-        getLogger().error("SendHubConfigToServer: macAddress is empty")
-        return 1
-
+def SendHubConfigToServer():
+    hub_id = getHubId()
     cmdWrite = f"s3cmd sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().warning(cmdWrite)
     result = run(
@@ -401,15 +436,15 @@ if __name__ == "__main__":
     Hub.diskSpacePercent = USBSpace()[0] / 1000
     Hub.temperature = ReadTemp()
     Hub.WriteConfig()
-    SendHubConfigToServer(Hub)
-    ReadHubConfigFromServer(Hub)
+    SendHubConfigToServer()
+    ReadHubConfigFromServer()
 
-    sys.exit(0)
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     scan_num = 0
     for CurrentScanner in listScannerconfigs:
         Scanner.ReadScannerConfig(CurrentScanner)
+        Scanner.WriteScannerConfig(CurrentScanner)
+        SendScannerConfigToServer(Scanner)
+        ReadScannerConfigFromServer(Scanner)
         scan_num += 1
-
-    # WriteScannerConfig(Scanner, "1-Scanner.json")
