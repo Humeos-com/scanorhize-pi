@@ -34,6 +34,7 @@ class Config:
 
     _instance = None  # Class variable to store the single instance
     platform: str
+    model: str
     usb_mode: str
 
     def __new__(cls):
@@ -47,13 +48,14 @@ class Config:
         """Load the configuration data (runs only once)."""
         self.platform = "Linux"
         self.usb_mode = "GPIO"
-
+        self.model = ""
         if os.path.exists("/sys/firmware/devicetree/base/model"):
             with open(
                 "/sys/firmware/devicetree/base/model", "r", encoding="utf-8"
             ) as f:
                 if "Raspberry Pi" in f.read():
                     self.platform = "Raspberry"
+                    self.model = f.read()
 
         if get_MEGA4():
             self.usb_mode = "MEGA4"
@@ -66,6 +68,9 @@ class Config:
     def has_MEGA4(self) -> bool:
         return self.usb_mode == "MEGA4"
 
+    def get_model(self) -> str:
+        return self.model
+
 
 def is_raspberry_pi():
     return Config().is_raspberry_pi()
@@ -77,6 +82,10 @@ def get_os():
     if platform.system() == "Darwin":
         return "MacOS"
     return "Linux"
+
+
+def get_model():
+    return Config().get_model()
 
 
 def has_MEGA4():
