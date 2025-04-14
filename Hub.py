@@ -151,7 +151,9 @@ def syncImageFiles(hub_: HubData):
     src = path.join(getUsbDir(), hub_.projectId)
     cmd = f"s3cmd --no-check-md5 --quiet sync {src} {getS3Bucket()}"
     try:
-        result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=True)
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+        )
         getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
         remove_image_files(src)
     except (SubprocessError, CalledProcessError) as e:
@@ -159,7 +161,6 @@ def syncImageFiles(hub_: HubData):
 
 
 def getTokens():
-
     # Get list of scanner serials
     scanner_serials = listScannerSerials()
 
@@ -168,10 +169,8 @@ def getTokens():
     num_scan = 0
     for num_scan, serial in enumerate(scanner_serials, 1):
         serial_dict[f"port{num_scan}"] = serial
-    # num_scan contient le nombre de scanners
 
     Hub_ = HubData()
-
     json_data = {"macAddress": Hub_.macAddress, "serialNumbers": serial_dict}
 
     cmdPost = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
@@ -181,21 +180,25 @@ def getTokens():
 
     getLogger().warning(cmdPost)
     result = run(
-        cmdPost, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdPost,
+        capture_output=True,
+        universal_newlines=True,
+        shell=True,
+        check=False,
     )
     if result.returncode != 0:
         getLogger().error(
-            "Post auth/devices: return: %s  error: %s", result.returncode, result.stderr
+            "Post auth/devices: return: %s  error: %s",
+            result.returncode,
+            result.stderr,
         )
         return 1
 
-    # Parse headers and body from response
     try:
         response_parts = result.stdout.split("\n\n", 1)
         headers = response_parts[0]
         body = response_parts[1] if len(response_parts) > 1 else ""
 
-        # Get status code from first line of headers
         status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
@@ -210,30 +213,34 @@ def getTokens():
             Hub_.token = results["accessTokenHub"]
             Hub_.projectId = results["projectId"]
             Hub_.WriteConfig()
+
             for i in range(1, num_scan + 1):
-                # Initialisation de l'objet Scanner
                 Scanner_ = ScannerData()
                 Scanner_.ReadScannerConfig(f"{i}-Scanner.json")
-                # On met à jour les valeurs
-                Scanner_.token = results["accessTokenScanners"][f"port{i}"]
-                Scanner_.projectId = results["projectId"]
-                Scanner_.sampleId = results["sampleIds"][f"port{i}"]
-                # On sauve le tout
-                Scanner_.WriteScannerConfig(f"{i}-Scanner.json")
+                port_key = f"port{i}"
+                if port_key in results["accessTokenScanners"]:
+                    Scanner_.token = results["accessTokenScanners"][port_key]
+                    Scanner_.projectId = results["projectId"]
+                    Scanner_.sampleId = results["sampleIds"][port_key]
+                    Scanner_.WriteScannerConfig(f"{i}-Scanner.json")
+                else:
+                    getLogger().error("Missing token for %s", port_key)
+                    return 1
         return 0
 
-    except (IndexError, ValueError, json.JSONDecodeError) as e:
+    except (IndexError, ValueError, json.JSONDecodeError, KeyError) as e:
         getLogger().error("getTokens: Error parsing response: %s", e)
         return 1
+
 
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     pass
 
 
 def ReadHubConfigFromServer(HubObj: HubData):
-    hub_id = getHwAddr().replace(":", "")
+    hub_id = HubObj.macAddress.replace(":", "")
     if hub_id == "":
-        getLogger().error("ReadHubConfigFromServer: macAddress is empty")
+        getLogger().error("SendHubConfigToServer: macAddress is empty")
         return 1
 
     cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
