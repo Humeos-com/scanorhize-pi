@@ -66,6 +66,14 @@ class ScannerData:
             print(f"{name}: {value}")
 
     def ReadScannerConfig(self, file=""):
+        if file == "":
+            if self.ScannerName == "":
+                getLogger().error("ReadScannerConfig: ScannerName is empty")
+                return self
+            file = f"{self.ScannerName}.json"
+        else:
+            self.ScannerName = file.replace(".json", "")
+
         fullpath = os.path.join(getConfigDir(), file)
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
@@ -76,7 +84,15 @@ class ScannerData:
             self.__dict__.update(data)
         return self
 
-    def WriteScannerConfig(self, file):
+    def WriteScannerConfig(self, file=""):
+        if file == "":
+            if self.ScannerName == "":
+                getLogger().error("WriteScannerConfig: ScannerName is empty")
+                return self
+            file = f"{self.ScannerName}.json"
+        else:
+            self.ScannerName = file.replace(".json", "")
+
         fullpath = os.path.join(getConfigDir(), file)
         json_data = self.json()
         try:
@@ -434,14 +450,14 @@ def listScannerSerials():
 
 def listConfigScanner():
     try:
-        # de la forme 1-Scanner.json
+        # de la forme Scanner-[1-9].json
         listfile = [
-            f for f in os.listdir(getConfigDir()) if re.match(r"[0-9]-Scanner.json", f)
+            f for f in os.listdir(getConfigDir()) if re.match(r"Scanner-[1-9].json", f)
         ]
         listfile.sort(reverse=False)
         getLogger().warning(str(listfile))
     except OSError:
-        listfile = ["1-Scanner.json", "2-Scanner.json", "3-Scanner.json"]
+        listfile = ["Scanner-1.json", "Scanner-2.json", "Scanner-3.json"]
     return listfile
 
 
@@ -467,7 +483,7 @@ def initScanners():
     l'initScanner. On va chercher les scanners sur les 3 ports
     et on va écrire leur configuration."""
     scanner = ScannerData()
-    listScannerconfigs_ = ["1-Scanner.json", "2-Scanner.json", "3-Scanner.json"]
+    listScannerconfigs_ = ["Scanner-1.json", "Scanner-2.json", "Scanner-3.json"]
     i_scan = 0
     for CurrentScanner in listScannerconfigs_:
         scanner.ReadScannerConfig(CurrentScanner)
@@ -505,5 +521,4 @@ if __name__ == "__main__":
         Scanner.LastImgFile = result_[0]
         Scanner.error = result_[1]
 
-    # WriteScannerConfig(Scanner, "1-Scanner.json")
     sys.exit(0)
