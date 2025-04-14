@@ -13,8 +13,8 @@ from Scanner import (
     ColorList,
 )
 from Hub import (
-    ReadConfigFromServer,
-    SendConfigToServer,
+    ReadScannerConfigFromServer,
+    SendScannerConfigToServer,
     pingAPI,
     GetWifiSSID,
     GetIP,
@@ -198,11 +198,11 @@ def action(actionName: str, scan_num_str: str):
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     if actionName == "GetConfig":
-        Scanner = ReadConfigFromServer(Scanner)
-        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        if ReadScannerConfigFromServer(Scanner) == 0:
+            Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     if actionName == "SendConfig":
-        SendConfigToServer(Scanner)
+        SendScannerConfigToServer(Scanner)
 
     return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
 

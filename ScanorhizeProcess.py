@@ -9,8 +9,8 @@ from os import path
 from ConfigApp import getLogger
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
-from Server import (
-    ReadConfigFromServer,
+from Hub import (
+    ReadScannerConfigFromServer,
 )
 from Miscellaneous import (
     InitGPIO,
@@ -88,7 +88,7 @@ for CurrentScanner in listScannerconfigs:
     # Prepare next StartDate for Scanner
     if Scanner.UseServer == 1:
         getLogger().warning("Get Scanner config from server")
-        Scanner = ReadConfigFromServer(Scanner)
+        Scanner = ReadScannerConfigFromServer(Scanner)
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     nextDate, nextDateS = CalculNextStartDate(
