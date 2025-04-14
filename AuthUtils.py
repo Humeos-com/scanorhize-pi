@@ -71,7 +71,7 @@ class AuthenticationData:
         self.__initialized = value
 
 
-def getHwAddr():
+def getHwAddr(ifname: str = IFACE):
     """Get the MAC address of eth0 interface"""
     if not is_raspberry_pi():
         return "0a:0b:0c:0d:0e:0f"
@@ -81,9 +81,9 @@ def getHwAddr():
         macaddress = ":".join(
             f"{b:02x}"
             for b in ioctl(
-            s.fileno(),
-            0x8927,  # SIOCGIFHWADDR (Get MAC Address)
-            pack("256s", IFACE[:15].encode("utf-8")),
+                s.fileno(),
+                0x8927,  # SIOCGIFHWADDR (Get MAC Address)
+                pack("256s", ifname[:15].encode("utf-8")),
             )[18:24]
         )
         return macaddress.lower()
@@ -92,7 +92,7 @@ def getHwAddr():
         return "00:00:00:00:00:00"
 
 
-def getIPAddr(ifname=IFACE):
+def getIPAddr(ifname: str = IFACE):
     if ifname == "lo":
         return "127.0.0.1"
     if not is_raspberry_pi():
