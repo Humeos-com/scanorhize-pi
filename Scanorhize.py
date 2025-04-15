@@ -27,6 +27,7 @@ from ConfigApp import (
     getLogger,
     getDisplayFile,
     is_debug,
+    is_prod,
     getConfigDir,
     getImageDir,
     getLogDir,
@@ -200,8 +201,7 @@ def action(actionName: str, scan_num_str: str):
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     if actionName == "GetConfig":
-        if ReadScannerConfigFromServer(Scanner) == 0:
-            Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        ReadScannerConfigFromServer(Scanner)
 
     if actionName == "SendConfig":
         SendScannerConfigToServer(Scanner)
@@ -350,5 +350,19 @@ Ping: {Hub.ping}"""
                             output=f"Error: {str(e)}")
 
 
+@app.route('/stop-server', methods=['GET'])
+def stop_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+    return 'Server shutting down...'
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=is_debug())
+    if is_prod():
+        # Run Flask in production mode for background execution
+        app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+    else:
+        # Run Flask in production mode for background execution
+        app.run(host="0.0.0.0", port=8080, debug=is_debug(), use_reloader=True)
