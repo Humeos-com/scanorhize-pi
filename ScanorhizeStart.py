@@ -17,8 +17,7 @@ from Miscellaneous import (
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds, CalculNextStartDate
 from ConfigApp import is_dev, getLogger, getScanorhizeServer
 from Scanner import listConfigScanner, ScannerData
-from Server import HubData, SendParameters, pingAPI, syncImageFiles
-
+from Hub import HubData, SendParameters, pingAPI, syncImageFiles, ReadScannerConfigFromServer
 from Campaign import USBSpace
 
 getLogger().warning("ScanorhizeStart.py")
@@ -29,10 +28,15 @@ EndGPIO()
 
 if config == 0:
     # En mode config
-    cmd = "python3 Scanorhize.py &"
+    cmd = "nohup python3 Scanorhize.py > /dev/null 2>&1 &"
     getLogger().warning(cmd)
-    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-    sys.exit(0)
+    result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+    if result.returncode == 0:
+        getLogger().warning("Scanorhize.py started successfully")
+        sys.exit(0)
+    else:
+        getLogger().error("Failed to start Scanorhize.py: %s", result.stderr)
+        sys.exit(1)
 
 # Etape 1 #############################################
 # Mise à jour des dates de réveil et d'arrêt du WittyPi
@@ -151,7 +155,11 @@ try:
     syncImageFiles(Hub_)
 
     # On recupère les configuration des Scanners en fonction de use_server
-
+    i_scan = 0
+    for CurrentScanner in listScannerconfigs:
+        Scanner.ReadScannerConfig(CurrentScanner)
+        if Scanner.UseServer:
+            ReadScannerConfigFromServer(Scanner)
 
 except RuntimeError as exc:
     getLogger().error(exc)
