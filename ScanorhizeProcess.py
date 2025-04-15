@@ -87,9 +87,7 @@ for CurrentScanner in listScannerconfigs:
             getLogger().error("Image acquisition Error")
     # Prepare next StartDate for Scanner
     if Scanner.UseServer == 1:
-        getLogger().warning("Get Scanner config from server")
-        Scanner = ReadScannerConfigFromServer(Scanner)
-        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        ReadScannerConfigFromServer(Scanner)
 
     nextDate, nextDateS = CalculNextStartDate(
         Scanner.StartDate, Scanner.PeriodeS, DateStart
