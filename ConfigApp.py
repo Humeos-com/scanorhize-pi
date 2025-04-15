@@ -9,18 +9,9 @@ import logging
 import logging.config
 from datetime import datetime
 
-# Default environment settings
-DEFAULT_ENV = "PROD"
-DEFAULT_LOG_LEVEL = "INFO"
-
 
 # Path to the config file
-CONFIG_APP_FILE_DEV = os.path.expanduser("~/.scanorhize-dev.json")
-CONFIG_APP_FILE_PREPROD = os.path.expanduser("~/.scanorhize-preprod.json")
-CONFIG_APP_FILE_PROD = os.path.expanduser("~/.scanorhize.json")
-S3_BUCKET_PROD = "s3://scanorhize-images-prod"
-S3_BUCKET_PREPROD = "s3://scanorhize-images-preprod"
-S3_BUCKET_DEV = "s3://scanorhize-images-dev"
+CONFIG_APP_FILE = os.path.expanduser("~/scanorhize.json")
 
 
 class ConfigApp:
@@ -38,21 +29,10 @@ class ConfigApp:
         if hasattr(self, "initialized"):  # Skip if already initialized
             return
 
-        # Get environment from APP_ENV or default to PROD
-        # APP_ENV can be DEV, PREPROD or PROD
-        self.environment = os.getenv("APP_ENV", DEFAULT_ENV).upper()
-
-        # Set config file based on environment
-        if self.environment == "DEV":
-            self.config_app_file = CONFIG_APP_FILE_DEV
-        elif self.environment == "PREPROD":
-            self.config_app_file = CONFIG_APP_FILE_PREPROD
-        else:
-            self.environment = "PROD"  # Ensure PROD for any other value
-            self.config_app_file = CONFIG_APP_FILE_PROD
-
         # Type hints for required attributes
-        self.log_level: str = os.getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL).upper()
+        self.config_app_file: str = CONFIG_APP_FILE
+        self.environment: str = "PROD"
+        self.log_level: str = "INFO"
         self.log_dir: str = "Log"
         self.config_dir: str = "ConfigFile"
         self.next_date_file: str = "NextStartDate.json"
@@ -62,7 +42,7 @@ class ConfigApp:
         self.uhubctl: str = "/usr/sbin/uhubctl"
         self.usb_dir: str = "/media/pi/Image"
         self.image_dir: str = "static"
-        self.s3_bucket: str = self._get_s3_bucket()
+        self.s3_bucket: str = "s3://scanorhize-images-prod"
         self.scanorhize_server: str = "scanorhize.duckdns.org"
         self.connect_timeout: int = 10
         self.max_time: int = 300
@@ -76,15 +56,7 @@ class ConfigApp:
         self.setup_final_logging()
 
         self.initialized = True  # Mark as initialized
-        self.logger.warning("Initialized ConfigApp in %s environment", self.environment)
-
-    def _get_s3_bucket(self) -> str:
-        """Get the appropriate S3 bucket based on environment"""
-        if self.environment == "DEV":
-            return S3_BUCKET_DEV
-        elif self.environment == "PREPROD":
-            return S3_BUCKET_PREPROD
-        return S3_BUCKET_PROD
+        self.logger.warning("Read configuration from: %s", self.config_app_file)
 
     def setup_basic_logging(self):
         """Setup initial basic logging"""
@@ -146,8 +118,18 @@ class ConfigApp:
             self.logger.error("Problem with config file: %s", self.config_app_file)
 
         # Handle environment overrides
+        if os.path.exists("DEV") or os.environ.get("DEV", False):
+            self.environment = "DEV"
         if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
             self.log_level = "DEBUG"
+
+        # Environment variables override
+        self.environment = os.getenv("APP_ENV", self.environment)
+        self.log_level = os.getenv("LOG_LEVEL", self.log_level)
+        if self.log_level.upper() == "DEBUG":
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
 
         self.logger.warning("Read configuration from: %s", self.config_app_file)
         return self
@@ -184,17 +166,13 @@ class ConfigApp:
             getLogger().error("save_config: OSError: %s", e)
             return 1
 
-    def is_dev(self) -> bool:
-        """Returns True if environment is set to DEV."""
-        return self.environment.upper() == "DEV"
-
-    def is_preprod(self) -> bool:
-        """Returns True if environment is set to PREPROD."""
-        return self.environment.upper() == "PREPROD"
-
     def is_prod(self) -> bool:
         """Returns True if environment is set to PROD."""
         return self.environment.upper() == "PROD"
+
+    def is_dev(self) -> bool:
+        """Returns True if environment is set to DEV."""
+        return self.environment.upper() == "DEV"
 
     def is_debug(self) -> bool:
         return self.log_level.upper() == "DEBUG"
@@ -207,16 +185,12 @@ class ConfigApp:
                 print(f"{key}: {value}")
 
 
-def is_dev():
-    return ConfigApp().is_dev()
-
-
-def is_preprod():
-    return ConfigApp().is_preprod()
-
-
 def is_prod():
     return ConfigApp().is_prod()
+
+
+def is_dev():
+    return ConfigApp().is_dev()
 
 
 def is_debug():
