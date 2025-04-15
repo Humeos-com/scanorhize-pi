@@ -226,7 +226,7 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
         )
         return 1
 
-    getLogger().warning("ReadScannerConfigFromServer: OK")
+    getLogger().warning("%s: ReadScannerConfigFromServer: OK", ScannerObj.ScannerName)
     return 0
 
 
@@ -246,7 +246,7 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
         )
         return 1
 
-    getLogger().warning("SendScannerConfigToServer: OK")
+    getLogger().warning("%s: SendScannerConfigToServer: OK", ScannerObj.ScannerName)
     return 0
 
 
@@ -266,7 +266,7 @@ def ReadHubConfigFromServer():
         )
         return 1
 
-    getLogger().warning("ReadHubConfigFromServer: OK")
+    getLogger().warning("hub-%s: ReadHubConfigFromServer: OK", hub_id)
     return 0
 
 
@@ -286,7 +286,7 @@ def SendHubConfigToServer():
         )
         return 1
 
-    getLogger().warning("SendHubConfigToServer: OK")
+    getLogger().warning("hub-%s: SendHubConfigToServer: OK", hub_id)
     return 0
 
 
