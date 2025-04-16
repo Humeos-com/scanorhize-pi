@@ -384,23 +384,18 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
 
 
 def ScannerPreview(scanner: ScannerData, i_scan: int):
-    image = f"{i_scan + 1}.jpg"
+    imagepreview = f"{getImageDir()}/{i_scan + 1}.jpg"
     error = TurnUsbOn(i_scan, scanner.TimeBeforeScan)
     if error != 0:
         scanner.error = 1
         res = scanner.error
-        return image, res
-    #### file = imagepath + image
-    # On ne passe pas le device, car on n'allume qu'un port USB
-    # donc scanimage va trouver le seul scanner sous tension !
-    # ######: Il faudrait faire la conversion en JPEG !!!!
-    #        + " --format=jpeg >"
-    #        + file
+        return imagepreview, res
+
     command = (
         f"scanimage "
         f"--mode={scanner.mode} "
         f"--resolution=75 "
-        f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
+        f"--format=jpeg > {imagepreview} | tee -a {DISPLAY_FILE}"
     )
     getLogger().warning("Command: %s", command)
     res = 1
@@ -425,7 +420,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
     else:
         getLogger().warning("Preview OK")
 
-    return image, res
+    return imagepreview, res
 
 
 def listScannerSerials():
