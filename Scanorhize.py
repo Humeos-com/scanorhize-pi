@@ -12,6 +12,7 @@ from Scanner import (
     initScanners,
     ResolutionList,
     ColorList,
+    calculate_and_set_next_date,
 )
 from Hub import (
     ReadScannerConfigFromServer,
@@ -165,6 +166,11 @@ def ScannerPage(scan_num_str: str):
         # Handle checkbox - if not in form, it means unchecked (0)
         Scanner.enable = 1 if "enable" in form else 0
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+
+        # Recalculate next start date after updating scanner configuration
+        nextStartDateValue = calculate_and_set_next_date()
+        getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
+
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
     # Format PeriodeS for display

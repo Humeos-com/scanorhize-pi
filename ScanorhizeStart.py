@@ -15,61 +15,11 @@ from Miscellaneous import (
     ReadGPIOConfig,
     ReadBatVoltCap,
 )
-from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds, CalculNextStartDate
+from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 from ConfigApp import is_dev, getLogger
-from Scanner import listConfigScanner, ScannerData
+from Scanner import listConfigScanner, ScannerData, calculate_and_set_next_date
 from Hub import HubData, SendParameters, syncImageFiles, ReadScannerConfigFromServer
 from Campaign import USBSpace
-
-
-def calculate_and_set_next_date():
-    """Calculate and set the next wake-up and shutdown date for the WittyPi.
-    This function:
-    1. Gets current date and calculates next start date for each scanner
-    2. Determines the earliest next start date
-    3. Handles battery level considerations
-    4. Sets the next wake-up and shutdown date
-    """
-    # Get current date and convert to seconds
-    DateStart = GetCurrentDate()
-    CurrentDateinS = DateToSeconds(DateStart)
-
-    # Get list of scanner configs and initialize arrays dynamically
-    listScannerconfigs_ = listConfigScanner()
-    num_scanners = len(listScannerconfigs_)
-    NextStartseconds = [0] * num_scanners
-    NextStartDates = [""] * num_scanners
-
-    # Calculate next start dates for each scanner
-    ScannerObj = ScannerData()
-    for i_scan_, CurrentScanner_ in enumerate(listScannerconfigs_):
-        ScannerObj.ReadScannerConfig(CurrentScanner_)
-        nextDate, nextDateS = CalculNextStartDate(
-            ScannerObj.StartDate, ScannerObj.PeriodeS, DateStart
-        )
-        NextStartDates[i_scan_] = nextDate
-        NextStartseconds[i_scan_] = nextDateS
-        getLogger().warning("Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate)
-
-    # Calculate the next wake-up time
-    # Ensure it's at least 600 seconds (10 minutes) from now
-    nextStartSecs = max(int(min(NextStartseconds)), (CurrentDateinS + 600))
-    nextStartDateValue_ = SecondsToDate(nextStartSecs)
-    getLogger().warning("Next start at: %s", nextStartDateValue_)
-
-    # Check battery level and adjust wake-up time if needed
-    Bat = ReadBatVoltCap()
-    if Bat[1] < 0:  # if battery is low, delay wake-up by 30 days
-        nextStartDateValue_ = SecondsToDate(nextStartSecs + (3600 * 24 * 30))
-        getLogger().warning("No more battery: start in 30 days: %s", nextStartDateValue_)
-
-    # Set the next wake-up time
-    SetNextStartDate(nextStartDateValue_)
-
-    # Set shutdown time to 20 minutes from now as a safety measure
-    StopTime = SecondsToDate(CurrentDateinS + (60 * 20))
-    setNextShutdownDate(StopTime)
-    return nextStartDateValue_
 
 
 # Etape 0 #############################################
@@ -100,8 +50,6 @@ if config == 0:
 
     else:
         getLogger().error("Failed to start Scanorhize.py: %s", result.stderr)
-
-
 
 
 # Etape 2 #############################################
