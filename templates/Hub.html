@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Hub{% endblock %}
+{% block title %}{% endblock %}
 {% block content %}
 <div class="container">
   <!-- Content here -->  
@@ -16,7 +16,7 @@
 		<button type="submit" class="btn btn-primary">Init Hub</button>
 	</form>
 	<form action="/stop-server" method="GET">
-		<button type="submit" class="btn btn-primary">Stop Server</button>
+		<button type="submit" class="btn btn-danger">Stop Server</button>
 	</form>
 	
 	{% if output %}
