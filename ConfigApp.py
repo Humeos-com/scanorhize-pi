@@ -11,7 +11,7 @@ from datetime import datetime
 
 
 # Path to the config file
-CONFIG_APP_FILE = os.path.expanduser("~/scanorhize.json")
+CONFIG_APP_FILE = os.path.expanduser("~/.scanorhize")
 
 
 class ConfigApp:
@@ -30,7 +30,7 @@ class ConfigApp:
             return
 
         # Type hints for required attributes
-        self.config_app_file: str = CONFIG_APP_FILE
+        self.config_app_file: str
         self.environment: str = "PROD"
         self.log_level: str = "INFO"
         self.log_dir: str = "Log"
@@ -46,6 +46,17 @@ class ConfigApp:
         self.scanorhize_server: str = "scanorhize.duckdns.org"
         self.connect_timeout: int = 10
         self.max_time: int = 300
+
+        # First handle app environment
+        self.environment = os.getenv("APP_ENV", self.environment)
+        if self.environment == "DEV":
+            self.config_app_file = f"{CONFIG_APP_FILE}-dev.json"
+            self.log_level = "DEBUG"
+        else:
+            self.config_app_file = f"{CONFIG_APP_FILE}-prod.json"
+
+        if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
+            self.log_level = "DEBUG"
 
         # Initialize logger
         self.logger = logging.getLogger("ConfigApp")
@@ -117,15 +128,6 @@ class ConfigApp:
         except (FileNotFoundError, ValueError):
             self.logger.error("Problem with config file: %s", self.config_app_file)
 
-        # Handle environment overrides
-        if os.path.exists("DEV") or os.environ.get("DEV", False):
-            self.environment = "DEV"
-        if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
-            self.log_level = "DEBUG"
-
-        # Environment variables override
-        self.environment = os.getenv("APP_ENV", self.environment)
-        self.log_level = os.getenv("LOG_LEVEL", self.log_level)
         if self.log_level.upper() == "DEBUG":
             logging.getLogger().setLevel(logging.DEBUG)
         else:
