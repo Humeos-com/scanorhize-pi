@@ -7,6 +7,8 @@ from datetime import datetime
 from datetime import timezone
 import time
 
+from ConfigApp import getLogger
+
 # Java Zoned Timestamp, with TZ=UTC
 JAVA_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DEFAULT_DATE_TIME = "2024-11-01T00:00:00Z"
@@ -54,36 +56,6 @@ def GetCurrentDate():
     return Time
 
 
-def CalculNextStartDate(StartDate: str, Period: int, CurrentDate: str):
-    """Calcule la prochaine date de début de campagne au format JAVA UTC
-    Compte combien de fois la période s'est écoulée depuis la date de début
-    et retourne la prochaine date de début de campagne
-
-    Args:
-        StartDate (str): en JAVA UTC
-        Period (int): en secondes
-        CurrentDate (str): en JAVA UTC
-
-    Returns:
-        string: la prochaine date de début de campagne en JAVA UTC
-        int: la prochaine date de début de campagne en secondes
-    """
-    try:
-        Periodi = int(Period)
-        StartTime = DateToSeconds(StartDate)
-        CurrentTime = DateToSeconds(CurrentDate)
-        NextTime = StartTime
-        now = GetCurrentDate()
-        nowTime = DateToSeconds(now) + 180
-        while NextTime < CurrentTime or NextTime < nowTime:
-            NextTime = NextTime + Periodi
-        NextDate = SecondsToDate(NextTime)
-    except ValueError:
-        NextDate = DEFAULT_DATE_TIME
-        NextTime = DEFAULT_SECONDS
-    return NextDate, NextTime
-
-
 def ConvertDateToWitty(date: str):
     """
     Convert date from JAVA to WittyPy format
@@ -102,6 +74,35 @@ def ConvertDateToWitty(date: str):
     return date
 
 
+def CalculNextStartDate(StartDate: str, PeriodeS: int, DateStart: str):
+    """Calculate the next start date for a scanner based on its configuration.
+
+    Args:
+        StartDate (str): Initial start date in JAVA_FORMAT
+        PeriodeS (int): Period in seconds between scans
+        DateStart (str): Current date in JAVA_FORMAT
+
+    Returns:
+        tuple: (next_date_str, next_date_seconds)
+    """
+    try:
+        # Convert dates to seconds
+        start_seconds = DateToSeconds(StartDate)
+        current_seconds = DateToSeconds(DateStart)
+
+        # Calculate the number of periods that have passed
+        periods_passed = (current_seconds - start_seconds) // PeriodeS
+
+        # Calculate the next start date
+        next_date_seconds = start_seconds + ((periods_passed + 1) * PeriodeS)
+        next_date_str = SecondsToDate(next_date_seconds)
+
+        return next_date_str, next_date_seconds
+    except (ValueError, TypeError) as e:
+        getLogger().error("Error calculating next start date: %s", e)
+        return DateStart, DateToSeconds(DateStart)
+
+
 if __name__ == "__main__":
     local_tz = time.tzname
     date_now = datetime.now(timezone.utc)
@@ -111,4 +112,3 @@ if __name__ == "__main__":
     print(DateToSeconds(date_new))
     print(SecondsToDate(nb_seconds))
     print(ConvertDateToWitty(date_new))
-    print(CalculNextStartDate(DEFAULT_DATE_TIME, "3600", date_new))
