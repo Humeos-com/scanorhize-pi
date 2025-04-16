@@ -21,11 +21,71 @@ from Scanner import listConfigScanner, ScannerData
 from Hub import HubData, SendParameters, syncImageFiles, ReadScannerConfigFromServer
 from Campaign import USBSpace
 
+
+def calculate_and_set_next_date():
+    """Calculate and set the next wake-up and shutdown date for the WittyPi.
+    This function:
+    1. Gets current date and calculates next start date for each scanner
+    2. Determines the earliest next start date
+    3. Handles battery level considerations
+    4. Sets the next wake-up and shutdown date
+    """
+    # Get current date and convert to seconds
+    DateStart = GetCurrentDate()
+    CurrentDateinS = DateToSeconds(DateStart)
+
+    # Get list of scanner configs and initialize arrays dynamically
+    listScannerconfigs_ = listConfigScanner()
+    num_scanners = len(listScannerconfigs_)
+    NextStartseconds = [0] * num_scanners
+    NextStartDates = [""] * num_scanners
+
+    # Calculate next start dates for each scanner
+    ScannerObj = ScannerData()
+    for i_scan_, CurrentScanner_ in enumerate(listScannerconfigs_):
+        ScannerObj.ReadScannerConfig(CurrentScanner_)
+        nextDate, nextDateS = CalculNextStartDate(
+            ScannerObj.StartDate, ScannerObj.PeriodeS, DateStart
+        )
+        NextStartDates[i_scan_] = nextDate
+        NextStartseconds[i_scan_] = nextDateS
+        getLogger().warning("Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate)
+
+    # Calculate the next wake-up time
+    # Ensure it's at least 600 seconds (10 minutes) from now
+    nextStartSecs = max(int(min(NextStartseconds)), (CurrentDateinS + 600))
+    nextStartDateValue_ = SecondsToDate(nextStartSecs)
+    getLogger().warning("Next start at: %s", nextStartDateValue_)
+
+    # Check battery level and adjust wake-up time if needed
+    Bat = ReadBatVoltCap()
+    if Bat[1] < 0:  # if battery is low, delay wake-up by 30 days
+        nextStartDateValue_ = SecondsToDate(nextStartSecs + (3600 * 24 * 30))
+        getLogger().warning("No more battery: start in 30 days: %s", nextStartDateValue_)
+
+    # Set the next wake-up time
+    SetNextStartDate(nextStartDateValue_)
+
+    # Set shutdown time to 20 minutes from now as a safety measure
+    StopTime = SecondsToDate(CurrentDateinS + (60 * 20))
+    setNextShutdownDate(StopTime)
+    return nextStartDateValue_
+
+
+# Etape 0 #############################################
 getLogger().warning("ScanorhizeStart.py")
 
 # On regarde si on est en mode configuration
 config = ReadGPIOConfig()
 EndGPIO()
+
+# Etape 1 #############################################
+# Mise à jour des dates de réveil et d'arrêt du WittyPi
+# Car en développement, on peut passer la date de réveil
+# et dans ce cas, le WittyPi ne se reveille plus !
+# L'allumer en mode config ou en mode run résout le problème, car
+# on fait le calcul de la date de réveil systématiquement
+nextStartDateValue = calculate_and_set_next_date()
 
 if config == 0:
     # En mode config
@@ -37,61 +97,19 @@ if config == 0:
     result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
     if result.returncode == 0:
         getLogger().warning("Scanorhize.py started successfully")
-        sys.exit(0)
+
     else:
         getLogger().error("Failed to start Scanorhize.py: %s", result.stderr)
-        sys.exit(1)
-
-# Etape 1 #############################################
-# Mise à jour des dates de réveil et d'arrêt du WittyPi
-DateStart = GetCurrentDate()
-CurrentDateinS = DateToSeconds(DateStart)
-
-# On détermine la prochaine date de réveil à partir du fichier NextStartDate.json
-NextStartseconds = [0, 0, 0]
-NextStartDates = [" ", " ", " "]
 
 
-# A mettre à jour avec les données des scanners
-Scanner = ScannerData()
-listScannerconfigs = listConfigScanner()
-i_scan = 0
-for CurrentScanner in listScannerconfigs:
-    Scanner.ReadScannerConfig(CurrentScanner)
-    DateOriginS = DateToSeconds(Scanner.StartDate)
-    nextDate, nextDateS = CalculNextStartDate(
-        Scanner.StartDate, Scanner.PeriodeS, DateStart
-    )
-    NextStartDates[i_scan] = nextDate
-    NextStartseconds[i_scan] = nextDateS
-    getLogger().warning("Scanner-%s: Next start date: %s", i_scan + 1, nextDate)
-    i_scan += 1
-
-# Quand la carte WittyPi n'a plus de batterie, son heure interne est aléatoire.
-# Lorsque les acquisitions ne fonctionnent pas, la nextStartDate ne bouge pas.
-# Donc elle se retrouve dans le passé. Avec un minimum de secs_now + 600, on
-# espère que la carte WittyPi se réveillera.
-nextStartSecs = max(int(min(NextStartseconds)), (CurrentDateinS + 600))
-nextStartDateValue = SecondsToDate(nextStartSecs)
-getLogger().warning("Next start at: %s", nextStartDateValue)
-
-Bat = ReadBatVoltCap()
-if Bat[1] < 0:  # si plus de batterie on ne réveille plus le système
-    nextStartDateValue = SecondsToDate(nextStartSecs + (3600 * 24 * 30))  # +30 jours
-    getLogger().warning("No more battery: start in 30 days: %s", nextStartDateValue)
-
-SetNextStartDate(nextStartDateValue)
-
-StopTime = SecondsToDate(
-    CurrentDateinS + (60 * 20)
-)  # arret au bout de 20min par sécurité en cas d'erreur
-setNextShutdownDate(StopTime)
 
 
 # Etape 2 #############################################
 # On lance le scan des images
 # On execute le contenu du fichier ScanorhizeProcess.py
 # On scanne les images et on les envoie à la plateforme Web
+# On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
+# import ScanorhizeProcess
 cmd = "python3 ScanorhizeProcess.py"
 getLogger().warning(cmd)
 try:
@@ -101,12 +119,9 @@ try:
 except CalledProcessError as exc:
     getLogger().error(exc.stderr)
 
-## On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
-## import ScanorhizeProcess
 
 # Etape 3 #############################################
 # Transfert des données
-
 try:
     # On allume la clé 4G et on attend d'avoir le réseau
     enable4G()
@@ -150,8 +165,8 @@ try:
     syncImageFiles(Hub_)
 
     # On recupère les configuration des Scanners en fonction de use_server
-    i_scan = 0
-    for CurrentScanner in listScannerconfigs:
+    Scanner = ScannerData()
+    for CurrentScanner in listConfigScanner():
         Scanner.ReadScannerConfig(CurrentScanner)
         if Scanner.UseServer:
             ReadScannerConfigFromServer(Scanner)
