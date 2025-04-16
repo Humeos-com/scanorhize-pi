@@ -129,10 +129,17 @@
        <img src = " {{url_for('static', filename=imagename)}}"width="80%", alt="Take a scan"/>      
        </div>       
 
-     
-                
+<pre id="display" class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></pre>
+<script>
+var display = document.getElementById('display');
+var xhr = new XMLHttpRequest();
+xhr.open('GET', "{{url_for('stream')}}", true);
+xhr.send();
 
-  
+setInterval(function() {
+    display.textContent = xhr.responseText;
+}, 2000);
+</script>
 
 {% endblock %}
       
