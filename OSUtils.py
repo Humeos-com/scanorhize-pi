@@ -33,19 +33,16 @@ class Config:
     """
 
     _instance = None  # Class variable to store the single instance
-    platform: str
-    model: str
-    usb_mode: str
 
     def __new__(cls):
-        """Ensure only one instance is created (Singleton pattern)."""
         if cls._instance is None:
             cls._instance = super(Config, cls).__new__(cls)
-            cls._instance._load_config()
         return cls._instance
 
-    def _load_config(self):
-        """Load the configuration data (runs only once)."""
+    def __init__(self):
+        """Initialize the instance if not already initialized."""
+        if hasattr(self, "initialized"):  # Skip if already initialized
+            return
         self.platform = "Linux"
         self.usb_mode = "GPIO"
         self.model = ""
@@ -53,14 +50,16 @@ class Config:
             with open(
                 "/sys/firmware/devicetree/base/model", "r", encoding="utf-8"
             ) as f:
-                if "Raspberry Pi" in f.read():
+                self.model = f.read()
+                if "Raspberry Pi" in self.model:
                     self.platform = "Raspberry"
-                    self.model = f.read()
 
         if get_MEGA4():
             self.usb_mode = "MEGA4"
         else:
             self.usb_mode = "GPIO"
+
+        self.initialized = True
 
     def is_raspberry_pi(self) -> bool:
         return self.platform == "Raspberry"
@@ -94,6 +93,7 @@ def has_MEGA4():
 
 if __name__ == "__main__":
     print(get_os())
+    print(f"Model: {get_model()}")
     print(f"Raspberry: {is_raspberry_pi()}")
     print(f"has MEGA4: {has_MEGA4()}")
     print(f"Raspberry: {is_raspberry_pi()}")
