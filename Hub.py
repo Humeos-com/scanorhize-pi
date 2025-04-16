@@ -212,7 +212,7 @@ def getTokens():
 
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     hub_id = getHubId()
-    cmdRead = f"s3cmd --no-check-md5 sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
+    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -232,7 +232,7 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
 
 def SendScannerConfigToServer(ScannerObj: ScannerData):
     hub_id = getHubId()
-    cmdWrite = f"s3cmd --no-check-md5 sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
+    cmdWrite = f"s3cmd sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -252,7 +252,7 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
 
 def ReadHubConfigFromServer():
     hub_id = getHubId()
-    cmdRead = f"s3cmd --no-check-md5 sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
+    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -272,7 +272,7 @@ def ReadHubConfigFromServer():
 
 def SendHubConfigToServer():
     hub_id = getHubId()
-    cmdWrite = f"s3cmd --no-check-md5 sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
+    cmdWrite = f"s3cmd sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().warning(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False

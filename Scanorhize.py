@@ -251,7 +251,7 @@ Ping: {Hub.ping}"""
         getLogger().warning("Update version")
         hub_id = Hub.macAddress.replace(":", "")
         result = run(
-            f"s3cmd --no-check-md5 sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
+            f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
             shell=True,
             capture_output=True,
             text=True,
