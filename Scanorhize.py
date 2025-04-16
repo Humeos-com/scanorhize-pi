@@ -350,13 +350,10 @@ Ping: {Hub.ping}"""
                             output=f"Error: {str(e)}")
 
 
-@app.route('/stop-server', methods=['GET'])
+@app.route('/poweroff', methods=['GET'])
 def stop_server():
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
-        raise RuntimeError('Not running with the Werkzeug Server')
-    func()
-    return 'Server shutting down...'
+    result = run("sudo poweroff", shell=True, capture_output=True, text=True, check=False)
+    return result.stdout
 
 
 if __name__ == "__main__":

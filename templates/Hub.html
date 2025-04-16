@@ -15,8 +15,8 @@
 	<form action="/init-hub" method="GET">
 		<button type="submit" class="btn btn-primary">Init Hub</button>
 	</form>
-	<form action="/stop-server" method="GET">
-		<button type="submit" class="btn btn-danger">Stop Server</button>
+	<form action="/poweroff" method="GET" onsubmit="return confirm('Are you sure you want to power off the Hub?');">
+		<button type="submit" class="btn btn-danger">Poweroff</button>
 	</form>
 	
 	{% if output %}
