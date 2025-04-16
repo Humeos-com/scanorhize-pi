@@ -9,15 +9,16 @@ from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
 from WittyPython import ReadTemp
 from Miscellaneous import (
     EndGPIO,
-    Start4G,
-    End4G,
+    enable4G,
+    disable4G,
+    check_connectivity,
     ReadGPIOConfig,
     ReadBatVoltCap,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds, CalculNextStartDate
-from ConfigApp import is_dev, getLogger, getScanorhizeServer
+from ConfigApp import is_dev, getLogger
 from Scanner import listConfigScanner, ScannerData
-from Hub import HubData, SendParameters, pingAPI, syncImageFiles, ReadScannerConfigFromServer
+from Hub import HubData, SendParameters, syncImageFiles, ReadScannerConfigFromServer
 from Campaign import USBSpace
 
 getLogger().warning("ScanorhizeStart.py")
@@ -28,6 +29,9 @@ EndGPIO()
 
 if config == 0:
     # En mode config
+    if enable4G():
+        getLogger().warning("4G enabled")
+
     cmd = "nohup python3 Scanorhize.py > /dev/null 2>&1 &"
     getLogger().warning(cmd)
     result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
@@ -105,18 +109,9 @@ except CalledProcessError as exc:
 
 try:
     # On allume la clé 4G et on attend d'avoir le réseau
-    Start4G()
+    enable4G()
     # Teste la connectivité
-    res = 0
-    MAX_ITERATION = 12
-    iteration = 0
-    while res == 0 and iteration < MAX_ITERATION:
-        res = pingAPI(getScanorhizeServer())
-        iteration += 1
-    if iteration == 12:
-        # No connectivity, stop the process
-        getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
-        raise RuntimeError("Pas de connectivité !")
+    check_connectivity()
 
     # On synchronise l'horloge de la carte WittyPi avec le serveur
     try:
@@ -166,7 +161,7 @@ except RuntimeError as exc:
 
 finally:
     # On éteint la clé 4G
-    End4G()
+    disable4G()
 
 
 # Etape 4 #############################################

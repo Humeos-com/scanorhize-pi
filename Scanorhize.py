@@ -16,7 +16,6 @@ from Scanner import (
 from Hub import (
     ReadScannerConfigFromServer,
     SendScannerConfigToServer,
-    pingAPI,
     GetWifiSSID,
     GetIP,
     updateServer,
@@ -32,33 +31,24 @@ from ConfigApp import (
     getImageDir,
     getLogDir,
 )
-from Miscellaneous import chaineIntwitherror, InitGPIO
+from Miscellaneous import chaineIntwitherror, InitGPIO, initDisplayFile, check_connectivity, sync_time
 from OSUtils import is_raspberry_pi
 
+
+initDisplayFile()
 getLogger().warning("Start Scanorhize.py")
-
-has_internet = False
-tries = 0
-while tries <= 10:
-    if pingAPI("www.google.com"):
-        has_internet = True
-        break
-    if is_raspberry_pi():
-        sleep(5)
-    tries += 1
-
-if tries > 10:
-    getLogger().error("No internet connection")
-    has_internet = False
-else:
-    getLogger().warning("Internet connection OK.")
-    has_internet = True
-
 Hub = HubData()
-
-
 getLogger().warning("Launch Web app")
 app = Flask(__name__)
+
+has_internet = False
+try:
+    check_connectivity()
+    has_internet = True
+    getLogger().warning("Internet OK !")
+    sync_time()
+except RuntimeError as exc:
+    getLogger().error("No internet connection: %s", exc)
 
 # init
 SSID = GetWifiSSID()
@@ -99,7 +89,7 @@ def stream():
         with open(getDisplayFile(), "r", encoding="utf-8") as f:
             while True:
                 yield f.read()
-                sleep(1)
+                sleep(5)
 
     return app.response_class(generate(), mimetype="text/plain")
 
@@ -147,13 +137,13 @@ def ScannerPage(scan_num_str: str):
 
         tmp = request.form["l"]
         # print("tmp=",tmp,"tmp type: ",type(tmp),"l type: ",type(Scanner.l))
-        Scanner.l = chaineIntwitherror(tmp, Scanner.l, 0, 216.7)
+        Scanner.l = chaineIntwitherror(tmp, Scanner.l, 0, Scanner.x_max)
         tmp = form["t"]
-        Scanner.t = chaineIntwitherror(tmp, Scanner.t, 0, 297.5)
+        Scanner.t = chaineIntwitherror(tmp, Scanner.t, 0, Scanner.y_max)
         tmp = form["x"]
-        Scanner.x = chaineIntwitherror(tmp, Scanner.x, 0, 216.7)
+        Scanner.x = chaineIntwitherror(tmp, Scanner.x, 0, Scanner.x_max)
         tmp = form["y"]
-        Scanner.y = chaineIntwitherror(tmp, Scanner.y, 0, 297.5)
+        Scanner.y = chaineIntwitherror(tmp, Scanner.y, 0, Scanner.y_max)
         tmp = form["quality"]
         Scanner.quality = chaineIntwitherror(tmp, Scanner.quality, 0, 90)
         if "token" in form:
@@ -251,7 +241,7 @@ Ping: {Hub.ping}"""
         getLogger().warning("Update version")
         hub_id = Hub.macAddress.replace(":", "")
         result = run(
-            f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
+            f"s3cmd --no-preserve sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
             shell=True,
             capture_output=True,
             text=True,
@@ -316,6 +306,7 @@ Ping: {Hub.ping}"""
 
 @app.route('/init-hub', methods=['GET'])
 def init_hub():
+    getLogger().warning("Start init-hub")
     hub_config = f"""Model: {Hub.model}
 MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
@@ -326,7 +317,6 @@ Ping: {Hub.ping}"""
 
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
-
     try:
         # Run getTokens() to get authentication tokens
         tokens_result = getTokens()
@@ -336,9 +326,9 @@ Ping: {Hub.ping}"""
                                 hub_config=hub_config,
                                 output="Failed to get tokens")
 
-        # Run initScanners() to initialize scanners
+        getLogger().warning("Start InitScanners")# Run initScanners() to initialize scanners
         initScanners()
-
+        getLogger().warning("End init-hub")
         return render_template("Hub.html",
                             **updateServer(Hub),
                             hub_config=hub_config,

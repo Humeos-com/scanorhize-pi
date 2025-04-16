@@ -2,7 +2,7 @@
 
 import sys
 import json
-from subprocess import run
+from subprocess import run, SubprocessError, CalledProcessError
 from time import sleep
 
 # import logging
@@ -15,7 +15,7 @@ from WittyPython import (
     get_output_voltage,
     get_power_mode,
 )
-from ConfigApp import getLogger, getBatteryFile, getDisplayFile
+from ConfigApp import getLogger, getBatteryFile, getDisplayFile, getScanorhizeServer
 from ConfigApp import getUhubctl
 from ConfigApp import getNextDateFile
 
@@ -167,7 +167,6 @@ def isWittyPiCharging():
 
 
 def ReadBatVoltCap():
-
     if not is_raspberry_pi():
         return (5.0, 99.0)
 
@@ -192,10 +191,28 @@ def EndGPIO():
     return
 
 
-def Start4G():
+def pingAPI(address):
+    """Lance un ping unique. Le timeout par défaut sur Linux est de 10s
+
+    Args:
+        address (str): nom DNS ou IP
+
+    Returns:
+        int: 1 si address répond, 0 en cas d'erreur
+    """
+    try:
+        run(["ping", "-c 1", address], capture_output=True, text=True, check=True)
+        getLogger().warning("Ping OK: %s", address)
+        return 1
+    except (SubprocessError, CalledProcessError) as e:
+        getLogger().error("Ping Error: %s", e)
+    return 0
+
+
+def enable4G():
     """Allume le port USB de la clé 4G"""
     if not is_raspberry_pi():
-        return 0
+        return 1
     try:
         if not has_MEGA4():
             GPIO.setwarnings(False)
@@ -204,14 +221,14 @@ def Start4G():
             GPIO.output(PinArray[3], GPIO.HIGH)
     except IOError as e:
         getLogger().error("IOError: %s", e)
-        return 1
-    return 0
+        return 0
+    return 1
 
 
-def End4G():
+def disable4G():
     """Eteint le port USB de la clé 4G"""
     if not is_raspberry_pi():
-        return 0
+        return 1
     try:
         if not has_MEGA4():
             GPIO.setwarnings(False)
@@ -220,8 +237,37 @@ def End4G():
             GPIO.cleanup(PinArray[3])
     except IOError as e:
         getLogger().error("IOError: %s", e)
+        return 0
+    return 1
+
+
+def check_connectivity(max_attempts=12):
+    """Check connectivity to the server with retries"""
+    res = 0
+    iteration = 0
+    while res == 0 and iteration < max_attempts:
+        res = pingAPI(getScanorhizeServer())
+        if is_raspberry_pi():
+            sleep(5)
+        iteration += 1
+    if iteration == max_attempts:
+        getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
+        raise RuntimeError("Pas de connectivité !")
+
+
+def sync_time():
+    """On synchronise l'horloge de la carte WittyPi avec le serveur"""
+    try:
+        cmd = "sudo ./TimeSynchronisation.sh"
+        run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+        )
+        getLogger().warning("TimeSynchronisation.sh: OK")
         return 1
+    except (SubprocessError, CalledProcessError) as e:
+        getLogger().error("TimeSynchronisation.sh error: %s", e)
     return 0
+
 
 
 def InitGPIO():
@@ -352,7 +398,7 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         # On allume la clé 4G
-        Start4G()
+        enable4G()
         for int_scan in [0, 1, 2]:
             value = input(
                 f"Basculer Scanner-{int_scan + 1} ? [Non=Entrée, sinon, Oui=o]: "
@@ -373,6 +419,6 @@ if __name__ == "__main__":
         EndGPIO()
         sys.exit(0)
 
-    End4G()
+    disable4G()
     # le EndGPIO remet les GPIO dans l'état d'origine, il éteint donc les relais
     ## EndGPIO()
