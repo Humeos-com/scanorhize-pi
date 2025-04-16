@@ -47,6 +47,7 @@ try:
     has_internet = True
     getLogger().warning("Internet OK !")
     sync_time()
+
 except RuntimeError as exc:
     getLogger().error("No internet connection: %s", exc)
 
