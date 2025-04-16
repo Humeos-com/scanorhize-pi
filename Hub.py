@@ -17,8 +17,8 @@ from ConfigApp import (
     getConfigDir,
 )
 from Campaign import getUsbDir, USBSpace
-from Miscellaneous import ReadBatVoltCap
-from OSUtils import get_os, get_model
+from Miscellaneous import ReadBatVoltCap, pingAPI
+from OSUtils import get_os, get_model, is_raspberry_pi
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 from WittyPython import ReadTemp
@@ -126,7 +126,7 @@ def remove_image_files(folder: str):
 def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
     src = path.join(getUsbDir(), hub_.projectId)
-    cmd = f"s3cmd --no-check-md5 --quiet sync {src} {getS3Bucket()}"
+    cmd = f"s3cmd --no-preserve --no-check-md5 --quiet sync {src} {getS3Bucket()}"
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
@@ -212,7 +212,7 @@ def getTokens():
 
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     hub_id = getHubId()
-    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
+    cmdRead = f"s3cmd --no-preserve sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -232,7 +232,7 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
 
 def SendScannerConfigToServer(ScannerObj: ScannerData):
     hub_id = getHubId()
-    cmdWrite = f"s3cmd sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
+    cmdWrite = f"s3cmd --no-preserve sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -252,7 +252,7 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
 
 def ReadHubConfigFromServer():
     hub_id = getHubId()
-    cmdRead = f"s3cmd sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
+    cmdRead = f"s3cmd --no-preserve sync s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -272,7 +272,7 @@ def ReadHubConfigFromServer():
 
 def SendHubConfigToServer():
     hub_id = getHubId()
-    cmdWrite = f"s3cmd sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
+    cmdWrite = f"s3cmd --no-preserve sync {getConfigHubFile()} s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().warning(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
@@ -344,6 +344,8 @@ def SendParameters(Hub_: HubData):
 
 
 def GetWifiSSID():
+    if not is_raspberry_pi():
+        return "No SSID"
     cmd = "sudo iwgetid"
     try:
         result = run(
@@ -374,24 +376,6 @@ def GetIP():
     IP = x[0]
     print(IP)
     return IP
-
-
-def pingAPI(address):
-    """Lance un ping unique. Le timeout par défaut sur Linux est de 10s
-
-    Args:
-        address (str): nom DNS ou IP
-
-    Returns:
-        int: 1 si le address répond, 0 en cas d'erreur
-    """
-    try:
-        run(["ping", "-c 1", address], capture_output=True, text=True, check=True)
-        getLogger().warning("Ping OK: %s", address)
-        return 1
-    except (SubprocessError, CalledProcessError) as e:
-        getLogger().error("Ping Error: %s", e)
-    return 0
 
 
 if __name__ == "__main__":
