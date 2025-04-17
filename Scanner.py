@@ -294,7 +294,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         _type_: _description_
     """
     if not scanner.enable:
-        getLogger().warning("scanAcq: le scanner %s est désactivé", i_scan + 1)
+        getLogger().warning("Scanner %s is disabled", str(i_scan + 1))
         return scanner
 
     getLogger().warning("scanAcq: on allume le port USB: %s", i_scan + 1)
