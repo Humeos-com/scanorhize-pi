@@ -48,7 +48,9 @@ if config == 0:
 
     cmd = "nohup python3 Scanorhize.py > /dev/null 2>&1 &"
     getLogger().warning(cmd)
-    result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+    result = run(
+        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+    )
     if result.returncode == 0:
         getLogger().warning("Scanorhize.py started successfully")
 
@@ -120,11 +122,22 @@ try:
     syncImageFiles(Hub)
 
     # On recupère les configuration des Scanners en fonction de use_server
+    # sauf qu'on n'écrase pas les 2 attributs LastImgFile et LastImgTime
+    # qui sont déjà présents dans la classe ScannerData
     Scanner = ScannerData()
     for CurrentScanner in listConfigScanner():
         Scanner.ReadScannerConfig(CurrentScanner)
         if Scanner.UseServer:
+            last_img_file_save = Scanner.LastImgFile
+            last_img_time_save = Scanner.LastImgTime
             ReadScannerConfigFromServer(Scanner)
+            # Relecture de la nouvelle config
+            Scanner.ReadScannerConfig(CurrentScanner)
+            # On remet les 2 attributs LastImgFile et LastImgTime
+            # à leurs valeurs précédentes
+            Scanner.LastImgFile = last_img_file_save
+            Scanner.LastImgTime = last_img_time_save
+            Scanner.WriteScannerConfig(CurrentScanner)
 
 except RuntimeError as exc:
     getLogger().error(exc)
