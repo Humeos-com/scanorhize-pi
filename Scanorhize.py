@@ -32,7 +32,13 @@ from ConfigApp import (
     getImageDir,
     getLogDir,
 )
-from Miscellaneous import chaineIntwitherror, InitGPIO, initDisplayFile, check_connectivity, sync_time
+from Miscellaneous import (
+    chaineIntwitherror,
+    InitGPIO,
+    initDisplayFile,
+    check_connectivity,
+    sync_time,
+)
 from OSUtils import is_raspberry_pi
 
 
@@ -242,7 +248,7 @@ Ping: {Hub.ping}"""
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            output="No update, not on Raspberry Pi"
+            output="No update, not on Raspberry Pi",
         )
     try:
         getLogger().warning("Update version")
@@ -255,17 +261,14 @@ Ping: {Hub.ping}"""
             check=False,
         )
         return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            output=result.stdout
+            "Hub.html", **updateServer(Hub), hub_config=hub_config, output=result.stdout
         )
     except CalledProcessError as e:
         return render_template(
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            output=f"Command failed: {e.stderr}"
+            output=f"Command failed: {e.stderr}",
         )
 
 
@@ -300,18 +303,18 @@ Ping: {Hub.ping}"""
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            output="Configuration written successfully"
+            output="Configuration written successfully",
         )
     except CalledProcessError as e:
         return render_template(
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            output=f"Error writing configuration: {str(e)}"
+            output=f"Error writing configuration: {str(e)}",
         )
 
 
-@app.route('/init-hub', methods=['GET'])
+@app.route("/init-hub", methods=["GET"])
 def init_hub():
     getLogger().warning("Start init-hub")
     hub_config = f"""Model: {Hub.model}
@@ -328,28 +331,38 @@ Ping: {Hub.ping}"""
         # Run getTokens() to get authentication tokens
         tokens_result = getTokens()
         if tokens_result != 0:
-            return render_template("Hub.html",
-                                **updateServer(Hub),
-                                hub_config=hub_config,
-                                output="Failed to get tokens")
+            return render_template(
+                "Hub.html",
+                **updateServer(Hub),
+                hub_config=hub_config,
+                output="Failed to get tokens",
+            )
 
-        getLogger().warning("Start InitScanners")# Run initScanners() to initialize scanners
+        getLogger().warning(
+            "Start InitScanners"
+        )  # Run initScanners() to initialize scanners
         initScanners()
         getLogger().warning("End init-hub")
-        return render_template("Hub.html",
-                            **updateServer(Hub),
-                            hub_config=hub_config,
-                            output="Hub initialized successfully")
+        return render_template(
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            output="Hub initialized successfully",
+        )
     except (OSError, ValueError) as e:
-        return render_template("Hub.html",
-                            **updateServer(Hub),
-                            hub_config=hub_config,
-                            output=f"Error: {str(e)}")
+        return render_template(
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            output=f"Error: {str(e)}",
+        )
 
 
-@app.route('/poweroff', methods=['GET'])
+@app.route("/poweroff", methods=["GET"])
 def stop_server():
-    result = run("sudo poweroff", shell=True, capture_output=True, text=True, check=False)
+    result = run(
+        "sudo poweroff", shell=True, capture_output=True, text=True, check=False
+    )
     return result.stdout
 
 

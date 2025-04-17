@@ -95,7 +95,6 @@ class HubData:
 
 def updateServer(server: HubData):
     server_param = {
-
         "ping": server.ping,
     }
     return server_param
@@ -118,7 +117,7 @@ def remove_image_files(folder: str):
                 file_path = os.path.join(root, name)
                 try:
                     os.remove(file_path)
-                    getLogger().warning("SyncImageFiles: removed %s", file_path)
+                    getLogger().warning("remove_image_files: removed %s", file_path)
                 except (FileNotFoundError, PermissionError) as e:
                     getLogger().error("Error removing file %s: %s", file_path, e)
 
@@ -127,6 +126,7 @@ def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
     src = path.join(getUsbDir(), hub_.projectId)
     cmd = f"s3cmd --no-preserve --no-check-md5 --quiet sync {src} {getS3Bucket()}"
+    getLogger().warning(cmd)
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
