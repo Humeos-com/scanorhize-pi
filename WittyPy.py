@@ -5,9 +5,11 @@ Ca fonctionne quelque soit la version de la carte WittyPi.
 """
 
 from subprocess import run
+from datetime import datetime, timedelta
 
 from OSUtils import is_raspberry_pi
 from DateUtils import ConvertDateToWitty
+from ConfigApp import getLogger
 
 path = "/home/pi/wittypi/"
 
@@ -60,44 +62,51 @@ def ReadNextStartDate():
 
 
 def SetNextStartDate(date):  # date en UTC!!
-    print("date: ", date)
-    try:
-        year = int(date[0:4], 10)
-    except ValueError:
-        year = 2020
-    try:
-        month = int(date[5:7], 10)
-    except ValueError:
-        month = 1
-    try:
-        day = int(date[8:10], 10)
-    except ValueError:
-        day = 1
-    try:
-        hour = int(date[11:13], 10)
-    except ValueError:
-        hour = 0
-    try:
-        mins = int(date[14:16], 10)
-    except ValueError:
-        mins = 0
-    try:
-        secs = int(date[17:19], 10)
-    except ValueError:
-        secs = 0
-    arg = f"{day:02d} {hour:02d} {mins:02d} {secs:02d}"
-    print(
-        "year:",
-        year,
-        "month:",
-        month,
-        "DD HH MM SS",
-        arg,
-    )
+    """Set the next startup time for the WittyPi.
+    If the parsing of the date fails, the next day is used as default.
+
+    Args:
+        date (str): Date string in format "YYYY-MM-DDTHH:mm:ssZ"
+
+    Returns:
+        int: Result of WriteWittyFunction call, or 0 if not on Raspberry Pi
+    """
+
     if not is_raspberry_pi():
         return 0
-    result = WriteWittyFunction("set_startup_time", arg)
-    return result
+    # Get current date plus one day for defaults
+    tomorrow = datetime.utcnow() + timedelta(days=1)
+    defaults = {
+        "year": tomorrow.year,
+        "month": tomorrow.month,
+        "day": tomorrow.day,
+        "hour": tomorrow.hour,
+        "mins": tomorrow.minute,
+        "secs": tomorrow.second,
+    }
+
+    # Parse date components with error handling
+    try:
+        # Extract components using string slicing
+        components = {
+            "year": int(date[0:4]),
+            "month": int(date[5:7]),
+            "day": int(date[8:10]),
+            "hour": int(date[11:13]),
+            "mins": int(date[14:16]),
+            "secs": int(date[17:19]),
+        }
+    except (ValueError, IndexError) as e:
+        # Use tomorrow's date if parsing fails
+        components = defaults
+        getLogger().error("Error parsing date: %s", e)
+
+    # Format the time string
+    arg = f"{components['day']:02d} {components['hour']:02d} {components['mins']:02d} {components['secs']:02d}"
+
+    # Only proceed if running on Raspberry Pi
+
+    return WriteWittyFunction("set_startup_time", arg)
 
 
 def setNextShutdownDate(date: str):
@@ -111,7 +120,6 @@ def setNextShutdownDate(date: str):
     """
 
     datew = ConvertDateToWitty(date)
-    print(f"date: {date} => datew: {datew}")
     if not is_raspberry_pi():
         return 0
     return WriteWittyFunction("set_shutdown_time", datew)
