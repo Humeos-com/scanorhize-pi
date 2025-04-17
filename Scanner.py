@@ -50,7 +50,7 @@ class ScannerData:
         self.y = Y_MAX
         self.x_max = X_MAX
         self.y_max = Y_MAX
-        self.quality = 5
+        self.quality = 10
         self.device = "NoScannerDetected"
         self.token = "token_bidon"
         self.projectId = ""
@@ -532,9 +532,14 @@ def calculate_and_set_next_date():
             )
             NextStartDates.append(nextDate)
             NextStartseconds.append(nextDateS)
-            getLogger().warning("Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate)
+            getLogger().warning(
+                "Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate
+            )
         else:
-            getLogger().warning("Scanner-%s: Disabled, skipping next start date calculation", i_scan_ + 1)
+            getLogger().warning(
+                "Scanner-%s: Disabled, skipping next start date calculation",
+                i_scan_ + 1,
+            )
 
     # If no scanners are enabled, set a default wake-up time
     if not NextStartseconds:
@@ -552,7 +557,9 @@ def calculate_and_set_next_date():
     Bat = ReadBatVoltCap()
     if Bat[1] < 0:  # if battery is low, delay wake-up by 30 days
         nextStartDateValue_ = SecondsToDate(nextStartSecs + (3600 * 24 * 30))
-        getLogger().warning("No more battery: start in 30 days: %s", nextStartDateValue_)
+        getLogger().warning(
+            "No more battery: start in 30 days: %s", nextStartDateValue_
+        )
 
     # Set the next wake-up time
     SetNextStartDate(nextStartDateValue_)
