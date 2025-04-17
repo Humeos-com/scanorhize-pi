@@ -5,7 +5,7 @@ On gère les GPIO pour la carte 4G depuis ce programme
 import sys
 from subprocess import run, CalledProcessError
 
-from WittyPy import SetNextStartDate, doShutdown, setNextShutdownDate
+from WittyPy import doShutdown, setNextShutdownDate
 from WittyPython import ReadTemp
 from Miscellaneous import (
     EndGPIO,
@@ -33,12 +33,16 @@ EndGPIO()
 # Mise à jour des dates de réveil et d'arrêt du WittyPi
 # Car en développement, on peut passer la date de réveil
 # et dans ce cas, le WittyPi ne se reveille plus !
-# L'allumer en mode config ou en mode run résout le problème, car
-# on fait le calcul de la date de réveil systématiquement
+# Idem si on change la batterie et qu'on repart quelques jours plus tard
+# On fait le calcul de la date de réveil systématiquement
+# avec la date courante.
+# Si la batterie est morte, l'heure sera aléatoire, il faut
+# refaire l'initialisation par le mode config, qui mettra
+# le boitier à l'heure correcte.
 nextStartDateValue = calculate_and_set_next_date()
 
 if config == 0:
-    # En mode config
+    # En mode config on lance le serveur web Scanorhize et on quitte
     if enable4G():
         getLogger().warning("4G enabled")
 
@@ -51,9 +55,10 @@ if config == 0:
     else:
         getLogger().error("Failed to start Scanorhize.py: %s", result.stderr)
 
+    sys.exit(0)
 
 # Etape 2 #############################################
-# On lance le scan des images
+# Si on n'est pas en mode config, on lance le scan des images
 # On execute le contenu du fichier ScanorhizeProcess.py
 # On scanne les images et on les envoie à la plateforme Web
 # On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
@@ -70,6 +75,8 @@ except CalledProcessError as exc:
 
 # Etape 3 #############################################
 # Transfert des données
+# C'est à partir de cette étape qu'on a de la connectivité
+# et qu'on peut
 try:
     # On allume la clé 4G et on attend d'avoir le réseau
     enable4G()
@@ -96,21 +103,21 @@ try:
     # selon le flag Scanner.UseServer
 
     # Paramètres
-    Hub_ = HubData()
-    Hub_.ReadConfig()
-    volt, Hub_.batteryLevelPercent = ReadBatVoltCap()
-    Hub_.diskSpacePercent = USBSpace()[0] / 1000
-    Hub_.temperature = ReadTemp()
-    Hub_.WriteConfig()
+    Hub = HubData()
+    Hub.ReadConfig()
+    volt, Hub.batteryLevelPercent = ReadBatVoltCap()
+    Hub.diskSpacePercent = USBSpace()[0] / 1000
+    Hub.temperature = ReadTemp()
+    Hub.WriteConfig()
 
     getLogger().warning(
         "Bat: %s  USB: %s  Temp: %s",
-        Hub_.batteryLevelPercent,
-        Hub_.diskSpacePercent,
-        Hub_.temperature,
+        Hub.batteryLevelPercent,
+        Hub.diskSpacePercent,
+        Hub.temperature,
     )
-    SendParameters(Hub_)  ## Plutôt envoie les paramètres au S3 ??
-    syncImageFiles(Hub_)
+    SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
+    syncImageFiles(Hub)
 
     # On recupère les configuration des Scanners en fonction de use_server
     Scanner = ScannerData()

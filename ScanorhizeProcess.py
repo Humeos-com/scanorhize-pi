@@ -1,6 +1,7 @@
 """
-Main process for Scanorhize: fait l'acquisition,
- envoie les images à la plateforme Web et éteint le système.
+Fait l'acquisition des images selon les paramètres des scanners
+Les images sont stockées sur le disque USB
+Les images seront envoyées par le processus ScanorhizeStart.py
 """
 
 from time import sleep
@@ -9,9 +10,6 @@ from os import path
 from ConfigApp import getLogger
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
-from Hub import (
-    ReadScannerConfigFromServer,
-)
 from Miscellaneous import (
     InitGPIO,
     WriteStartDateConfig,
@@ -46,6 +44,10 @@ for dates in NextStartDates:
 i_scan = 0
 for CurrentScanner in listScannerconfigs:
     Scanner.ReadScannerConfig(CurrentScanner)
+    if not Scanner.enable:
+        getLogger().warning("Scanner %s is disabled", str(i_scan + 1))
+        continue
+
     data = "scanner file: " + CurrentScanner
     getLogger().warning(data)
 
@@ -66,10 +68,9 @@ for CurrentScanner in listScannerconfigs:
     getLogger().warning(data)
 
     if CurrentDateinS > DateOriginS and CurrentDateinS >= NextStartseconds[i_scan]:
-        getLogger().warning("Turn scanner %s On", str(i_scan + 1))
 
-        # get image and post image
-        getLogger().warning("Start image acquisition")
+        # get image from scanner
+        getLogger().warning("Scanner %s: start image acquisition", str(i_scan + 1))
         Scanner = scanAcq(Scanner, i_scan, DateStart)
         Scanner.WriteScannerConfig(CurrentScanner)
         scanning = 1
@@ -86,9 +87,6 @@ for CurrentScanner in listScannerconfigs:
         else:
             getLogger().error("Image acquisition Error")
     # Prepare next StartDate for Scanner
-    if Scanner.UseServer == 1:
-        ReadScannerConfigFromServer(Scanner)
-
     nextDate, nextDateS = CalculNextStartDate(
         Scanner.StartDate, Scanner.PeriodeS, DateStart
     )
