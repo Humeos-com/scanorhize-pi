@@ -17,7 +17,7 @@ from WittyPython import (
 )
 from ConfigApp import getLogger, getBatteryFile, getDisplayFile, getScanorhizeServer
 from ConfigApp import getUhubctl
-from ConfigApp import getNextDateFile
+from ConfigApp import getNextDateFile, getChPin
 
 from OSUtils import is_raspberry_pi, has_MEGA4
 
@@ -34,6 +34,8 @@ else:
     sys.modules["smbus"] = fake_rpi.smbus
     from RPi import GPIO
 
+CHRG_PIN: int = 5  # input to detect charging status
+STDBY_PIN: int = 6  # input to detect standby status
 
 # Pour le mode config
 # Bouton poussoir config
@@ -42,41 +44,6 @@ if is_WittyPi_3():
     ConfigPin = 17  # pin physique 11
 else:
     ConfigPin = 16  # pin physique 36 + ground 34
-
-# Pour la carte USB Big 7
-# Pour le relai Banggood initial
-# pins BCM
-# Ch1Pin = 19  # Scanner1
-# Ch2Pin = 26  # Scanner2
-# Ch3Pin = 20  # Scanner3
-# Ch4Pin = 21  # Clé 4G
-
-# Pour le relai SBComponent RelayPi-V2
-# pins BCM
-Ch1Pin = 19  # Scanner1
-Ch2Pin = 13  # Scanner2
-# Attention pour ces 2 pins, il faut supprimer les jumpers jaunes
-# et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
-Ch3Pin = 22  # Scanner3
-Ch4Pin = 27  # Clé 4G
-PinArray = [Ch1Pin, Ch2Pin, Ch3Pin, Ch4Pin]
-
-# Pour l'alimentation de la carte WittyPi L3V7
-# Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
-# Pins BCM
-CHRG_PIN = 5  # input to detect charging status
-STDBY_PIN = 6  # input to detect standby status
-
-
-def getChPin(i_scan: int):
-    if 0 <= i_scan < 4:
-        # print(f"getChPin: {i_scan} => {PinArray[i_scan]}")
-        return PinArray[i_scan]
-
-    getLogger().error(
-        "La valeur passee doit être comprise entre 0 et 4, ici: %d", i_scan
-    )
-    return -1
 
 
 def chaineIntwitherror(chaine, valueerror, valuemin, valuemax):
@@ -217,8 +184,8 @@ def enable4G():
         if not has_MEGA4():
             GPIO.setwarnings(False)
             GPIO.setmode(GPIO.BCM)
-            GPIO.setup(PinArray[3], GPIO.OUT)
-            GPIO.output(PinArray[3], GPIO.HIGH)
+            GPIO.setup(getChPin(3), GPIO.OUT)
+            GPIO.output(getChPin(3), GPIO.HIGH)
     except IOError as e:
         getLogger().error("IOError: %s", e)
         return 0
@@ -233,8 +200,8 @@ def disable4G():
         if not has_MEGA4():
             GPIO.setwarnings(False)
             GPIO.setmode(GPIO.BCM)
-            GPIO.output(PinArray[3], GPIO.LOW)
-            GPIO.cleanup(PinArray[3])
+            GPIO.output(getChPin(3), GPIO.LOW)
+            GPIO.cleanup(getChPin(3))
     except IOError as e:
         getLogger().error("IOError: %s", e)
         return 0
@@ -277,9 +244,9 @@ def InitGPIO():
         if not has_MEGA4():
             # On arrête les scanners
             for i_pin in range(0, 3):
-                print(f"Initialisation du GPIO: {PinArray[i_pin]}")
-                GPIO.setup(PinArray[i_pin], GPIO.OUT)
-                GPIO.output(PinArray[i_pin], GPIO.LOW)
+                print(f"Initialisation du GPIO: {getChPin(i_pin)}")
+                GPIO.setup(getChPin(i_pin), GPIO.OUT)
+                GPIO.output(getChPin(i_pin), GPIO.LOW)
     except IOError as e:
         getLogger().error("IOError: %s", e)
         return 1

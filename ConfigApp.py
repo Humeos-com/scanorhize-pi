@@ -29,9 +29,19 @@ class ConfigApp:
         if hasattr(self, "initialized"):  # Skip if already initialized
             return
 
+        # First handle app environment
+        self.environment = os.getenv("APP_ENV", "PROD")
+        if self.environment == "DEV":
+            self.config_app_file = f"{CONFIG_APP_FILE}-dev.json"
+            self.log_level = "DEBUG"
+        else:
+            self.config_app_file = f"{CONFIG_APP_FILE}-prod.json"
+
+        if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
+            self.log_level = "DEBUG"
+
         # Type hints for required attributes
         self.config_app_file: str
-        self.environment: str = "PROD"
         self.log_level: str = "INFO"
         self.log_dir: str = "Log"
         self.config_dir: str = "ConfigFile"
@@ -46,17 +56,33 @@ class ConfigApp:
         self.scanorhize_server: str = "scanorhize.duckdns.org"
         self.connect_timeout: int = 10
         self.max_time: int = 300
+        # Pour le relai Banggood initial
+        # pins BCM
+        # Ch1Pin = 19  # Scanner1
+        # Ch2Pin = 26  # Scanner2
+        # Ch3Pin = 20  # Scanner3
+        # Ch4Pin = 21  # Clé 4G
 
-        # First handle app environment
-        self.environment = os.getenv("APP_ENV", self.environment)
-        if self.environment == "DEV":
-            self.config_app_file = f"{CONFIG_APP_FILE}-dev.json"
-            self.log_level = "DEBUG"
-        else:
-            self.config_app_file = f"{CONFIG_APP_FILE}-prod.json"
+        # Pour le relai SBComponent RelayPi-V2
+        # pins BCM
+        # Ch1Pin = 19  # Scanner1
+        # Ch2Pin = 13  # Scanner2
+        # Attention pour ces 2 pins, il faut supprimer les jumpers jaunes
+        # et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
+        # Ch3Pin = 22  # Scanner3
+        # Ch4Pin = 27  # Clé 4G
 
-        if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
-            self.log_level = "DEBUG"
+        # Pour l'alimentation de la carte WittyPi L3V7
+        # Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
+        # Pins BCM
+        # CHRG_PIN = 5  # input to detect charging status
+        # STDBY_PIN = 6  # input to detect standby status
+        # Pour la carte USB Big 7
+        self.Ch1Pin: int # Scanner1
+        self.Ch2Pin: int # Scanner2
+        self.Ch3Pin: int # Scanner3
+        self.Ch4Pin: int # clé 4G
+        self.PinArray = []
 
         # Initialize logger
         self.logger = logging.getLogger("ConfigApp")
@@ -133,6 +159,8 @@ class ConfigApp:
         else:
             logging.getLogger().setLevel(logging.INFO)
 
+        self.PinArray = [self.Ch1Pin, self.Ch2Pin, self.Ch3Pin, self.Ch4Pin]
+
         self.logger.warning("Read configuration from: %s", self.config_app_file)
         return self
 
@@ -178,6 +206,14 @@ class ConfigApp:
 
     def is_debug(self) -> bool:
         return self.log_level.upper() == "DEBUG"
+
+    def getChPin(self, i_scan: int):
+        if 0 <= i_scan < 4:
+            return self.PinArray[i_scan]
+        self.logger.error(
+            "La valeur passee doit être comprise entre 0 et 4, ici: %d", i_scan
+        )
+        return -1
 
     def print(self):
         """Prints the current configuration."""
@@ -265,6 +301,10 @@ def getConfigFile():
 
 def getLogDir():
     return ConfigApp().log_dir
+
+
+def getChPin(i_scan: int):
+    return ConfigApp().getChPin(i_scan)
 
 
 if __name__ == "__main__":
