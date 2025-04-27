@@ -31,7 +31,7 @@ EndGPIO()
 
 # Etape 1 #############################################
 # Mise à jour des dates de réveil et d'arrêt du WittyPi
-# Car en développement, on peut passer la date de réveil
+# Car en développement, on peut dépasser la date de réveil
 # et dans ce cas, le WittyPi ne se reveille plus !
 # Idem si on change la batterie et qu'on repart quelques jours plus tard
 # On fait le calcul de la date de réveil systématiquement
