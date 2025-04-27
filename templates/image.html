@@ -126,6 +126,13 @@
        <p>Last image time : {{LastImgTime}}</p> 
        <p>Token : {{token[:24]}}</p>
        <p>Device : {{device}}</p>
+       
+       {% if action_output %}
+       <div class="alert alert-info mt-3">
+           <strong>Action Result:</strong> {{ action_output }}
+       </div>
+       {% endif %}
+       
        <img src = " {{url_for('static', filename=imagename)}}"width="80%", alt="Take a scan"/>      
        </div>       
 </form>
@@ -143,32 +150,12 @@ setInterval(function() {
 
 // Add JavaScript for the Send conf to server button
 document.getElementById('send-to-server').addEventListener('click', function() {
-    // First submit the form to save locally
+    // Get the form element
     const form = document.getElementById('scanner-form');
     
-    // Create a temporary form to submit
-    const tempForm = document.createElement('form');
-    tempForm.method = 'POST';
-    tempForm.action = window.location.href;
-    
-    // Copy all form data
-    const formData = new FormData(form);
-    for (const [name, value] of formData.entries()) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value;
-        tempForm.appendChild(input);
-    }
-    
-    // Add to document, submit, and remove
-    document.body.appendChild(tempForm);
-    tempForm.submit();
-    
-    // Navigate to the SendConfig route after a small delay
-    setTimeout(function() {
-        window.location.href = '/Scanner/SendConfig/{{scan_num_str}}';
-    }, 500);
+    // Change the form's action to the SendConfig route and submit it
+    form.action = "/Scanner/SendConfig/{{scan_num_str}}";
+    form.submit();
 });
 </script>
 
