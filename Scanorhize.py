@@ -22,6 +22,7 @@ from Hub import (
     updateServer,
     HubData,
     getTokens,
+    getHubId,
 )
 from ConfigApp import (
     getLogger,
@@ -173,13 +174,47 @@ def ScannerPage(scan_num_str: str):
     )
 
 
-@app.route("/Scanner/<actionName>/<scan_num_str>")
+@app.route("/Scanner/<actionName>/<scan_num_str>", methods=["GET", "POST"])
 def action(actionName: str, scan_num_str: str):
     i_scan = int(scan_num_str) - 1
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     print("action : ", actionName)
+
+    # If it's a POST request, save the form data first
+    if request.method == "POST" and request.form:
+        getLogger().warning(f"Processing form data for {Scanner.ScannerName}")
+        form = request.form
+
+        # Update Scanner object with form data (similar to ScannerPage route)
+        Scanner.resolution = ResolutionList[int(form["resolution"]) - 1] if int(form["resolution"]) <= 3 else ResolutionList[0]
+        Scanner.mode = ColorList[int(form["mode"]) - 1] if form["mode"] != Scanner.mode else Scanner.mode
+
+        # Update numeric fields with validation
+        Scanner.l = chaineIntwitherror(form["l"], Scanner.l, 0, Scanner.x_max)
+        Scanner.t = chaineIntwitherror(form["t"], Scanner.t, 0, Scanner.y_max)
+        Scanner.x = chaineIntwitherror(form["x"], Scanner.x, 0, Scanner.x_max)
+        Scanner.y = chaineIntwitherror(form["y"], Scanner.y, 0, Scanner.y_max)
+        Scanner.quality = chaineIntwitherror(form["quality"], Scanner.quality, 0, 90)
+
+        # Update other fields
+        if "token" in form and form["token"] != "":
+            Scanner.token = form["token"]
+        Scanner.UseServer = chaineIntwitherror(form["UseServer"], Scanner.UseServer, 0, 1)
+        if form["StartDate"] != "":
+            Scanner.StartDate = form["StartDate"]
+        Scanner.PeriodeS = parse_period(form["PeriodeS"])
+        Scanner.TimeBeforeScan = chaineIntwitherror(form["TimeBeforeScan"], Scanner.TimeBeforeScan, 0, 60)
+        Scanner.TimeAfterScan = chaineIntwitherror(form["TimeAfterScan"], Scanner.TimeAfterScan, 0, 60)
+        Scanner.enable = 1 if "enable" in form else 0
+
+        # Save the updated Scanner object
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        getLogger().warning(f"Saved form data for {Scanner.ScannerName}")
+
+    output_message = None
+
     if actionName == "acqimg":
         InitGPIO()
         result = ScannerPreview(Scanner, i_scan)
@@ -188,15 +223,45 @@ def action(actionName: str, scan_num_str: str):
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
     if actionName == "GetConfig":
-        ReadScannerConfigFromServer(Scanner)
+        result = ReadScannerConfigFromServer(Scanner)
+        if result == 0:
+            output_message = f"Configuration successfully downloaded from server for {Scanner.ScannerName}"
+        else:
+            output_message = f"Error downloading configuration from server for {Scanner.ScannerName}"
 
     if actionName == "SendConfig":
-        # First save locally
+        # First save locally to ensure we have the latest data
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-        # Then send to server
-        SendScannerConfigToServer(Scanner)
 
-    return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
+        # Capture the command that will be executed
+        hub_id = getHubId()
+        command = f"s3cmd --no-preserve sync {getConfigDir()}/{Scanner.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{Scanner.ScannerName}.json"
+
+        # Then send to server
+        result = SendScannerConfigToServer(Scanner)
+
+        if result == 0:
+            output_message = f"Configuration successfully sent to server for {Scanner.ScannerName}\nCommand: {command}"
+        else:
+            output_message = f"Error sending configuration to server for {Scanner.ScannerName}\nCommand: {command}"
+
+    # Update scanner parameters
+    Scanner.ScannerName = f"Scanner-{i_scan + 1}"
+    Scannerparam = updateScanParameters(Scanner)
+    # Format PeriodeS for display
+    Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
+
+    if output_message:
+        # Add the output message to the template parameters
+        Scannerparam["action_output"] = output_message
+
+    # Return the template with parameters
+    return render_template(
+        "image.html",
+        **Scannerparam,
+        scan_num_str=scan_num_str,
+        imagename=f"{i_scan + 1}.jpg"
+    )
 
 
 @app.route("/Hub", methods=["POST", "GET"])
