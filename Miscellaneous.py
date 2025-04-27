@@ -1,7 +1,6 @@
 """Miscellaneous functions"""
 
 import sys
-import json
 from subprocess import run, SubprocessError, CalledProcessError
 from time import sleep
 
@@ -17,7 +16,7 @@ from WittyPython import (
 )
 from ConfigApp import getLogger, getBatteryFile, getDisplayFile, getScanorhizeServer
 from ConfigApp import getUhubctl
-from ConfigApp import getNextDateFile, getChPin
+from ConfigApp import getChPin
 
 from OSUtils import is_raspberry_pi, has_MEGA4
 
@@ -312,46 +311,8 @@ def ReadGPIOConfig():
     return state_
 
 
-def WriteStartDateConfig(NextStartDate):
-    data = {
-        "NextStartDate1": NextStartDate[0],
-        "NextStartDate2": NextStartDate[1],
-        "NextStartDate3": NextStartDate[2],
-    }
-    try:
-        json_object = json.dumps(data, indent=len(data))
-        with open(getNextDateFile(), "w", encoding="utf-8") as outfile:
-            outfile.write(json_object)
-    except ValueError as e:
-        getLogger().error("Error writing file: %s, error: %s", getNextDateFile(), e)
-        return 1
-
-    return 0
-
-
-def ReadStartDateConfig():
-    NextStartDate = [
-        "2025-01-01T00:05:00Z",
-        "2025-01-01T00:05:00Z",
-        "2025-01-01T00:05:00Z",
-    ]
-    try:
-        with open(getNextDateFile(), "r", encoding="utf-8") as openfile:
-            data = json.load(openfile)
-    except FileNotFoundError as e:
-        getLogger().error("File not found: %s, error: %s", getNextDateFile(), e)
-
-    else:
-        NextStartDate[0] = data["NextStartDate1"]
-        NextStartDate[1] = data["NextStartDate2"]
-        NextStartDate[2] = data["NextStartDate3"]
-
-    return NextStartDate
-
-
 if __name__ == "__main__":
     print("Test unitaire Miscellaneous")
-    print(f"{getNextDateFile()}: {ReadStartDateConfig()}")
     InitGPIO()
     ReadGPIOConfig()
     initDisplayFile()
