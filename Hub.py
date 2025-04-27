@@ -360,7 +360,7 @@ def GetIP():
         cmd = "ipconfig getifaddr en13"
         return "192.168.2.20"
 
-    cmd = "hostname -I"
+        cmd = "hostname -I"
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
     )
