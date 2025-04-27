@@ -45,7 +45,6 @@ class ConfigApp:
         self.log_level: str = "INFO"
         self.log_dir: str = "Log"
         self.config_dir: str = "ConfigFile"
-        self.next_date_file: str = "NextStartDate.json"
         self.config_hub_file: str = "Hub.json"
         self.display_file: str = "Display.txt"
         self.battery_file: str = "Battery.txt"
@@ -192,13 +191,7 @@ class ConfigApp:
     def save_config(self):
         """Save the current configuration to a JSON file."""
         json_data = self.json()
-        try:
-            with open(self.config_app_file, "w", encoding="utf-8") as outfile:
-                outfile.write(json_data)
-                return 0
-        except OSError as e:
-            getLogger().error("save_config: OSError: %s", e)
-            return 1
+        return write_json_to_file(self.config_app_file, json_data)
 
     def is_prod(self) -> bool:
         """Returns True if environment is set to PROD."""
@@ -225,6 +218,25 @@ class ConfigApp:
         for key, value in self.__dict__.items():
             if key != "initialized":
                 print(f"{key}: {value}")
+
+
+def write_json_to_file(file_path: str, json_data: str) -> int:
+    """Utility function to write JSON data to a file.
+
+    Args:
+            file_path: Path to the file to write
+            json_data: JSON string to write
+
+    Returns:
+            0 on success, 1 on error
+    """
+    try:
+        with open(file_path, "w", encoding="utf-8") as outfile:
+            outfile.write(json_data)
+        return 0
+    except OSError as e:
+        getLogger().error("write_json_to_file: OSError: %s", e)
+        return 1
 
 
 def is_prod():
@@ -265,12 +277,6 @@ def getUsbDir():
 
 def getImageDir():
     return ConfigApp().image_dir
-
-
-def getNextDateFile():
-    return os.path.join(
-        os.path.expanduser(ConfigApp().config_dir), ConfigApp().next_date_file
-    )
 
 
 def getConfigHubFile():

@@ -15,6 +15,7 @@ from ConfigApp import (
     getLogger,
     getS3Bucket,
     getConfigDir,
+    write_json_to_file,
 )
 from Campaign import getUsbDir, USBSpace
 from Miscellaneous import ReadBatVoltCap, pingAPI
@@ -64,13 +65,7 @@ class HubData:
     def WriteConfig(self):
         """Save the current configuration to a JSON file."""
         json_data = self.json()
-        try:
-            with open(getConfigHubFile(), "w", encoding="utf-8") as outfile:
-                outfile.write(json_data)
-                return 0
-        except OSError as e:
-            getLogger().error("save_config: OSError: %s", e)
-            return 1
+        return write_json_to_file(getConfigHubFile(), json_data)
 
     def ReadConfig(self):
         fullpath = getConfigHubFile()
@@ -364,8 +359,8 @@ def GetIP():
     if get_os() == "MacOS":
         cmd = "ipconfig getifaddr en13"
         return "192.168.2.20"
-    else:
-        cmd = "hostname -I"
+
+    cmd = "hostname -I"
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
     )
