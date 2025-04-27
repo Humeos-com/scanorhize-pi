@@ -74,11 +74,14 @@ def ConvertDateToWitty(date: str):
     return date
 
 
-def CalculNextStartDate(StartDate: str, PeriodeS: int, DateStart: str):
+def CalculNextStartDate(DateOrigin: str, PeriodeS: int, DateStart: str):
     """Calculate the next start date for a scanner based on its configuration.
+    On prend la date d'origine et on compte le nombre de périodes
+    qui ont été parcourues depuis cette date.
+    On ajoute une période et on obtient la date du prochain déclenchement.
 
     Args:
-        StartDate (str): Initial start date in JAVA_FORMAT
+        DateOrigin (str): Initial start date in JAVA_FORMAT
         PeriodeS (int): Period in seconds between scans
         DateStart (str): Current date in JAVA_FORMAT
 
@@ -87,14 +90,14 @@ def CalculNextStartDate(StartDate: str, PeriodeS: int, DateStart: str):
     """
     try:
         # Convert dates to seconds
-        start_seconds = DateToSeconds(StartDate)
+        origin_seconds = DateToSeconds(DateOrigin)
         current_seconds = DateToSeconds(DateStart)
 
         # Calculate the number of periods that have passed
-        periods_passed = (current_seconds - start_seconds) // PeriodeS
+        periods_passed = (current_seconds - origin_seconds) // PeriodeS
 
         # Calculate the next start date
-        next_date_seconds = start_seconds + ((periods_passed + 1) * PeriodeS)
+        next_date_seconds = origin_seconds + ((periods_passed + 1) * PeriodeS)
         next_date_str = SecondsToDate(next_date_seconds)
 
         return next_date_str, next_date_seconds
@@ -112,3 +115,4 @@ if __name__ == "__main__":
     print(DateToSeconds(date_new))
     print(SecondsToDate(nb_seconds))
     print(ConvertDateToWitty(date_new))
+    print(CalculNextStartDate("2025-01-01T00:00:00Z", 3600, date_new))
