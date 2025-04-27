@@ -12,7 +12,12 @@ from subprocess import run
 
 from DateUtils import GetCurrentDate, DateToSeconds, SecondsToDate, CalculNextStartDate
 from WittyPy import SetNextStartDate, setNextShutdownDate
-from Miscellaneous import InitGPIO, TurnUsbOn, TurnUsbOff, ReadBatVoltCap
+from Miscellaneous import (
+    InitGPIO,
+    TurnUsbOn,
+    TurnUsbOff,
+    ReadBatVoltCap,
+)
 from OSUtils import is_raspberry_pi
 from ConfigApp import getDisplayFile, getConfigDir, getLogger, getImageDir
 
@@ -526,18 +531,19 @@ def calculate_and_set_next_date():
     ScannerObj = ScannerData()
     for i_scan_, CurrentScanner_ in enumerate(listScannerconfigs_):
         ScannerObj.ReadScannerConfig(CurrentScanner_)
+        nextDate, nextDateS = CalculNextStartDate(
+            ScannerObj.StartDate, ScannerObj.PeriodeS, DateStart
+        )
+        # NextStartDates toujours présent dans la config
+        NextStartDates.append(nextDate)
+        getLogger().warning("Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate)
+
+        # On utilise NextStartseconds pour calcuer le prochain réveil
         if ScannerObj.enable:
-            nextDate, nextDateS = CalculNextStartDate(
-                ScannerObj.StartDate, ScannerObj.PeriodeS, DateStart
-            )
-            NextStartDates.append(nextDate)
             NextStartseconds.append(nextDateS)
-            getLogger().warning(
-                "Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate
-            )
         else:
             getLogger().warning(
-                "Scanner-%s: Disabled, skipping next start date calculation",
+                "Scanner-%s: Disabled, skipping for next wake up calculation",
                 i_scan_ + 1,
             )
 
@@ -551,14 +557,14 @@ def calculate_and_set_next_date():
         nextStartSecs = max(int(min(NextStartseconds)), (CurrentDateinS + 600))
 
     nextStartDateValue_ = SecondsToDate(nextStartSecs)
-    getLogger().warning("Next start at: %s", nextStartDateValue_)
+    getLogger().warning("Next wake up at: %s", nextStartDateValue_)
 
     # Check battery level and adjust wake-up time if needed
     Bat = ReadBatVoltCap()
     if Bat[1] < 0:  # if battery is low, delay wake-up by 30 days
         nextStartDateValue_ = SecondsToDate(nextStartSecs + (3600 * 24 * 30))
         getLogger().warning(
-            "No more battery: start in 30 days: %s", nextStartDateValue_
+            "No more battery: wake up in 30 days: %s", nextStartDateValue_
         )
 
     # Set the next wake-up time

@@ -41,7 +41,6 @@ from Miscellaneous import (
 )
 from OSUtils import is_raspberry_pi
 
-
 initDisplayFile()
 getLogger().warning("Start Scanorhize.py")
 Hub = HubData()
@@ -63,7 +62,6 @@ SSID = GetWifiSSID()
 getLogger().warning("SSID: %s", SSID)
 IP = GetIP()
 getLogger().warning("IP: %s", IP)
-listScannerconfigs = listConfigScanner()
 
 
 # This function does not allow caching of images from browser
@@ -127,6 +125,7 @@ def format_period(seconds):
 def ScannerPage(scan_num_str: str):
     form = request.form
     Scanner = ScannerData()
+    listScannerconfigs = listConfigScanner()
     i_scan = int(scan_num_str) - 1
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     if request.method == "POST":
@@ -194,6 +193,7 @@ def ScannerPage(scan_num_str: str):
 def action(actionName: str, scan_num_str: str):
     i_scan = int(scan_num_str) - 1
     Scanner = ScannerData()
+    listScannerconfigs = listConfigScanner()
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     print("action : ", actionName)
     if actionName == "acqimg":
