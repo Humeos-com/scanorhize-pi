@@ -128,62 +128,46 @@ def ScannerPage(scan_num_str: str):
     listScannerconfigs = listConfigScanner()
     i_scan = int(scan_num_str) - 1
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
+
     if request.method == "POST":
-        print(form)
-        restmp = form["resolution"]
-        result = int(restmp, 10)
-        if result > 3:  # pas de selection
-            result = 1
-        Scanner.resolution = ResolutionList[result - 1]
-        print(Scanner.resolution)
-        modetmp = form["mode"]
-        print(modetmp, " ", Scanner.mode)
-        if modetmp != Scanner.mode:
-            mode = int(modetmp, 10)
-            Scanner.mode = ColorList[mode - 1]
+        print("Form data:", form)
 
-        tmp = request.form["l"]
-        # print("tmp=",tmp,"tmp type: ",type(tmp),"l type: ",type(Scanner.l))
-        Scanner.l = chaineIntwitherror(tmp, Scanner.l, 0, Scanner.x_max)
-        tmp = form["t"]
-        Scanner.t = chaineIntwitherror(tmp, Scanner.t, 0, Scanner.y_max)
-        tmp = form["x"]
-        Scanner.x = chaineIntwitherror(tmp, Scanner.x, 0, Scanner.x_max)
-        tmp = form["y"]
-        Scanner.y = chaineIntwitherror(tmp, Scanner.y, 0, Scanner.y_max)
-        tmp = form["quality"]
-        Scanner.quality = chaineIntwitherror(tmp, Scanner.quality, 0, 90)
-        if "token" in form:
-            tmp = form["token"]
-            if tmp != "":
-                Scanner.token = tmp
-        tmp = form["UseServer"]
-        Scanner.UseServer = chaineIntwitherror(tmp, Scanner.UseServer, 0, 1)
-        tmp = form["StartDate"]  # token vide pour non utilisation du scanner
-        if tmp != "":
-            Scanner.StartDate = tmp
-        tmp = form["PeriodeS"]
-        Scanner.PeriodeS = parse_period(tmp)
-        tmp = form["TimeBeforeScan"]
-        Scanner.TimeBeforeScan = chaineIntwitherror(tmp, Scanner.TimeBeforeScan, 0, 60)
-        tmp = form["TimeAfterScan"]
-        Scanner.TimeAfterScan = chaineIntwitherror(tmp, Scanner.TimeAfterScan, 0, 60)
-        # Handle checkbox - if not in form, it means unchecked (0)
+        # Update Scanner object with form data
+        Scanner.resolution = ResolutionList[int(form["resolution"]) - 1] if int(form["resolution"]) <= 3 else ResolutionList[0]
+        Scanner.mode = ColorList[int(form["mode"]) - 1] if form["mode"] != Scanner.mode else Scanner.mode
+
+        # Update numeric fields with validation
+        Scanner.l = chaineIntwitherror(form["l"], Scanner.l, 0, Scanner.x_max)
+        Scanner.t = chaineIntwitherror(form["t"], Scanner.t, 0, Scanner.y_max)
+        Scanner.x = chaineIntwitherror(form["x"], Scanner.x, 0, Scanner.x_max)
+        Scanner.y = chaineIntwitherror(form["y"], Scanner.y, 0, Scanner.y_max)
+        Scanner.quality = chaineIntwitherror(form["quality"], Scanner.quality, 0, 90)
+
+        # Update other fields
+        if "token" in form and form["token"] != "":
+            Scanner.token = form["token"]
+        Scanner.UseServer = chaineIntwitherror(form["UseServer"], Scanner.UseServer, 0, 1)
+        if form["StartDate"] != "":
+            Scanner.StartDate = form["StartDate"]
+        Scanner.PeriodeS = parse_period(form["PeriodeS"])
+        Scanner.TimeBeforeScan = chaineIntwitherror(form["TimeBeforeScan"], Scanner.TimeBeforeScan, 0, 60)
+        Scanner.TimeAfterScan = chaineIntwitherror(form["TimeAfterScan"], Scanner.TimeAfterScan, 0, 60)
         Scanner.enable = 1 if "enable" in form else 0
-        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
 
-        # Recalculate next start date after updating scanner configuration
+        # Save the updated Scanner object
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        print("Updated Scanner object:", Scanner.__dict__)
+
+        # Recalculate next start date
         nextStartDateValue = calculate_and_set_next_date()
         getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
-    # Format PeriodeS for display
     Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
     print("Scanner n° : " + str(i_scan + 1))
     Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
-    print(filename)
     return render_template(
         "image.html", **Scannerparam, scan_num_str=scan_num_str, imagename=filename
     )
@@ -207,6 +191,9 @@ def action(actionName: str, scan_num_str: str):
         ReadScannerConfigFromServer(Scanner)
 
     if actionName == "SendConfig":
+        # First save locally
+        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        # Then send to server
         SendScannerConfigToServer(Scanner)
 
     return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
@@ -303,14 +290,14 @@ Ping: {Hub.ping}"""
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            output="Configuration written successfully",
+            output="Configuration saved locally",
         )
     except CalledProcessError as e:
         return render_template(
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
-            output=f"Error writing configuration: {str(e)}",
+            output=f"Error saving configuration locally: {str(e)}",
         )
 
 
