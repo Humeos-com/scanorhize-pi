@@ -54,8 +54,12 @@ class ConfigApp:
         self.image_dir: str = "static"
         self.s3_bucket: str = "s3://scanorhize-images-prod"
         self.scanorhize_server: str = "scanorhize.duckdns.org"
+        # Temps en secondes pour la connexion du s3cmd
         self.connect_timeout: int = 10
+        # Temps en secondes pour la durée du s3cmd
         self.max_time: int = 300
+        # Temps max en secondes entre
+        self.delta_time: int = 300
         # Pour le relai Banggood initial
         # pins BCM
         # Ch1Pin = 19  # Scanner1
@@ -78,10 +82,10 @@ class ConfigApp:
         # CHRG_PIN = 5  # input to detect charging status
         # STDBY_PIN = 6  # input to detect standby status
         # Pour la carte USB Big 7
-        self.Ch1Pin: int # Scanner1
-        self.Ch2Pin: int # Scanner2
-        self.Ch3Pin: int # Scanner3
-        self.Ch4Pin: int # clé 4G
+        self.Ch1Pin: int  # Scanner1
+        self.Ch2Pin: int  # Scanner2
+        self.Ch3Pin: int  # Scanner3
+        self.Ch4Pin: int  # clé 4G
         self.PinArray = []
 
         # Initialize logger
@@ -293,6 +297,10 @@ def getConnectTimeout():
 
 def getMaxTime():
     return ConfigApp().max_time
+
+
+def getDeltaTime():
+    return ConfigApp().delta_time
 
 
 def getConfigFile():
