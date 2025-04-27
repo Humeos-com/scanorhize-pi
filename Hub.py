@@ -81,8 +81,6 @@ class HubData:
             getLogger().error("No file: %s", fullpath)
         else:
             self.__dict__.update(data)
-        finally:
-            self.print()
         return self
 
     def print(self):
@@ -365,6 +363,7 @@ def GetWifiSSID():
 def GetIP():
     if get_os() == "MacOS":
         cmd = "ipconfig getifaddr en13"
+        return "192.168.2.20"
     else:
         cmd = "hostname -I"
     result = run(
