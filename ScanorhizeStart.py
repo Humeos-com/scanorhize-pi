@@ -1,5 +1,7 @@
-"""Lance le scanner et programme le prochain réveil"
+"""Lance le scanner et programme le prochain réveil
 On gère les GPIO pour la carte 4G depuis ce programme
+Si jamais il y a un plantage de ScanorhizeProcess.py,
+ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 """
 
 import sys
@@ -16,9 +18,9 @@ from Miscellaneous import (
     ReadBatVoltCap,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
-from ConfigApp import is_dev, getLogger
+from ConfigApp import is_debug, getLogger
 from Scanner import listConfigScanner, ScannerData, calculate_and_set_next_date
-from Hub import HubData, SendParameters, syncImageFiles, ReadScannerConfigFromServer
+from Hub import HubData, SendParameters, syncImageFiles, ReadScannerConfigFromServer, getOffline, getSyncImages, getTodo, SendHubConfigToServer, ReadHubConfigFromServer
 from Campaign import USBSpace
 
 
@@ -46,6 +48,7 @@ if config == 0:
     if enable4G():
         getLogger().warning("4G enabled")
 
+    # En principe, on éteint le Raspberry Pi depuis l'application Web Scanorhize.py
     cmd = "nohup python3 Scanorhize.py > /dev/null 2>&1 &"
     getLogger().warning(cmd)
     result = run(
@@ -76,80 +79,86 @@ except CalledProcessError as exc:
 
 
 # Etape 3 #############################################
-# Transfert des données
-# C'est à partir de cette étape qu'on a de la connectivité
-# et qu'on peut
-try:
-    # On allume la clé 4G et on attend d'avoir le réseau
-    enable4G()
-    # Teste la connectivité
-    check_connectivity()
+# Mise à jour des paramètres
+Hub = HubData()
+Hub.ReadConfig()
+volt, Hub.batteryLevelPercent = ReadBatVoltCap()
+Hub.diskSpacePercent = USBSpace()[0] / 1000
+Hub.temperature = ReadTemp()
+# On sauvegarde les paramètres pour envoi à la plateforme
+Hub.WriteConfig()
 
-    # On synchronise l'horloge de la carte WittyPi avec le serveur
+getLogger().warning(
+    "Bat: %s  USB: %s  Temp: %s",
+    Hub.batteryLevelPercent,
+    Hub.diskSpacePercent,
+    Hub.temperature,
+)
+
+if not getOffline():
+    # Transfert des données
     try:
-        cmd = "sudo ./TimeSynchronisation.sh"
-        getLogger().warning(cmd)
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-        )
-    except CalledProcessError as exc:
-        getLogger().error(exc.stderr)
+        # On allume la clé 4G et on attend d'avoir le réseau
+        enable4G()
+        # Teste la connectivité
+        check_connectivity()
 
-    #
-    # Etape 4 #############################################
-    # On lance un sous programme qui met à jour toutes les données sur la plateforme
-    # On échange avec la plateforme Web pour envoyer les images et les paramètres
+        # On synchronise l'horloge de la carte WittyPi avec le serveur
+        try:
+            cmd = "sudo ./TimeSynchronisation.sh"
+            getLogger().warning(cmd)
+            result = run(
+                cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+            )
+        except CalledProcessError as exc:
+            getLogger().error(exc.stderr)
 
-    # On récupère les configs des scanners depuis la plateforme / le S3 ??
-    # avec la TODO liste
-    # selon le flag Scanner.UseServer
+        # Etape 4 #############################################
+        # On lance un sous programme qui met à jour toutes les données sur la plateforme
+        # On échange avec la plateforme Web pour envoyer les images et les paramètres
 
-    # Paramètres
-    Hub = HubData()
-    Hub.ReadConfig()
-    volt, Hub.batteryLevelPercent = ReadBatVoltCap()
-    Hub.diskSpacePercent = USBSpace()[0] / 1000
-    Hub.temperature = ReadTemp()
-    Hub.WriteConfig()
+        # On récupère les configs des scanners depuis la plateforme / le S3 ??
+        # selon le flag Scanner.UseServer
 
-    getLogger().warning(
-        "Bat: %s  USB: %s  Temp: %s",
-        Hub.batteryLevelPercent,
-        Hub.diskSpacePercent,
-        Hub.temperature,
-    )
-    SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
-    syncImageFiles(Hub)
+        SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
+        SendHubConfigToServer()
+        if Hub.use_server():
+            GetHubConfigFromServer()
+        
+        # On peut travailler sans synchroniser les images si le réseau est mauvais
+        # ou si les images sont trop grosses pour le réseau
+        if getSyncImages():
+            syncImageFiles(Hub)
 
-    # On recupère les configuration des Scanners en fonction de use_server
-    # sauf qu'on n'écrase pas les 2 attributs LastImgFile et LastImgTime
-    # qui sont déjà présents dans la classe ScannerData
-    Scanner = ScannerData()
-    for CurrentScanner in listConfigScanner():
-        Scanner.ReadScannerConfig(CurrentScanner)
-        if Scanner.UseServer:
-            last_img_file_save = Scanner.LastImgFile
-            last_img_time_save = Scanner.LastImgTime
-            ReadScannerConfigFromServer(Scanner)
-            # Relecture de la nouvelle config
+        # On recupère les configuration des Scanners en fonction de use_server
+        # sauf qu'on n'écrase pas les 2 attributs LastImgFile et LastImgTime
+        # qui sont déjà présents dans la classe ScannerData
+        Scanner = ScannerData()
+        for CurrentScanner in listConfigScanner():
             Scanner.ReadScannerConfig(CurrentScanner)
-            # On remet les 2 attributs LastImgFile et LastImgTime
-            # à leurs valeurs précédentes
-            Scanner.LastImgFile = last_img_file_save
-            Scanner.LastImgTime = last_img_time_save
-            Scanner.WriteScannerConfig(CurrentScanner)
+            if Scanner.UseServer:
+                last_img_file_save = Scanner.LastImgFile
+                last_img_time_save = Scanner.LastImgTime
+                ReadScannerConfigFromServer(Scanner)
+                # Relecture de la nouvelle config
+                Scanner.ReadScannerConfig(CurrentScanner)
+                # On remet les 2 attributs LastImgFile et LastImgTime
+                # à leurs valeurs précédentes
+                Scanner.LastImgFile = last_img_file_save
+                Scanner.LastImgTime = last_img_time_save
+                Scanner.WriteScannerConfig(CurrentScanner)
 
-except RuntimeError as exc:
-    getLogger().error(exc)
+    except RuntimeError as exc:
+        getLogger().error(exc)
 
-finally:
-    # On éteint la clé 4G
-    disable4G()
-
+    finally:
+        # On éteint la clé 4G
+        disable4G()
+# fin getOffline()
 
 # Etape 4 #############################################
 # On éteint le Raspberry Pi et le WittyPi
-if is_dev():
+if is_debug():  # Debug mode
     getLogger().warning(
         "Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé"
     )
