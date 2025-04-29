@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Terminal=true
-StartupNotify=true
-Name=Scanorhize
-Comment=exécute mon script
-Exec=/home/pi/Documents/Scanorhize/Raccourci/Scanorhize.sh
-Categories=Application; 
-X-KeepTerminal=true
