@@ -2,8 +2,9 @@
 
 from subprocess import run, CalledProcessError
 from time import sleep
+import os
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from Scanner import (
     ScannerData,
     ScannerPreview,
@@ -34,6 +35,8 @@ from ConfigApp import (
     getConfigDir,
     getImageDir,
     getLogDir,
+    ConfigApp,
+    CONFIG_APP_FILE
 )
 from Miscellaneous import (
     chaineIntwitherror,
@@ -363,14 +366,108 @@ Ping: {Hub.ping}"""
 
 @app.route("/App", methods=["GET"])
 def AppPage():
-    # Format ConfigApp attributes for display
-    app_config = f"""Config Directory: {getConfigDir()}
-Image Directory: {getImageDir()}
-Log Directory: {getLogDir()}
-Display File: {getDisplayFile()}
-Debug Mode: {is_debug()}"""
+    # Get ConfigApp instance
+    config = ConfigApp()
+
+    # Create dictionary with all relevant attributes
+    app_config = {
+        "environment": config.environment,  # Always use the environment variable
+        "config_app_file": config.config_app_file,
+        "log_level": config.log_level,
+        "config_dir": config.config_dir,
+        "config_hub_file": config.config_hub_file,
+        "display_file": config.display_file,
+        "battery_file": config.battery_file,
+        "usb_dir": config.usb_dir,
+        "image_dir": config.image_dir,
+        "s3_bucket": config.s3_bucket,
+        "scanorhize_server": config.scanorhize_server
+    }
 
     return render_template("App.html", app_config=app_config)
+
+
+@app.route("/get-app-config", methods=["GET"])
+def get_app_config():
+    try:
+        # Get the requested environment from query parameters
+        requested_env = request.args.get("environment", "PROD")
+
+        # Create a temporary ConfigApp instance with the requested environment
+        temp_config = ConfigApp()
+        temp_config.environment = requested_env
+        temp_config.config_app_file = f"{CONFIG_APP_FILE}-{requested_env.lower()}.json"
+
+        # Load the configuration for the requested environment
+        temp_config.load_config()
+
+        # Create dictionary with all relevant attributes
+        app_config = {
+            "environment": temp_config.environment,
+            "config_app_file": temp_config.config_app_file,
+            "log_level": temp_config.log_level,
+            "config_dir": temp_config.config_dir,
+            "config_hub_file": temp_config.config_hub_file,
+            "display_file": temp_config.display_file,
+            "battery_file": temp_config.battery_file,
+            "usb_dir": temp_config.usb_dir,
+            "image_dir": temp_config.image_dir,
+            "s3_bucket": temp_config.s3_bucket,
+            "scanorhize_server": temp_config.scanorhize_server
+        }
+
+        return jsonify(app_config)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/update-app-config", methods=["POST"])
+def update_app_config():
+    try:
+        # Get the new values from the form
+        new_log_level = request.form.get("log_level")
+        new_usb_dir = request.form.get("usb_dir")
+
+        if new_log_level not in ["WARNING", "INFO", "DEBUG"]:
+            return render_template("App.html",
+                                app_config=ConfigApp().__dict__,
+                                output="Invalid log level value. Must be WARNING, INFO, or DEBUG.")
+
+        # Get ConfigApp instance
+        config = ConfigApp()
+        config.log_level = new_log_level
+        config.usb_dir = new_usb_dir
+
+        # Save the configuration
+        if config.save_config() == 0:
+            # Reload the configuration to get the correct attributes
+            config.load_config()
+            output = f"Configuration updated successfully. Log level set to {new_log_level}"
+        else:
+            output = "Error saving configuration"
+
+        # Recreate app_config with updated values
+        app_config = {
+            "environment": config.environment,
+            "config_app_file": config.config_app_file,
+            "log_level": config.log_level,
+            "config_dir": config.config_dir,
+            "config_hub_file": config.config_hub_file,
+            "display_file": config.display_file,
+            "battery_file": config.battery_file,
+            "usb_dir": config.usb_dir,
+            "image_dir": config.image_dir,
+            "s3_bucket": config.s3_bucket,
+            "scanorhize_server": config.scanorhize_server
+        }
+
+        return render_template("App.html", app_config=app_config, output=output)
+
+    except Exception as e:
+        return render_template("App.html",
+                            app_config=ConfigApp().__dict__,
+                            output=f"Error updating configuration: {str(e)}")
 
 
 @app.route("/write_config", methods=["GET", "POST"])
