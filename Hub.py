@@ -10,8 +10,6 @@ import json
 from ConfigApp import (
     getConfigHubFile,
     getScanorhizeServer,
-    getConnectTimeout,
-    getMaxTime,
     getLogger,
     getS3Bucket,
     getConfigDir,
@@ -47,6 +45,23 @@ class HubData:
         self.batteryLevelPercent: int = 0
         self.diskSpacePercent: int = 0
         self.temperature: float = 0
+        # Est-ce qu'on récupère la configuration depuis le serveur ?
+        self.use_server: bool = True
+        # Temps en secondes pour la connexion du s3cmd
+        self.connect_timeout: int = 10
+        # Temps en secondes pour la durée du s3cmd
+        self.max_time: int = 300
+        # Temps max en secondes entre
+        self.delta_time: int = 300
+        # Mode connecté ou offline (on n'alluma pas la 4G)
+        self.offline: bool = False
+        # On synchronise les images ou non
+        # si self.offline = True, alors on ne synchronise pas les images
+        self.sync_images: bool = True
+        # todo.sh to run ?
+        # si self.todo = True, alors on va chercher le fichier todo.sh
+        # et on va l'exécuter au réveil suivant
+        self.todo: bool = False
 
         self.initialized = True  # Mark as initialized
         self.ReadConfig()
@@ -84,6 +99,34 @@ class HubData:
         for key, value in self.__dict__.items():
             if key != "initialized":
                 print(f"{key}: {value}")
+
+
+def getConnectTimeout():
+    return HubData().connect_timeout
+
+
+def getMaxTime():
+    return HubData().max_time
+
+
+def getDeltaTime():
+    return HubData().delta_time
+
+
+def getOffline():
+    return HubData().offline
+
+
+def getSyncImages():
+    return HubData().sync_images
+
+
+def getTodo():
+    return HubData().todo
+
+
+def getUseServer():
+    return HubData().use_server
 
 
 def updateServer(server: HubData):

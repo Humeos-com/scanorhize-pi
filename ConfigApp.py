@@ -33,16 +33,16 @@ class ConfigApp:
         self.environment = os.getenv("APP_ENV", "PROD")
         if self.environment == "DEV":
             self.config_app_file = f"{CONFIG_APP_FILE}-dev.json"
-            self.log_level = "DEBUG"
         else:
             self.config_app_file = f"{CONFIG_APP_FILE}-prod.json"
 
         if os.path.exists("DEBUG") or os.environ.get("DEBUG", False):
             self.log_level = "DEBUG"
+        else:
+            self.log_level = "INFO"
 
         # Type hints for required attributes
         self.config_app_file: str
-        self.log_level: str = "INFO"
         self.log_dir: str = "Log"
         self.config_dir: str = "ConfigFile"
         self.config_hub_file: str = "Hub.json"
@@ -53,12 +53,6 @@ class ConfigApp:
         self.image_dir: str = "static"
         self.s3_bucket: str = "s3://scanorhize-images-prod"
         self.scanorhize_server: str = "scanorhize.duckdns.org"
-        # Temps en secondes pour la connexion du s3cmd
-        self.connect_timeout: int = 10
-        # Temps en secondes pour la durée du s3cmd
-        self.max_time: int = 300
-        # Temps max en secondes entre
-        self.delta_time: int = 300
         # Pour le relai Banggood initial
         # pins BCM
         # Ch1Pin = 19  # Scanner1
@@ -101,7 +95,7 @@ class ConfigApp:
     def setup_basic_logging(self):
         """Setup initial basic logging"""
         logging.basicConfig(
-            level=logging.INFO,
+            level=self.log_level,
             format="%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
@@ -295,18 +289,6 @@ def getS3Bucket():
 
 def getScanorhizeServer():
     return ConfigApp().scanorhize_server
-
-
-def getConnectTimeout():
-    return ConfigApp().connect_timeout
-
-
-def getMaxTime():
-    return ConfigApp().max_time
-
-
-def getDeltaTime():
-    return ConfigApp().delta_time
 
 
 def getConfigFile():
