@@ -23,6 +23,8 @@ from Hub import (
     HubData,
     getTokens,
     getHubId,
+    ReadHubConfigFromServer,
+    SendHubConfigToServer,
 )
 from ConfigApp import (
     getLogger,
@@ -184,7 +186,7 @@ def action(actionName: str, scan_num_str: str):
 
     # If it's a POST request, save the form data first
     if request.method == "POST" and request.form:
-        getLogger().warning(f"Processing form data for {Scanner.ScannerName}")
+        getLogger().warning("Processing form data for %s", Scanner.ScannerName)
         form = request.form
 
         # Update Scanner object with form data (similar to ScannerPage route)
@@ -211,7 +213,7 @@ def action(actionName: str, scan_num_str: str):
 
         # Save the updated Scanner object
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-        getLogger().warning(f"Saved form data for {Scanner.ScannerName}")
+        getLogger().warning("Saved form data for %s", Scanner.ScannerName)
 
     output_message = None
 
@@ -279,7 +281,18 @@ Ping: {Hub.ping}"""
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
 
-    return render_template("Hub.html", **updateServer(Hub), hub_config=hub_config)
+    return render_template(
+        "Hub.html",
+        **updateServer(Hub),
+        hub_config=hub_config,
+        use_server=Hub.use_server,
+        connect_timeout=Hub.connect_timeout,
+        max_time=Hub.max_time,
+        delta_time=Hub.delta_time,
+        offline=Hub.offline,
+        sync_images=Hub.sync_images,
+        todo=Hub.todo
+    )
 
 
 @app.route("/update_version", methods=["GET"])
@@ -300,6 +313,13 @@ Ping: {Hub.ping}"""
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
             output="No update, not on Raspberry Pi",
         )
     try:
@@ -313,13 +333,30 @@ Ping: {Hub.ping}"""
             check=False,
         )
         return render_template(
-            "Hub.html", **updateServer(Hub), hub_config=hub_config, output=result.stdout
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
+            output=result.stdout
         )
     except CalledProcessError as e:
         return render_template(
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
             output=f"Command failed: {e.stderr}",
         )
 
@@ -336,9 +373,24 @@ Debug Mode: {is_debug()}"""
     return render_template("App.html", app_config=app_config)
 
 
-@app.route("/write_config", methods=["GET"])
+@app.route("/write_config", methods=["GET", "POST"])
 def write_config():
     try:
+        # If this is a POST request, update the Hub settings first
+        if request.method == "POST":
+            form = request.form
+            # Update Hub object with form data
+            Hub.use_server = "use_server" in form
+            # Parse numeric values with validation
+            Hub.connect_timeout = int(form.get("connect_timeout", 10))
+            Hub.max_time = int(form.get("max_time", 300))
+            Hub.delta_time = int(form.get("delta_time", 300))
+            # Handle checkboxes
+            Hub.offline = "offline" in form
+            Hub.sync_images = "sync_images" in form
+            Hub.todo = "todo" in form
+
+        # Save the Hub configuration
         Hub.WriteConfig()
         hub_config = f"""Model: {Hub.model}
 MAC Address: {Hub.macAddress}
@@ -355,18 +407,44 @@ Ping: {Hub.ping}"""
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
             output="Configuration saved locally",
         )
-    except CalledProcessError as e:
+    except Exception as e:
+        # Recreate hub_config in the exception handler
+        hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent} GB
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
+
+        if is_debug():
+            hub_config += f"\nToken: {Hub.token}"
+
         return render_template(
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
             output=f"Error saving configuration locally: {str(e)}",
         )
 
 
-@app.route("/init-hub", methods=["GET"])
+@app.route("/init_hub", methods=["GET", "POST"])
 def init_hub():
     getLogger().warning("Start init-hub")
     hub_config = f"""Model: {Hub.model}
@@ -387,18 +465,31 @@ Ping: {Hub.ping}"""
                 "Hub.html",
                 **updateServer(Hub),
                 hub_config=hub_config,
+                use_server=Hub.use_server,
+                connect_timeout=Hub.connect_timeout,
+                max_time=Hub.max_time,
+                delta_time=Hub.delta_time,
+                offline=Hub.offline,
+                sync_images=Hub.sync_images,
+                todo=Hub.todo,
                 output="Failed to get tokens",
             )
 
-        getLogger().warning(
-            "Start InitScanners"
-        )  # Run initScanners() to initialize scanners
+        getLogger().warning("Start InitScanners")
+        # Run initScanners() to initialize scanners
         initScanners()
         getLogger().warning("End init-hub")
         return render_template(
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
             output="Hub initialized successfully",
         )
     except (OSError, ValueError) as e:
@@ -406,11 +497,18 @@ Ping: {Hub.ping}"""
             "Hub.html",
             **updateServer(Hub),
             hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
             output=f"Error: {str(e)}",
         )
 
 
-@app.route("/poweroff", methods=["GET"])
+@app.route("/poweroff", methods=["POST"])
 def stop_server():
     result = run(
         "sudo poweroff", shell=True, capture_output=True, text=True, check=False
@@ -418,10 +516,113 @@ def stop_server():
     return result.stdout
 
 
+@app.route("/send-hub-config", methods=["GET"])
+def send_hub_config():
+    try:
+        # First ensure we have the latest config saved locally
+        Hub.WriteConfig()
+
+        # Then send to server
+        result = SendHubConfigToServer()
+
+        hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent} GB
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
+
+        if is_debug():
+            hub_config += f"\nToken: {Hub.token}"
+
+        if result == 0:
+            output = "Configuration successfully sent to server"
+        else:
+            output = "Error sending configuration to server"
+
+        return render_template(
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
+            output=output
+        )
+    except Exception as e:
+        return render_template(
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
+            output=f"Error sending configuration to server: {str(e)}"
+        )
+
+@app.route("/get-hub-config", methods=["GET"])
+def get_hub_config():
+    try:
+        result = ReadHubConfigFromServer()
+
+        hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery Level: {Hub.batteryLevelPercent}%
+Disk Space: {Hub.diskSpacePercent} GB
+Temperature: {Hub.temperature}°C
+Ping: {Hub.ping}"""
+
+        if is_debug():
+            hub_config += f"\nToken: {Hub.token}"
+
+        if result == 0:
+            output = "Configuration successfully downloaded from server"
+        else:
+            output = "Error downloading configuration from server"
+
+        return render_template(
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
+            output=output
+        )
+    except Exception as e:
+        return render_template(
+            "Hub.html",
+            **updateServer(Hub),
+            hub_config=hub_config,
+            use_server=Hub.use_server,
+            connect_timeout=Hub.connect_timeout,
+            max_time=Hub.max_time,
+            delta_time=Hub.delta_time,
+            offline=Hub.offline,
+            sync_images=Hub.sync_images,
+            todo=Hub.todo,
+            output=f"Error downloading configuration from server: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
     if is_prod():
         # Run Flask in production mode for background execution
-        app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=8080, debug=is_debug(), use_reloader=is_debug())
     else:
         # Run Flask in production mode for background execution
-        app.run(host="0.0.0.0", port=8080, debug=is_debug(), use_reloader=True)
+        app.run(host="0.0.0.0", port=8080, debug=is_debug(), use_reloader=is_debug())
