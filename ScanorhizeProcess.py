@@ -2,12 +2,12 @@
 Fait l'acquisition des images selon les paramètres des scanners
 Si cette tâche est lancée, c'est suite à un réveil du WittyPi.
 C'est qu'il y a probablement des acquisitions à faire.
-Donc chaque scanner va regarder si sa date de déclenchement se trouve dans les 10 minutes avant
+Chaque scanner va regarder si sa date de déclenchement se trouve dans les 10 minutes (delta_time) avant
 la date courante.
 En effet, on démarre le WittyPi à la date théorique d'acquisition.
 Mais, quand on est dans ce processus, la date est donc passée (temps du boot, etc...) mais de quelques minutes.
-On se laisse une marge de 10 minutes pour considérer qu'il faut lancer l'acquisition.
-Si on est au delà des 10 minutes, on ne fait rien, c'est qu'on a allumé le WittyPi à la main.
+On se laisse une marge de delta_time pour considérer qu'il faut lancer l'acquisition.
+Si on est au delà de delta_time, on ne fait rien, c'est qu'on a allumé le WittyPi à la main.
 
 Les images sont stockées sur le disque USB
 Les images seront envoyées par le processus ScanorhizeStart.py
@@ -16,7 +16,8 @@ Les images seront envoyées par le processus ScanorhizeStart.py
 from time import sleep
 from os import path
 
-from ConfigApp import getLogger, getDeltaTime
+from ConfigApp import getLogger
+from Hub import getDeltaTime
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Miscellaneous import (
@@ -55,7 +56,7 @@ for CurrentScanner in listScannerconfigs:
         Scanner.StartDate, Scanner.PeriodeS, CurrentDate
     )
     NextStartseconds = NextStartseconds - Scanner.PeriodeS
-    # On déclenche l'acquisition si la date courante voisine à DeltaTime près de la date de déclenchement
+    # On déclenche l'acquisition si la date courante voisine à "DeltaTime près" de la date de déclenchement
     if (
         CurrentDateinS > DateOriginS
         and NextStartseconds <= CurrentDateinS <= NextStartseconds + getDeltaTime()
