@@ -122,9 +122,9 @@ if not getOffline():
 
         SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
         SendHubConfigToServer()
-        if Hub.use_server():
-            GetHubConfigFromServer()
-        
+        if Hub.use_server:
+            ReadHubConfigFromServer()
+
         # On peut travailler sans synchroniser les images si le réseau est mauvais
         # ou si les images sont trop grosses pour le réseau
         if getSyncImages():
