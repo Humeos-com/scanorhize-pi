@@ -1,46 +1,33 @@
 {% extends "base.html" %}
+{%block title%}
+{%endblock%}
 {%block content%}
-<div class="row">
-	<div class="col-sm">
-		<div class="row">
-			<div class="col-sm">
-				<p>Scanner-1</p>
-				<img src = "{{url_for('static', filename=imagename1)}}" width="100%", alt="No image for Scanner-1"/>
-			</div>	
-			<div class="col-sm">
-				<p>Scanner-2</p>
-				<img src = "{{url_for('static', filename=imagename2)}}" width="100%", alt="No image for Scanner-2"/>
-			</div>		
-			<div class="col-sm">
-				<p>Scanner-3</p>
-				<img src = "{{url_for('static', filename=imagename3)}}" width="100%", alt="No image for Scanner-3"/>
-			</div>
-		</div>	
+<div class="container">
+  <!-- Content here -->  
+	<H1>Scanorhize</H1>	
+	<div class="row">
+		<div class="col-md-4">
+			<img src = " {{url_for('static', filename=imagename1)}}"width="100%", alt="Take a scan"/>
+		</div>
+		<div class="col-md-4">
+			<img src = " {{url_for('static', filename=imagename2)}}"width="100%", alt="Take a scan"/>
+		</div>
+		<div class="col-md-4">
+			<img src = " {{url_for('static', filename=imagename3)}}"width="100%", alt="Take a scan"/>
+		</div>
 	</div>
-	<div class="col-sm">
-	<form action = "#" method = "post">
-		<button type="submit" class="btn btn-primary">Stop Process</button>
-	</form>
-	<pre id="output"></pre>
+	
+	<pre id="display" class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></pre>
 	<script>
-	var output = document.getElementById('output');
-
+	var display = document.getElementById('display');
 	var xhr = new XMLHttpRequest();
 	xhr.open('GET', "{{url_for('stream')}}", true);
 	xhr.send();
 
 	setInterval(function() {
-		output.textContent = xhr.responseText;
+		display.textContent = xhr.responseText;
 	}, 2000);
 	</script>
-	</div>
-</div>
-
-
-	
-	
-
-
-       
+</div>        
 {%endblock%}
 

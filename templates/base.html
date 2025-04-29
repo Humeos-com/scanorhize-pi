@@ -18,6 +18,7 @@
                         <a class="nav-link" href="/Scanner/2"><button type="button" class="btn btn-secondary btn-lg">Scanner-2</button></a> 
                         <a class="nav-link" href="/Scanner/3"><button type="button" class="btn btn-secondary btn-lg">Scanner-3</button></a>                        
                         <a class="nav-link" href="/App"><button type="button" class="btn btn-secondary btn-lg">App</button></a> 
+                        <a class="nav-link"><button type="button" class="btn btn-danger btn-lg" id="poweroff-btn">Poweroff</button></a> 
                                               
             </div>
       </div>     
@@ -33,5 +34,27 @@
       <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
       <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>      
+      
+      <script>
+      // Add JavaScript for the Poweroff button
+      document.getElementById('poweroff-btn').addEventListener('click', function() {
+          if (confirm('Are you sure you want to power off the Hub?')) {
+              fetch("{{url_for('stop_server')}}", {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  }
+              }).then(response => {
+                  if (response.ok) {
+                      alert('Hub is powering off...');
+                  } else {
+                      alert('Error powering off the Hub');
+                  }
+              }).catch(error => {
+                  alert('Error powering off the Hub: ' + error);
+              });
+          }
+      });
+      </script>
    </body>   
 </html>

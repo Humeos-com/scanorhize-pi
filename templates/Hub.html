@@ -20,32 +20,6 @@
 							<small class="form-text text-muted">Download configuration from server</small>
 						</div>
 						
-						<div class="form-group">
-							<label for="connect_timeout">Connection Timeout (seconds)</label>
-							<input type="text" class="form-control" id="connect_timeout" name="connect_timeout" value="{{ connect_timeout }}" onblur="validateTimeout(this, 10, 60)">
-							<small class="form-text text-muted">Timeout for s3cmd connections (10-60 seconds)</small>
-						</div>
-						
-						<div class="form-group">
-							<label for="max_time">Maximum Time (seconds)</label>
-							<input type="text" class="form-control" id="max_time" name="max_time" value="{{ max_time }}" onblur="validateTimeout(this, 60, 600)">
-							<small class="form-text text-muted">Maximum duration for s3cmd operations (60-600 seconds)</small>
-						</div>
-					</div>
-					
-					<div class="col-md-6">
-						<div class="form-group">
-							<label for="delta_time">Delta Time (seconds)</label>
-							<input type="text" class="form-control" id="delta_time" name="delta_time" value="{{ delta_time }}" onblur="validateTimeout(this, 180, 3600)">
-							<small class="form-text text-muted">Maximum time between operations (180-3600 seconds)</small>
-						</div>
-						
-						<div class="form-check mb-3">
-							<input type="checkbox" class="form-check-input" id="offline" name="offline" {% if offline %}checked{% endif %} onchange="warnOffline(this)">
-							<label class="form-check-label" for="offline">Offline Mode</label>
-							<small class="form-text text-muted">Don't enable 4G connection</small>
-						</div>
-						
 						<div class="form-check mb-3">
 							<input type="checkbox" class="form-check-input" id="sync_images" name="sync_images" {% if sync_images %}checked{% endif %}>
 							<label class="form-check-label" for="sync_images">Synchronize Images</label>
@@ -57,6 +31,32 @@
 							<label class="form-check-label" for="todo">Run Todo Script</label>
 							<small class="form-text text-muted">Execute todo.sh on next wake-up</small>
 						</div>
+						
+						<div class="form-check mb-3">
+							<input type="checkbox" class="form-check-input" id="offline" name="offline" {% if offline %}checked{% endif %} onchange="warnOffline(this)">
+							<label class="form-check-label" for="offline">Offline Mode</label>
+							<small class="form-text text-muted">Don't enable 4G connection</small>
+						</div>
+					</div>
+					
+					<div class="col-md-6">
+						<div class="form-group">
+							<label for="connect_timeout">Connection Timeout (seconds)</label>
+							<input type="text" class="form-control" id="connect_timeout" name="connect_timeout" value="{{ connect_timeout }}" onblur="validateTimeout(this, 10, 60)">
+							<small class="form-text text-muted">Timeout for s3cmd connections (10-60 seconds)</small>
+						</div>
+						
+						<div class="form-group">
+							<label for="max_time">Maximum Time (seconds)</label>
+							<input type="text" class="form-control" id="max_time" name="max_time" value="{{ max_time }}" onblur="validateTimeout(this, 60, 600)">
+							<small class="form-text text-muted">Maximum duration for s3cmd operations (60-600 seconds)</small>
+						</div>
+						
+						<div class="form-group">
+							<label for="delta_time">Delta Time (seconds)</label>
+							<input type="text" class="form-control" id="delta_time" name="delta_time" value="{{ delta_time }}" onblur="validateTimeout(this, 180, 3600)">
+							<small class="form-text text-muted">Maximum time between operations (180-3600 seconds)</small>
+						</div>
 					</div>
 				</div>
 				
@@ -66,9 +66,8 @@
 					<button type="submit" class="btn btn-primary" formaction="{{url_for('update_version')}}">Update version</button>
 					<button type="submit" class="btn btn-primary" id="send-to-server">Send conf to server</button>
 					<a href="{{url_for('get_hub_config')}}" class="btn btn-primary">Get conf from server</a>
-					<button type="button" class="btn btn-danger" id="poweroff-btn">Poweroff</button>
 				</div>
-			</form>
+	</form>
 		</div>
 	</div>
 	
@@ -89,9 +88,7 @@
 	setInterval(function() {
 		display.textContent = xhr.responseText;
 	}, 2000);
-	</script>
 
-	<script>
 	function warnOffline(checkbox) {
 		if (checkbox.checked) {
 			if (!confirm("WARNING: Enabling Offline mode will prevent images from being sent to the platform. Are you sure you want to continue?")) {
@@ -152,26 +149,6 @@
 		setTimeout(function() {
 			window.location.href = "/send-hub-config";
 		}, 500);
-	});
-
-	// Add JavaScript for the Poweroff button
-	document.getElementById('poweroff-btn').addEventListener('click', function() {
-		if (confirm('Are you sure you want to power off the Hub?')) {
-			fetch("{{url_for('stop_server')}}", {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			}).then(response => {
-				if (response.ok) {
-					alert('Hub is powering off...');
-				} else {
-					alert('Error powering off the Hub');
-				}
-			}).catch(error => {
-				alert('Error powering off the Hub: ' + error);
-			});
-		}
 	});
 	</script>
 </div>        

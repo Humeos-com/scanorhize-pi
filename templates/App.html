@@ -3,6 +3,145 @@
 <div class="container">
   <!-- Content here -->  
 	<H1>Application Configuration</H1>	
-	<pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ app_config }}</pre>
+	<div class="card mb-4">
+		<div class="card-header">
+			<h4>System Configuration</h4>
+		</div>
+		<div class="card-body">
+			<form id="app-config-form">
+				<div class="row">
+					<div class="col-md-6">
+						<div class="form-group mb-3">
+							<label>Environment</label>
+							<input type="text" class="form-control" id="environment" name="environment" value="{{ app_config.environment }}" readonly>
+							<small class="form-text text-muted">Current environment (set by APP_ENV)</small>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Config File</label>
+							<input type="text" class="form-control" id="config_app_file" value="{{ app_config.config_app_file }}" readonly>
+							<small class="form-text text-muted">Current configuration file</small>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label for="log_level">Log Level</label>
+							<select class="form-control" id="log_level" name="log_level">
+								<option value="WARNING" {% if app_config.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+								<option value="INFO" {% if app_config.log_level == 'INFO' %}selected{% endif %}>INFO</option>
+								<option value="DEBUG" {% if app_config.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+							</select>
+							<small class="form-text text-muted">Application logging level</small>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Config Directory</label>
+							<input type="text" class="form-control" id="config_dir" value="{{ app_config.config_dir }}" readonly>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Config Hub File</label>
+							<input type="text" class="form-control" id="config_hub_file" value="{{ app_config.config_hub_file }}" readonly>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Display File</label>
+							<input type="text" class="form-control" id="display_file" value="{{ app_config.display_file }}" readonly>
+						</div>
+					</div>
+					
+					<div class="col-md-6">
+						<div class="form-group mb-3">
+							<label>USB Directory</label>
+							<input type="text" class="form-control" id="usb_dir" name="usb_dir" value="{{ app_config.usb_dir }}">
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Image Directory</label>
+							<input type="text" class="form-control" id="image_dir" value="{{ app_config.image_dir }}" readonly>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>S3 Bucket</label>
+							<input type="text" class="form-control" id="s3_bucket" value="{{ app_config.s3_bucket }}" readonly>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Server</label>
+							<input type="text" class="form-control" id="scanorhize_server" value="{{ app_config.scanorhize_server }}" readonly>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label>Battery File</label>
+							<input type="text" class="form-control" id="battery_file" value="{{ app_config.battery_file }}" readonly>
+						</div>
+					</div>
+				</div>
+				
+				<div class="mt-3">
+					<button type="button" class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
+				</div>
+			</form>
+		</div>
+	</div>
+	
+	{% if output %}
+	<div class="mt-3">
+		<h4>Output:</h4>
+		<pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ output }}</pre>
+	</div>
+	{% endif %}
+	
+	<pre id="display" class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></pre>
+	<script>
+	var display = document.getElementById('display');
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', "{{url_for('stream')}}", true);
+	xhr.send();
+
+	setInterval(function() {
+		display.textContent = xhr.responseText;
+	}, 2000);
+
+	function updateEnvironment(environment) {
+		fetch(`/get-app-config?environment=${environment}`)
+			.then(response => response.json())
+			.then(data => {
+				// Update all form fields with the new values
+				document.getElementById('config_app_file').value = data.config_app_file;
+				document.getElementById('log_level').value = data.log_level;
+				document.getElementById('config_dir').value = data.config_dir;
+				document.getElementById('config_hub_file').value = data.config_hub_file;
+				document.getElementById('display_file').value = data.display_file;
+				document.getElementById('usb_dir').value = data.usb_dir;
+				document.getElementById('image_dir').value = data.image_dir;
+				document.getElementById('s3_bucket').value = data.s3_bucket;
+				document.getElementById('scanorhize_server').value = data.scanorhize_server;
+				document.getElementById('battery_file').value = data.battery_file;
+			})
+			.catch(error => {
+				console.error('Error:', error);
+			});
+	}
+
+	function saveConfiguration() {
+		const logLevel = document.getElementById('log_level').value;
+		const usbDir = document.getElementById('usb_dir').value;
+		
+		fetch('/update-app-config', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: `log_level=${logLevel}&usb_dir=${encodeURIComponent(usbDir)}`
+		})
+		.then(response => response.text())
+		.then(html => {
+			document.body.innerHTML = html;
+		})
+		.catch(error => {
+			console.error('Error:', error);
+		});
+	}
+	</script>
 </div>        
 {%endblock%} 
