@@ -36,7 +36,7 @@ from ConfigApp import (
     getImageDir,
     getLogDir,
     ConfigApp,
-    CONFIG_APP_FILE
+    CONFIG_APP_FILE,
 )
 from Miscellaneous import (
     chaineIntwitherror,
@@ -140,25 +140,49 @@ def ScannerPage(scan_num_str: str):
 
         try:
             # Update Scanner object with form data
-            Scanner.resolution = ResolutionList[int(form["resolution"]) - 1] if int(form["resolution"]) <= 3 else ResolutionList[0]
-            Scanner.mode = ColorList[int(form["mode"]) - 1] if form["mode"] != Scanner.mode else Scanner.mode
+            Scanner.resolution = (
+                ResolutionList[int(form["resolution"]) - 1]
+                if int(form["resolution"]) <= 3
+                else ResolutionList[0]
+            )
+            Scanner.mode = (
+                ColorList[int(form["mode"]) - 1]
+                if form["mode"] != Scanner.mode
+                else Scanner.mode
+            )
 
             # Update numeric fields with validation, using empty string as default
-            Scanner.l = chaineIntwitherror(form.get("l", ""), Scanner.l, 0, Scanner.x_max)
-            Scanner.t = chaineIntwitherror(form.get("t", ""), Scanner.t, 0, Scanner.y_max)
-            Scanner.x = chaineIntwitherror(form.get("x", ""), Scanner.x, 0, Scanner.x_max)
-            Scanner.y = chaineIntwitherror(form.get("y", ""), Scanner.y, 0, Scanner.y_max)
-            Scanner.quality = chaineIntwitherror(form.get("quality", ""), Scanner.quality, 0, 90)
+            Scanner.l = chaineIntwitherror(
+                form.get("l", ""), Scanner.l, 0, Scanner.x_max
+            )
+            Scanner.t = chaineIntwitherror(
+                form.get("t", ""), Scanner.t, 0, Scanner.y_max
+            )
+            Scanner.x = chaineIntwitherror(
+                form.get("x", ""), Scanner.x, 0, Scanner.x_max
+            )
+            Scanner.y = chaineIntwitherror(
+                form.get("y", ""), Scanner.y, 0, Scanner.y_max
+            )
+            Scanner.quality = chaineIntwitherror(
+                form.get("quality", ""), Scanner.quality, 0, 90
+            )
 
             # Update other fields
             if "token" in form and form["token"] != "":
                 Scanner.token = form["token"]
-            Scanner.UseServer = chaineIntwitherror(form.get("UseServer", "0"), Scanner.UseServer, 0, 1)
+            Scanner.UseServer = chaineIntwitherror(
+                form.get("UseServer", "0"), Scanner.UseServer, 0, 1
+            )
             if form.get("StartDate", "") != "":
                 Scanner.StartDate = form["StartDate"]
             Scanner.PeriodeS = parse_period(form.get("PeriodeS", "3600s"))
-            Scanner.TimeBeforeScan = chaineIntwitherror(form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60)
-            Scanner.TimeAfterScan = chaineIntwitherror(form.get("TimeAfterScan", "0"), Scanner.TimeAfterScan, 0, 60)
+            Scanner.TimeBeforeScan = chaineIntwitherror(
+                form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60
+            )
+            Scanner.TimeAfterScan = chaineIntwitherror(
+                form.get("TimeAfterScan", "0"), Scanner.TimeAfterScan, 0, 60
+            )
             Scanner.enable = 1 if "enable" in form else 0
 
             # Save the updated Scanner object
@@ -176,7 +200,7 @@ def ScannerPage(scan_num_str: str):
                 **updateScanParameters(Scanner),
                 scan_num_str=scan_num_str,
                 imagename=f"{i_scan + 1}.jpg",
-                action_output=f"Error saving configuration: {str(e)}"
+                action_output=f"Error saving configuration: {str(e)}",
             )
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
@@ -204,8 +228,16 @@ def action(actionName: str, scan_num_str: str):
         form = request.form
 
         # Update Scanner object with form data (similar to ScannerPage route)
-        Scanner.resolution = ResolutionList[int(form["resolution"]) - 1] if int(form["resolution"]) <= 3 else ResolutionList[0]
-        Scanner.mode = ColorList[int(form["mode"]) - 1] if form["mode"] != Scanner.mode else Scanner.mode
+        Scanner.resolution = (
+            ResolutionList[int(form["resolution"]) - 1]
+            if int(form["resolution"]) <= 3
+            else ResolutionList[0]
+        )
+        Scanner.mode = (
+            ColorList[int(form["mode"]) - 1]
+            if form["mode"] != Scanner.mode
+            else Scanner.mode
+        )
 
         # Update numeric fields with validation
         Scanner.l = chaineIntwitherror(form["l"], Scanner.l, 0, Scanner.x_max)
@@ -217,12 +249,18 @@ def action(actionName: str, scan_num_str: str):
         # Update other fields
         if "token" in form and form["token"] != "":
             Scanner.token = form["token"]
-        Scanner.UseServer = chaineIntwitherror(form["UseServer"], Scanner.UseServer, 0, 1)
+        Scanner.UseServer = chaineIntwitherror(
+            form["UseServer"], Scanner.UseServer, 0, 1
+        )
         if form["StartDate"] != "":
             Scanner.StartDate = form["StartDate"]
         Scanner.PeriodeS = parse_period(form["PeriodeS"])
-        Scanner.TimeBeforeScan = chaineIntwitherror(form["TimeBeforeScan"], Scanner.TimeBeforeScan, 0, 60)
-        Scanner.TimeAfterScan = chaineIntwitherror(form["TimeAfterScan"], Scanner.TimeAfterScan, 0, 60)
+        Scanner.TimeBeforeScan = chaineIntwitherror(
+            form["TimeBeforeScan"], Scanner.TimeBeforeScan, 0, 60
+        )
+        Scanner.TimeAfterScan = chaineIntwitherror(
+            form["TimeAfterScan"], Scanner.TimeAfterScan, 0, 60
+        )
         Scanner.enable = 1 if "enable" in form else 0
 
         # Save the updated Scanner object
@@ -243,7 +281,9 @@ def action(actionName: str, scan_num_str: str):
         if result == 0:
             output_message = f"Configuration successfully downloaded from server for {Scanner.ScannerName}"
         else:
-            output_message = f"Error downloading configuration from server for {Scanner.ScannerName}"
+            output_message = (
+                f"Error downloading configuration from server for {Scanner.ScannerName}"
+            )
 
     if actionName == "SendConfig":
         # First save locally to ensure we have the latest data
@@ -276,7 +316,7 @@ def action(actionName: str, scan_num_str: str):
         "image.html",
         **Scannerparam,
         scan_num_str=scan_num_str,
-        imagename=f"{i_scan + 1}.jpg"
+        imagename=f"{i_scan + 1}.jpg",
     )
 
 
@@ -305,7 +345,7 @@ Ping: {Hub.ping}"""
         delta_time=Hub.delta_time,
         offline=Hub.offline,
         sync_images=Hub.sync_images,
-        todo=Hub.todo
+        todo=Hub.todo,
     )
 
 
@@ -357,7 +397,7 @@ Ping: {Hub.ping}"""
             offline=Hub.offline,
             sync_images=Hub.sync_images,
             todo=Hub.todo,
-            output=result.stdout
+            output=result.stdout,
         )
     except CalledProcessError as e:
         return render_template(
@@ -392,7 +432,7 @@ def AppPage():
         "usb_dir": config.usb_dir,
         "image_dir": config.image_dir,
         "s3_bucket": config.s3_bucket,
-        "scanorhize_server": config.scanorhize_server
+        "scanorhize_server": config.scanorhize_server,
     }
 
     return render_template("App.html", app_config=app_config)
@@ -424,7 +464,7 @@ def get_app_config():
             "usb_dir": temp_config.usb_dir,
             "image_dir": temp_config.image_dir,
             "s3_bucket": temp_config.s3_bucket,
-            "scanorhize_server": temp_config.scanorhize_server
+            "scanorhize_server": temp_config.scanorhize_server,
         }
 
         return jsonify(app_config)
@@ -441,9 +481,11 @@ def update_app_config():
         new_usb_dir = request.form.get("usb_dir")
 
         if new_log_level not in ["WARNING", "INFO", "DEBUG"]:
-            return render_template("App.html",
-                                app_config=ConfigApp().__dict__,
-                                output="Invalid log level value. Must be WARNING, INFO, or DEBUG.")
+            return render_template(
+                "App.html",
+                app_config=ConfigApp().__dict__,
+                output="Invalid log level value. Must be WARNING, INFO, or DEBUG.",
+            )
 
         # Get ConfigApp instance
         config = ConfigApp()
@@ -454,7 +496,9 @@ def update_app_config():
         if config.save_config() == 0:
             # Reload the configuration to get the correct attributes
             config.load_config()
-            output = f"Configuration updated successfully. Log level set to {new_log_level}"
+            output = (
+                f"Configuration updated successfully. Log level set to {new_log_level}"
+            )
         else:
             output = "Error saving configuration"
 
@@ -470,15 +514,17 @@ def update_app_config():
             "usb_dir": config.usb_dir,
             "image_dir": config.image_dir,
             "s3_bucket": config.s3_bucket,
-            "scanorhize_server": config.scanorhize_server
+            "scanorhize_server": config.scanorhize_server,
         }
 
         return render_template("App.html", app_config=app_config, output=output)
 
     except Exception as e:
-        return render_template("App.html",
-                            app_config=ConfigApp().__dict__,
-                            output=f"Error updating configuration: {str(e)}")
+        return render_template(
+            "App.html",
+            app_config=ConfigApp().__dict__,
+            output=f"Error updating configuration: {str(e)}",
+        )
 
 
 @app.route("/write_config", methods=["GET", "POST"])
@@ -660,7 +706,7 @@ Ping: {Hub.ping}"""
             offline=Hub.offline,
             sync_images=Hub.sync_images,
             todo=Hub.todo,
-            output=output
+            output=output,
         )
     except Exception as e:
         return render_template(
@@ -674,8 +720,9 @@ Ping: {Hub.ping}"""
             offline=Hub.offline,
             sync_images=Hub.sync_images,
             todo=Hub.todo,
-            output=f"Error sending configuration to server: {str(e)}"
+            output=f"Error sending configuration to server: {str(e)}",
         )
+
 
 @app.route("/get-hub-config", methods=["GET"])
 def get_hub_config():
@@ -709,7 +756,7 @@ Ping: {Hub.ping}"""
             offline=Hub.offline,
             sync_images=Hub.sync_images,
             todo=Hub.todo,
-            output=output
+            output=output,
         )
     except Exception as e:
         return render_template(
@@ -723,7 +770,7 @@ Ping: {Hub.ping}"""
             offline=Hub.offline,
             sync_images=Hub.sync_images,
             todo=Hub.todo,
-            output=f"Error downloading configuration from server: {str(e)}"
+            output=f"Error downloading configuration from server: {str(e)}",
         )
 
 

@@ -20,7 +20,17 @@ from Miscellaneous import (
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 from ConfigApp import is_debug, getLogger
 from Scanner import listConfigScanner, ScannerData, calculate_and_set_next_date
-from Hub import HubData, SendParameters, syncImageFiles, ReadScannerConfigFromServer, getOffline, getSyncImages, getTodo, SendHubConfigToServer, ReadHubConfigFromServer
+from Hub import (
+    HubData,
+    SendParameters,
+    syncImageFiles,
+    ReadScannerConfigFromServer,
+    getOffline,
+    getSyncImages,
+    getTodo,
+    SendHubConfigToServer,
+    ReadHubConfigFromServer,
+)
 from Campaign import USBSpace
 
 
@@ -108,7 +118,11 @@ if not getOffline():
             cmd = "sudo ./TimeSynchronisation.sh"
             getLogger().warning(cmd)
             result = run(
-                cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+                cmd,
+                capture_output=True,
+                universal_newlines=True,
+                shell=True,
+                check=False,
             )
         except CalledProcessError as exc:
             getLogger().error(exc.stderr)
