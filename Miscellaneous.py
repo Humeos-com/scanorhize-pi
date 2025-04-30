@@ -55,14 +55,6 @@ def chaineIntwitherror(chaine, valueerror, valuemin, valuemax):
     return tmp
 
 
-def checkchaine(chaine, valueerror):
-    tmp = isinstance(chaine, str)
-    print("is a chaine: ", tmp)
-    if tmp:
-        return chaine
-    return valueerror
-
-
 def initDisplayFile():
     try:
         with open(getDisplayFile(), "w", encoding="utf-8") as f:
