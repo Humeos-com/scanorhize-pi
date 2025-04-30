@@ -53,12 +53,14 @@ class ConfigApp:
         self.image_dir: str = "static"
         self.s3_bucket: str = "s3://scanorhize-images-prod"
         self.scanorhize_server: str = "scanorhize.duckdns.org"
+
         # Pour le relai Banggood initial
         # pins BCM
         # Ch1Pin = 19  # Scanner1
         # Ch2Pin = 26  # Scanner2
         # Ch3Pin = 20  # Scanner3
         # Ch4Pin = 21  # Clé 4G
+        # PinArray = [19, 26, 20, 21]
 
         # Pour le relai SBComponent RelayPi-V2
         # pins BCM
@@ -68,18 +70,27 @@ class ConfigApp:
         # et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
         # Ch3Pin = 22  # Scanner3
         # Ch4Pin = 27  # Clé 4G
+        # PinArray = [19, 13, 22, 27]
 
         # Pour l'alimentation de la carte WittyPi L3V7
         # Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
         # Pins BCM
         # CHRG_PIN = 5  # input to detect charging status
         # STDBY_PIN = 6  # input to detect standby status
+
         # Pour la carte USB Big 7
-        self.Ch1Pin: int  # Scanner1
-        self.Ch2Pin: int  # Scanner2
-        self.Ch3Pin: int  # Scanner3
-        self.Ch4Pin: int  # clé 4G
-        self.PinArray = []
+        # self.Ch1Pin: int  # Scanner1
+        # self.Ch2Pin: int  # Scanner2
+        # self.Ch3Pin: int  # Scanner3
+        # self.Ch4Pin: int  # clé 4G
+        # Initialize PinArray with default values
+        # Ici la clé 4G se trouve sur le port USB1 de la carte Big 7
+        self.PinArray = [13, 22, 27, 19]  # Default pin configuration
+
+        # Ce qu'on voudrait faire, c'est que la clé 4G soit la première entrée du tableau
+        # et les scanners dans l'ordre
+        # self.PinArray = [19, 13, 22, 27]
+        # Comme ça on peut ajouter des scanners sans avoir à modifier le code !
 
         # Initialize logger
         self.logger = logging.getLogger("ConfigApp")
@@ -156,8 +167,6 @@ class ConfigApp:
         else:
             logging.getLogger().setLevel(logging.INFO)
 
-        self.PinArray = [self.Ch1Pin, self.Ch2Pin, self.Ch3Pin, self.Ch4Pin]
-
         self.logger.warning("Read configuration from: %s", self.config_app_file)
         return self
 
@@ -199,10 +208,13 @@ class ConfigApp:
         return self.log_level.upper() == "DEBUG"
 
     def getChPin(self, i_scan: int):
-        if 0 <= i_scan < 4:
+        """Get the pin number for a given scanner index"""
+        if 0 <= i_scan < len(self.PinArray):
             return self.PinArray[i_scan]
         self.logger.error(
-            "La valeur passee doit être comprise entre 0 et 4, ici: %d", i_scan
+            "La valeur passee doit être comprise entre 0 et %d, ici: %d",
+            len(self.PinArray) - 1,
+            i_scan
         )
         return -1
 
