@@ -136,42 +136,53 @@ def ScannerPage(scan_num_str: str):
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
 
     if request.method == "POST":
-        print("Form data:", form)
+        getLogger().warning("Form data: %s", form)
 
-        # Update Scanner object with form data
-        Scanner.resolution = ResolutionList[int(form["resolution"]) - 1] if int(form["resolution"]) <= 3 else ResolutionList[0]
-        Scanner.mode = ColorList[int(form["mode"]) - 1] if form["mode"] != Scanner.mode else Scanner.mode
+        try:
+            # Update Scanner object with form data
+            Scanner.resolution = ResolutionList[int(form["resolution"]) - 1] if int(form["resolution"]) <= 3 else ResolutionList[0]
+            Scanner.mode = ColorList[int(form["mode"]) - 1] if form["mode"] != Scanner.mode else Scanner.mode
 
-        # Update numeric fields with validation
-        Scanner.l = chaineIntwitherror(form["l"], Scanner.l, 0, Scanner.x_max)
-        Scanner.t = chaineIntwitherror(form["t"], Scanner.t, 0, Scanner.y_max)
-        Scanner.x = chaineIntwitherror(form["x"], Scanner.x, 0, Scanner.x_max)
-        Scanner.y = chaineIntwitherror(form["y"], Scanner.y, 0, Scanner.y_max)
-        Scanner.quality = chaineIntwitherror(form["quality"], Scanner.quality, 0, 90)
+            # Update numeric fields with validation, using empty string as default
+            Scanner.l = chaineIntwitherror(form.get("l", ""), Scanner.l, 0, Scanner.x_max)
+            Scanner.t = chaineIntwitherror(form.get("t", ""), Scanner.t, 0, Scanner.y_max)
+            Scanner.x = chaineIntwitherror(form.get("x", ""), Scanner.x, 0, Scanner.x_max)
+            Scanner.y = chaineIntwitherror(form.get("y", ""), Scanner.y, 0, Scanner.y_max)
+            Scanner.quality = chaineIntwitherror(form.get("quality", ""), Scanner.quality, 0, 90)
 
-        # Update other fields
-        if "token" in form and form["token"] != "":
-            Scanner.token = form["token"]
-        Scanner.UseServer = chaineIntwitherror(form["UseServer"], Scanner.UseServer, 0, 1)
-        if form["StartDate"] != "":
-            Scanner.StartDate = form["StartDate"]
-        Scanner.PeriodeS = parse_period(form["PeriodeS"])
-        Scanner.TimeBeforeScan = chaineIntwitherror(form["TimeBeforeScan"], Scanner.TimeBeforeScan, 0, 60)
-        Scanner.TimeAfterScan = chaineIntwitherror(form["TimeAfterScan"], Scanner.TimeAfterScan, 0, 60)
-        Scanner.enable = 1 if "enable" in form else 0
+            # Update other fields
+            if "token" in form and form["token"] != "":
+                Scanner.token = form["token"]
+            Scanner.UseServer = chaineIntwitherror(form.get("UseServer", "0"), Scanner.UseServer, 0, 1)
+            if form.get("StartDate", "") != "":
+                Scanner.StartDate = form["StartDate"]
+            Scanner.PeriodeS = parse_period(form.get("PeriodeS", "3600s"))
+            Scanner.TimeBeforeScan = chaineIntwitherror(form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60)
+            Scanner.TimeAfterScan = chaineIntwitherror(form.get("TimeAfterScan", "0"), Scanner.TimeAfterScan, 0, 60)
+            Scanner.enable = 1 if "enable" in form else 0
 
-        # Save the updated Scanner object
-        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-        print("Updated Scanner object:", Scanner.__dict__)
+            # Save the updated Scanner object
+            Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+            getLogger().warning("Updated Scanner object: %s", Scanner.__dict__)
 
-        # Recalculate next start date
-        nextStartDateValue = calculate_and_set_next_date()
-        getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
+            # Recalculate next start date
+            nextStartDateValue = calculate_and_set_next_date()
+            getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
+
+        except Exception as e:
+            getLogger().error("Error processing form data: %s", str(e))
+            return render_template(
+                "image.html",
+                **updateScanParameters(Scanner),
+                scan_num_str=scan_num_str,
+                imagename=f"{i_scan + 1}.jpg",
+                action_output=f"Error saving configuration: {str(e)}"
+            )
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
     Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
-    print("Scanner n° : " + str(i_scan + 1))
+    getLogger().warning("Scanner n° : %s", str(i_scan + 1))
     Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     return render_template(
