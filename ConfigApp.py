@@ -8,6 +8,7 @@ import json
 import logging
 import logging.config
 from datetime import datetime
+from utils import write_json_to_file
 
 
 # Path to the config file
@@ -53,45 +54,7 @@ class ConfigApp:
         self.image_dir: str = "static"
         self.s3_bucket: str = "s3://scanorhize-images-prod"
         self.scanorhize_server: str = "scanorhize.duckdns.org"
-
-        # Pour le relai Banggood initial
-        # pins BCM
-        # Ch1Pin = 19  # Scanner1
-        # Ch2Pin = 26  # Scanner2
-        # Ch3Pin = 20  # Scanner3
-        # Ch4Pin = 21  # Clé 4G
-        # PinArray = [19, 26, 20, 21]
-
-        # Pour le relai SBComponent RelayPi-V2
-        # pins BCM
-        # Ch1Pin = 19  # Scanner1
-        # Ch2Pin = 13  # Scanner2
-        # Attention pour ces 2 pins, il faut supprimer les jumpers jaunes
-        # et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
-        # Ch3Pin = 22  # Scanner3
-        # Ch4Pin = 27  # Clé 4G
-        # PinArray = [19, 13, 22, 27]
-
-        # Pour l'alimentation de la carte WittyPi L3V7
-        # Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
-        # Pins BCM
-        # CHRG_PIN = 5  # input to detect charging status
-        # STDBY_PIN = 6  # input to detect standby status
-
-        # Pour la carte USB Big 7
-        # self.Ch1Pin: int  # Scanner1
-        # self.Ch2Pin: int  # Scanner2
-        # self.Ch3Pin: int  # Scanner3
-        # self.Ch4Pin: int  # clé 4G
-        # Initialize PinArray with default values
-        # Ici la clé 4G se trouve sur le port USB1 de la carte Big 7
-        self.PinArray = [13, 22, 27, 19]  # Default pin configuration
-
-        # Ce qu'on voudrait faire, c'est que la clé 4G soit la première entrée du tableau
-        # et les scanners dans l'ordre
-        # self.PinArray = [19, 13, 22, 27]
-        # Comme ça on peut ajouter des scanners sans avoir à modifier le code !
-
+        self.offline: bool = False
         # Initialize logger
         self.logger = logging.getLogger("ConfigApp")
 
@@ -207,17 +170,6 @@ class ConfigApp:
     def is_debug(self) -> bool:
         return self.log_level.upper() == "DEBUG"
 
-    def getChPin(self, i_scan: int):
-        """Get the pin number for a given scanner index"""
-        if 0 <= i_scan < len(self.PinArray):
-            return self.PinArray[i_scan]
-        self.logger.error(
-            "La valeur passee doit être comprise entre 0 et %d, ici: %d",
-            len(self.PinArray) - 1,
-            i_scan
-        )
-        return -1
-
     def print(self):
         """Prints the current configuration."""
         print("Current Configuration:")
@@ -226,23 +178,10 @@ class ConfigApp:
                 print(f"{key}: {value}")
 
 
-def write_json_to_file(file_path: str, json_data: str) -> int:
-    """Utility function to write JSON data to a file.
-
-    Args:
-            file_path: Path to the file to write
-            json_data: JSON string to write
-
-    Returns:
-            0 on success, 1 on error
-    """
-    try:
-        with open(file_path, "w", encoding="utf-8") as outfile:
-            outfile.write(json_data)
-        return 0
-    except OSError as e:
-        getLogger().error("write_json_to_file: OSError: %s", e)
-        return 1
+def write_config():
+    """Save the current configuration to a JSON file."""
+    json_data = ConfigApp().json()
+    return write_json_to_file(ConfigApp().config_app_file, json_data)
 
 
 def is_prod():
@@ -309,10 +248,6 @@ def getConfigFile():
 
 def getLogDir():
     return ConfigApp().log_dir
-
-
-def getChPin(i_scan: int):
-    return ConfigApp().getChPin(i_scan)
 
 
 if __name__ == "__main__":

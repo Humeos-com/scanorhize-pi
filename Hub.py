@@ -13,14 +13,14 @@ from ConfigApp import (
     getLogger,
     getS3Bucket,
     getConfigDir,
-    write_json_to_file,
 )
 from Campaign import getUsbDir, USBSpace
-from Miscellaneous import ReadBatVoltCap, pingAPI
 from OSUtils import get_os, get_model, is_raspberry_pi
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 from WittyPython import ReadTemp
+from utils import write_json_to_file
+from pin_config import DEFAULT_PIN_ARRAY
 
 
 class HubData:
@@ -42,9 +42,12 @@ class HubData:
         self.projectId: str = ""
         self.macAddress: str = "00:00:00:00:00:00"
         self.token: str = "token_bidon"
+        # devraient pas être dans le fichier de configuration
         self.batteryLevelPercent: int = 0
         self.diskSpacePercent: int = 0
         self.temperature: float = 0
+
+        self.PinArray = DEFAULT_PIN_ARRAY
         # Est-ce qu'on récupère la configuration depuis le serveur ?
         self.use_server: bool = True
         # Temps en secondes pour la connexion du s3cmd
@@ -77,7 +80,7 @@ class HubData:
         }
         return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=4)
 
-    def WriteConfig(self):
+    def write_config(self):
         """Save the current configuration to a JSON file."""
         json_data = self.json()
         return write_json_to_file(getConfigHubFile(), json_data)
@@ -225,7 +228,7 @@ def getTokens():
             results = json.loads(body)
             Hub_.token = results["accessTokenHub"]
             Hub_.projectId = results["projectId"]
-            Hub_.WriteConfig()
+            Hub_.write_config()
 
             for i in range(1, num_scan + 1):
                 Scanner_ = ScannerData()
@@ -418,15 +421,12 @@ def GetIP():
 if __name__ == "__main__":
     # pylint: disable=duplicate-code
     getTokens()
-    print(pingAPI("www.google.com"))
-    # print(pingAPI("192.168.73.1"))
     # syncImageFiles()
     Hub = HubData()
     # Hub_.ReadConfig()
-    volt, Hub.batteryLevelPercent = ReadBatVoltCap()
     Hub.diskSpacePercent = USBSpace()[0] / 1000
     Hub.temperature = ReadTemp()
-    Hub.WriteConfig()
+    Hub.write_config()
     SendHubConfigToServer()
     ReadHubConfigFromServer()
 
