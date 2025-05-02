@@ -91,12 +91,12 @@ except CalledProcessError as exc:
 # Etape 3 #############################################
 # Mise à jour des paramètres
 Hub = HubData()
-Hub.ReadConfig()
+Hub.read_config()
 volt, Hub.batteryLevelPercent = ReadBatVoltCap()
 Hub.diskSpacePercent = USBSpace()[0] / 1000
 Hub.temperature = ReadTemp()
 # On sauvegarde les paramètres pour envoi à la plateforme
-Hub.WriteConfig()
+Hub.write_config()
 
 getLogger().warning(
     "Bat: %s  USB: %s  Temp: %s",

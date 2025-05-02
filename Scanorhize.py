@@ -2,9 +2,8 @@
 
 from subprocess import run, CalledProcessError
 from time import sleep
-import os
 
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, jsonify
 from Scanner import (
     ScannerData,
     ScannerPreview,
@@ -33,8 +32,6 @@ from ConfigApp import (
     is_debug,
     is_prod,
     getConfigDir,
-    getImageDir,
-    getLogDir,
     ConfigApp,
     CONFIG_APP_FILE,
 )
@@ -322,7 +319,7 @@ def action(actionName: str, scan_num_str: str):
 
 @app.route("/Hub", methods=["POST", "GET"])
 def HubPage():
-    Hub.ReadConfig()
+    Hub.read_config()
     # Format Hub configuration for display
     hub_config = f"""Model: {Hub.model}
 MAC Address: {Hub.macAddress}
@@ -545,7 +542,7 @@ def write_config():
             Hub.todo = "todo" in form
 
         # Save the Hub configuration
-        Hub.WriteConfig()
+        Hub.write_config()
         hub_config = f"""Model: {Hub.model}
 MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
@@ -674,7 +671,7 @@ def stop_server():
 def send_hub_config():
     try:
         # First ensure we have the latest config saved locally
-        Hub.WriteConfig()
+        Hub.write_config()
 
         # Then send to server
         result = SendHubConfigToServer()

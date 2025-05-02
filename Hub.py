@@ -67,7 +67,7 @@ class HubData:
         self.todo: bool = False
 
         self.initialized = True  # Mark as initialized
-        self.ReadConfig()
+        self.read_config()
         self.macAddress = getHwAddr()
         self.model = get_model()
 
@@ -85,7 +85,7 @@ class HubData:
         json_data = self.json()
         return write_json_to_file(getConfigHubFile(), json_data)
 
-    def ReadConfig(self):
+    def read_config(self):
         fullpath = getConfigHubFile()
         try:
             with open(fullpath, "r", encoding="utf-8") as openfile:
@@ -423,7 +423,7 @@ if __name__ == "__main__":
     getTokens()
     # syncImageFiles()
     Hub = HubData()
-    # Hub_.ReadConfig()
+    Hub.read_config()
     Hub.diskSpacePercent = USBSpace()[0] / 1000
     Hub.temperature = ReadTemp()
     Hub.write_config()
