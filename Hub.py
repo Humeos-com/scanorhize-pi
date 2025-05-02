@@ -21,6 +21,7 @@ from AuthUtils import getHwAddr
 from WittyPython import ReadTemp
 from utils import write_json_to_file
 from pin_config import DEFAULT_PIN_ARRAY
+from Miscellaneous import ReadBatVoltCap
 
 
 class HubData:
@@ -42,11 +43,7 @@ class HubData:
         self.projectId: str = ""
         self.macAddress: str = "00:00:00:00:00:00"
         self.token: str = "token_bidon"
-        # devraient pas être dans le fichier de configuration
-        self.batteryLevelPercent: int = 0
-        self.diskSpacePercent: int = 0
-        self.temperature: float = 0
-
+        # Configuration des ports USB
         self.PinArray = DEFAULT_PIN_ARRAY
         # Est-ce qu'on récupère la configuration depuis le serveur ?
         self.use_server: bool = True
@@ -331,10 +328,11 @@ def SendHubConfigToServer():
 
 def SendParameters(Hub_: HubData):
     # print(battery,diskspace,temperature)
+    hub_info = get_hub_info()
     json_data = {
-        "batteryLevelPercent": Hub_.batteryLevelPercent,
-        "temperatureCelsius": Hub_.temperature,
-        "availableMemoryGB": Hub_.diskSpacePercent,
+        "batteryLevelPercent": hub_info[1],
+        "temperatureCelsius": hub_info[4],
+        "availableMemoryGB": hub_info[2],
     }
 
     cmdPUT = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
@@ -418,15 +416,41 @@ def GetIP():
     return IP
 
 
+def get_hub_info():
+    """Get current hub information including battery, USB space, and temperature.
+
+    Returns:
+        list: [voltage, battery_percent, usb_space_mb, usb_space_percent, temperature]
+    """
+    usb_space_info = USBSpace()
+    battery_info = ReadBatVoltCap()
+    return [
+        battery_info[0],  # voltage
+        battery_info[1],  # battery percent
+        usb_space_info[0],  # USB space in MB
+        usb_space_info[1],  # USB space percent
+        ReadTemp()  # temperature
+    ]
+
+
+
+
 if __name__ == "__main__":
     # pylint: disable=duplicate-code
     getTokens()
     # syncImageFiles()
     Hub = HubData()
     Hub.read_config()
-    Hub.diskSpacePercent = USBSpace()[0] / 1000
-    Hub.temperature = ReadTemp()
-    Hub.write_config()
+    hub_info_ = get_hub_info()
+    getLogger().warning(
+        "Volts: %.2fV  Bat: %d%%  USB: %dMo %d%%  Temp: %.1f°C",
+        hub_info_[0],
+        hub_info_[1],
+        hub_info_[2],
+        hub_info_[3],
+        hub_info_[4]
+)
+
     SendHubConfigToServer()
     ReadHubConfigFromServer()
 

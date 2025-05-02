@@ -8,14 +8,12 @@ import sys
 from subprocess import run, CalledProcessError
 
 from WittyPy import doShutdown, setNextShutdownDate
-from WittyPython import ReadTemp
 from Miscellaneous import (
     EndGPIO,
     enable4G,
     disable4G,
     check_connectivity,
     ReadGPIOConfig,
-    ReadBatVoltCap,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 from ConfigApp import is_debug, getLogger
@@ -30,8 +28,8 @@ from Hub import (
     getTodo,
     SendHubConfigToServer,
     ReadHubConfigFromServer,
+    get_hub_info,
 )
-from Campaign import USBSpace
 
 
 # Etape 0 #############################################
@@ -92,17 +90,15 @@ except CalledProcessError as exc:
 # Mise à jour des paramètres
 Hub = HubData()
 Hub.read_config()
-volt, Hub.batteryLevelPercent = ReadBatVoltCap()
-Hub.diskSpacePercent = USBSpace()[0] / 1000
-Hub.temperature = ReadTemp()
-# On sauvegarde les paramètres pour envoi à la plateforme
-Hub.write_config()
+hub_info = get_hub_info()
 
 getLogger().warning(
-    "Bat: %s  USB: %s  Temp: %s",
-    Hub.batteryLevelPercent,
-    Hub.diskSpacePercent,
-    Hub.temperature,
+    "Volts: %.2fV  Bat: %d%%  USB: %dMo %d%%  Temp: %.1f°C",
+    hub_info[0],
+    hub_info[1],
+    hub_info[2],
+    hub_info[3],
+    hub_info[4]
 )
 
 if not getOffline():
