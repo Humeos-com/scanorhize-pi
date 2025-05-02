@@ -133,7 +133,7 @@ def ScannerPage(scan_num_str: str):
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
 
     # Get output message from query parameters if it exists
-    output = request.args.get('output', None)
+    output = request.args.get("output", None)
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
@@ -146,7 +146,7 @@ def ScannerPage(scan_num_str: str):
         **Scannerparam,
         scan_num_str=scan_num_str,
         imagename=filename,
-        output=output
+        output=output,
     )
 
 
@@ -176,18 +176,10 @@ def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
         )
 
         # Update numeric fields with validation, using empty string as default
-        Scanner.l = chaineIntwitherror(
-            form.get("l", ""), Scanner.l, 0, Scanner.x_max
-        )
-        Scanner.t = chaineIntwitherror(
-            form.get("t", ""), Scanner.t, 0, Scanner.y_max
-        )
-        Scanner.x = chaineIntwitherror(
-            form.get("x", ""), Scanner.x, 0, Scanner.x_max
-        )
-        Scanner.y = chaineIntwitherror(
-            form.get("y", ""), Scanner.y, 0, Scanner.y_max
-        )
+        Scanner.l = chaineIntwitherror(form.get("l", ""), Scanner.l, 0, Scanner.x_max)
+        Scanner.t = chaineIntwitherror(form.get("t", ""), Scanner.t, 0, Scanner.y_max)
+        Scanner.x = chaineIntwitherror(form.get("x", ""), Scanner.x, 0, Scanner.x_max)
+        Scanner.y = chaineIntwitherror(form.get("y", ""), Scanner.y, 0, Scanner.y_max)
         Scanner.quality = chaineIntwitherror(
             form.get("quality", ""), Scanner.quality, 0, 90
         )
@@ -240,22 +232,34 @@ def action(actionName: str, scan_num_str: str):
         Scanner.LastImgFile = result[0]
         Scanner.error = result[1]
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-        return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output="Image scan completed"))
+        return redirect(
+            url_for(
+                "ScannerPage", scan_num_str=scan_num_str, output="Image scan completed"
+            )
+        )
 
     elif actionName == "GetConfig":
         result = ReadScannerConfigFromServer(Scanner)
         if result == 0:
             output_message = f"Configuration successfully downloaded from server for {Scanner.ScannerName}"
         else:
-            output_message = f"Error downloading configuration from server for {Scanner.ScannerName}"
-        return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=output_message))
+            output_message = (
+                f"Error downloading configuration from server for {Scanner.ScannerName}"
+            )
+        return redirect(
+            url_for("ScannerPage", scan_num_str=scan_num_str, output=output_message)
+        )
 
     elif actionName == "SendConfig":
         if request.method == "POST":
             # Process form data and save locally
-            success, message = process_scanner_form_data(request.form, Scanner, listScannerconfigs, i_scan)
+            success, message = process_scanner_form_data(
+                request.form, Scanner, listScannerconfigs, i_scan
+            )
             if not success:
-                return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=message))
+                return redirect(
+                    url_for("ScannerPage", scan_num_str=scan_num_str, output=message)
+                )
 
             # Then send to server
             result = SendScannerConfigToServer(Scanner)
@@ -264,14 +268,20 @@ def action(actionName: str, scan_num_str: str):
             else:
                 output_message = f"Error sending configuration to server: {result}"
 
-            return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=output_message))
+            return redirect(
+                url_for("ScannerPage", scan_num_str=scan_num_str, output=output_message)
+            )
 
     elif actionName == "WriteConfig":
         if request.method == "POST":
-            success, message = process_scanner_form_data(request.form, Scanner, listScannerconfigs, i_scan)
-            return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=message))
+            success, message = process_scanner_form_data(
+                request.form, Scanner, listScannerconfigs, i_scan
+            )
+            return redirect(
+                url_for("ScannerPage", scan_num_str=scan_num_str, output=message)
+            )
 
-    return redirect(url_for('ScannerPage', scan_num_str=scan_num_str))
+    return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
 
 
 @app.route("/Hub", methods=["POST", "GET"])
@@ -295,7 +305,7 @@ Ping: {Hub.ping}"""
     pin_array = get_pin_array()
 
     # Get output message from query parameters if it exists
-    output = request.args.get('output', None)
+    output = request.args.get("output", None)
 
     return render_template(
         "Hub.html",
@@ -524,8 +534,12 @@ def process_hub_form_data(form):
 def write_config():
     if request.method == "POST":
         success, message = process_hub_form_data(request.form)
-        return redirect(url_for('HubPage', output=f"{'Success: ' if success else 'Error: '}{message}"))
-    return redirect(url_for('HubPage'))
+        return redirect(
+            url_for(
+                "HubPage", output=f"{'Success: ' if success else 'Error: '}{message}"
+            )
+        )
+    return redirect(url_for("HubPage"))
 
 
 @app.route("/send-hub-config", methods=["POST"])
@@ -534,17 +548,25 @@ def send_hub_config():
         # First process the form data and save locally
         success, message = process_hub_form_data(request.form)
         if not success:
-            return redirect(url_for('HubPage', output=message))
+            return redirect(url_for("HubPage", output=message))
 
         # Then send to server
         result = SendHubConfigToServer()
         if result == 0:
-            return redirect(url_for('HubPage', output="Configuration successfully sent to server"))
+            return redirect(
+                url_for("HubPage", output="Configuration successfully sent to server")
+            )
         else:
-            return redirect(url_for('HubPage', output="Error sending configuration to server"))
+            return redirect(
+                url_for("HubPage", output="Error sending configuration to server")
+            )
 
     except Exception as e:
-        return redirect(url_for('HubPage', output=f"Error sending configuration to server: {str(e)}"))
+        return redirect(
+            url_for(
+                "HubPage", output=f"Error sending configuration to server: {str(e)}"
+            )
+        )
 
 
 @app.route("/get-hub-config", methods=["GET"])
@@ -557,14 +579,26 @@ def get_hub_config():
 
         if result == 0:
             # Redirect to /Hub with success message
-            return redirect(url_for('HubPage', output="Configuration successfully downloaded from server"))
+            return redirect(
+                url_for(
+                    "HubPage",
+                    output="Configuration successfully downloaded from server",
+                )
+            )
         else:
             # Redirect to /Hub with error message
-            return redirect(url_for('HubPage', output="Error downloading configuration from server"))
+            return redirect(
+                url_for("HubPage", output="Error downloading configuration from server")
+            )
 
     except Exception as e:
         # Redirect to /Hub with error message
-        return redirect(url_for('HubPage', output=f"Error downloading configuration from server: {str(e)}"))
+        return redirect(
+            url_for(
+                "HubPage",
+                output=f"Error downloading configuration from server: {str(e)}",
+            )
+        )
 
 
 @app.route("/init_hub", methods=["GET", "POST"])
@@ -574,16 +608,16 @@ def init_hub():
         # Run getTokens() to get authentication tokens
         tokens_result = getTokens()
         if tokens_result != 0:
-            return redirect(url_for('HubPage', output="Failed to get tokens"))
+            return redirect(url_for("HubPage", output="Failed to get tokens"))
 
         getLogger().warning("Start InitScanners")
         # Run initScanners() to initialize scanners
         initScanners()
         getLogger().warning("End init-hub")
-        return redirect(url_for('HubPage', output="Hub initialized successfully"))
+        return redirect(url_for("HubPage", output="Hub initialized successfully"))
 
     except (OSError, ValueError) as e:
-        return redirect(url_for('HubPage', output=f"Error: {str(e)}"))
+        return redirect(url_for("HubPage", output=f"Error: {str(e)}"))
 
 
 @app.route("/poweroff", methods=["POST"])

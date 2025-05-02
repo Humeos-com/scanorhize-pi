@@ -98,7 +98,7 @@ getLogger().warning(
     hub_info[1],
     hub_info[2],
     hub_info[3],
-    hub_info[4]
+    hub_info[4],
 )
 
 if not getOffline():

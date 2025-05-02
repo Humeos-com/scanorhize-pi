@@ -429,10 +429,8 @@ def get_hub_info():
         battery_info[1],  # battery percent
         usb_space_info[0],  # USB space in MB
         usb_space_info[1],  # USB space percent
-        ReadTemp()  # temperature
+        ReadTemp(),  # temperature
     ]
-
-
 
 
 if __name__ == "__main__":
@@ -448,8 +446,8 @@ if __name__ == "__main__":
         hub_info_[1],
         hub_info_[2],
         hub_info_[3],
-        hub_info_[4]
-)
+        hub_info_[4],
+    )
 
     SendHubConfigToServer()
     ReadHubConfigFromServer()
