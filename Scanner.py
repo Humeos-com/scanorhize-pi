@@ -561,7 +561,7 @@ def calculate_and_set_next_date():
 
     # Check battery level and adjust wake-up time if needed
     Bat = ReadBatVoltCap()
-    if Bat[1] < 0:  # if battery is low, delay wake-up by 30 days
+    if Bat[1] < 7:  # if battery is low, under 7%, delay wake-up by 30 days
         nextStartDateValue_ = SecondsToDate(nextStartSecs + (3600 * 24 * 30))
         getLogger().warning(
             "No more battery: wake up in 30 days: %s", nextStartDateValue_
