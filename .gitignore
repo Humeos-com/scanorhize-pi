@@ -7,6 +7,7 @@ static/image*
 *.code-workspace
 pyvenv.cfg
 .vscode
+DEBUG
 
 
 # Byte-compiled / optimized / DLL files
