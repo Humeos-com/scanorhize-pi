@@ -3,6 +3,16 @@
       <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
       <title>ScanTerrae</title>
       {%block title%}{%endblock%}
+      <style>
+         .hub-info {
+            font-size: 0.9em;
+            color: #666;
+            margin: 0 10px;
+         }
+         .hub-info span {
+            margin: 0 5px;
+         }
+      </style>
    </head>
    <body>         
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -22,7 +32,12 @@
                                               
             </div>
       </div>     
-      <p>{{SSID}} <p><p>  </p><p>{{IP}} </p>                   
+      <div class="hub-info">
+         <span>Battery: {{ "%.2f"|format(hub_info[0]) }}V ({{hub_info[1]}}%)</span>
+         <span>USB: {{ hub_info[2]|int }}MB ({{ hub_info[3]|int }}%)</span>
+         <span>Temp: {{ "%.1f"|format(hub_info[4]) }}°C</span>
+         <span>IP: {{ IP }} {{ SSID }}</span>
+      </div>
       <img src="{{url_for('static',filename='Mycea_logo.png')}}" height="60"/> 
       <img src="{{url_for('static',filename='axlr-satt_logo.png')}}" height="60" align="right"/>
       <img src="{{url_for('static',filename='ARDITECH_logo_Small.png')}}" height="30", align="right">

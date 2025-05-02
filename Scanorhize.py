@@ -90,6 +90,7 @@ def index():
         imagename3="3.jpg",
         SSID=SSID,
         IP=IP,
+        hub_info=get_hub_info(),
     )
 
 
@@ -142,11 +143,14 @@ def ScannerPage(scan_num_str: str):
     Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     return render_template(
-        "image.html",
+        "Scanner.html",
         **Scannerparam,
         scan_num_str=scan_num_str,
         imagename=filename,
         output=output,
+        SSID=SSID,
+        IP=IP,
+        hub_info=get_hub_info(),
     )
 
 
@@ -320,6 +324,9 @@ Ping: {Hub.ping}"""
         sync_images=Hub.sync_images,
         todo=Hub.todo,
         output=output,
+        SSID=SSID,
+        IP=IP,
+        hub_info=hub_info,
     )
 
 
@@ -410,7 +417,13 @@ def AppPage():
         "scanorhize_server": config.scanorhize_server,
     }
 
-    return render_template("App.html", app_config=app_config)
+    return render_template(
+        "App.html",
+        app_config=app_config,
+        SSID=SSID,
+        IP=IP,
+        hub_info=get_hub_info(),
+    )
 
 
 @app.route("/get-app-config", methods=["GET"])
