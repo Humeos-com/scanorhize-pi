@@ -4,7 +4,8 @@
 <div class="container">
   <!-- Content here -->  
 	<H1>Hub Configuration</H1>	
-	<pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ hub_config }}</pre>
+	<pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ hub_config }}
+Pin Array: {{ pin_array }}</pre>
 	
 	<div class="card mb-4">
 		<div class="card-header">
@@ -140,15 +141,11 @@
 	document.getElementById('send-to-server').addEventListener('click', function(e) {
 		e.preventDefault();
 		
-		// First save locally
+		// Submit the form directly to send-hub-config with POST method
 		const form = document.querySelector('form');
-		form.action = "{{url_for('write_config')}}";
+		form.action = "{{url_for('send_hub_config')}}";
+		form.method = "POST";
 		form.submit();
-		
-		// Then send to server
-		setTimeout(function() {
-			window.location.href = "/send-hub-config";
-		}, 500);
 	});
 	</script>
 </div>        

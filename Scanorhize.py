@@ -1,9 +1,10 @@
 """Application Web pour configurer les scanners"""
 
+import os
 from subprocess import run, CalledProcessError
 from time import sleep
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from Scanner import (
     ScannerData,
     ScannerPreview,
@@ -22,16 +23,15 @@ from Hub import (
     updateServer,
     HubData,
     getTokens,
-    getHubId,
     ReadHubConfigFromServer,
     SendHubConfigToServer,
+    get_hub_info,
 )
 from ConfigApp import (
     getLogger,
     getDisplayFile,
     is_debug,
     is_prod,
-    getConfigDir,
     ConfigApp,
     CONFIG_APP_FILE,
 )
@@ -43,6 +43,7 @@ from Miscellaneous import (
     sync_time,
 )
 from OSUtils import is_raspberry_pi
+from pin_config import get_pin_array
 
 initDisplayFile()
 getLogger().warning("Start Scanorhize.py")
@@ -124,81 +125,15 @@ def format_period(seconds):
     return f"{seconds}s"
 
 
-@app.route("/Scanner/<scan_num_str>", methods=["POST", "GET"])
+@app.route("/Scanner/<scan_num_str>", methods=["GET"])
 def ScannerPage(scan_num_str: str):
-    form = request.form
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
     i_scan = int(scan_num_str) - 1
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
 
-    if request.method == "POST":
-        getLogger().warning("Form data: %s", form)
-
-        try:
-            # Update Scanner object with form data
-            Scanner.resolution = (
-                ResolutionList[int(form["resolution"]) - 1]
-                if int(form["resolution"]) <= 3
-                else ResolutionList[0]
-            )
-            Scanner.mode = (
-                ColorList[int(form["mode"]) - 1]
-                if form["mode"] != Scanner.mode
-                else Scanner.mode
-            )
-
-            # Update numeric fields with validation, using empty string as default
-            Scanner.l = chaineIntwitherror(
-                form.get("l", ""), Scanner.l, 0, Scanner.x_max
-            )
-            Scanner.t = chaineIntwitherror(
-                form.get("t", ""), Scanner.t, 0, Scanner.y_max
-            )
-            Scanner.x = chaineIntwitherror(
-                form.get("x", ""), Scanner.x, 0, Scanner.x_max
-            )
-            Scanner.y = chaineIntwitherror(
-                form.get("y", ""), Scanner.y, 0, Scanner.y_max
-            )
-            Scanner.quality = chaineIntwitherror(
-                form.get("quality", ""), Scanner.quality, 0, 90
-            )
-
-            # Update other fields
-            if "token" in form and form["token"] != "":
-                Scanner.token = form["token"]
-            Scanner.UseServer = chaineIntwitherror(
-                form.get("UseServer", "0"), Scanner.UseServer, 0, 1
-            )
-            if form.get("StartDate", "") != "":
-                Scanner.StartDate = form["StartDate"]
-            Scanner.PeriodeS = parse_period(form.get("PeriodeS", "3600s"))
-            Scanner.TimeBeforeScan = chaineIntwitherror(
-                form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60
-            )
-            Scanner.TimeAfterScan = chaineIntwitherror(
-                form.get("TimeAfterScan", "0"), Scanner.TimeAfterScan, 0, 60
-            )
-            Scanner.enable = 1 if "enable" in form else 0
-
-            # Save the updated Scanner object
-            Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-            getLogger().warning("Updated Scanner object: %s", Scanner.__dict__)
-
-            # Recalculate next start date
-            nextStartDateValue = calculate_and_set_next_date()
-            getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
-
-        except Exception as e:
-            getLogger().error("Error processing form data: %s", str(e))
-            return render_template(
-                "image.html",
-                **updateScanParameters(Scanner),
-                scan_num_str=scan_num_str,
-                imagename=f"{i_scan + 1}.jpg",
-                action_output=f"Error saving configuration: {str(e)}",
-            )
+    # Get output message from query parameters if it exists
+    output = request.args.get('output', None)
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
@@ -207,24 +142,28 @@ def ScannerPage(scan_num_str: str):
     Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     return render_template(
-        "image.html", **Scannerparam, scan_num_str=scan_num_str, imagename=filename
+        "image.html",
+        **Scannerparam,
+        scan_num_str=scan_num_str,
+        imagename=filename,
+        output=output
     )
 
 
-@app.route("/Scanner/<actionName>/<scan_num_str>", methods=["GET", "POST"])
-def action(actionName: str, scan_num_str: str):
-    i_scan = int(scan_num_str) - 1
-    Scanner = ScannerData()
-    listScannerconfigs = listConfigScanner()
-    Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
-    print("action : ", actionName)
+def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
+    """Process form data for Scanner configuration and update Scanner object.
 
-    # If it's a POST request, save the form data first
-    if request.method == "POST" and request.form:
-        getLogger().warning("Processing form data for %s", Scanner.ScannerName)
-        form = request.form
+    Args:
+        form: The form data from the request
+        Scanner: The ScannerData object to update
+        listScannerconfigs: List of scanner configuration files
+        i_scan: Index of the current scanner
 
-        # Update Scanner object with form data (similar to ScannerPage route)
+    Returns:
+        tuple: (success, error_message) where success is a boolean and error_message is a string
+    """
+    try:
+        # Update Scanner object with form data
         Scanner.resolution = (
             ResolutionList[int(form["resolution"]) - 1]
             if int(form["resolution"]) <= 3
@@ -236,35 +175,64 @@ def action(actionName: str, scan_num_str: str):
             else Scanner.mode
         )
 
-        # Update numeric fields with validation
-        Scanner.l = chaineIntwitherror(form["l"], Scanner.l, 0, Scanner.x_max)
-        Scanner.t = chaineIntwitherror(form["t"], Scanner.t, 0, Scanner.y_max)
-        Scanner.x = chaineIntwitherror(form["x"], Scanner.x, 0, Scanner.x_max)
-        Scanner.y = chaineIntwitherror(form["y"], Scanner.y, 0, Scanner.y_max)
-        Scanner.quality = chaineIntwitherror(form["quality"], Scanner.quality, 0, 90)
+        # Update numeric fields with validation, using empty string as default
+        Scanner.l = chaineIntwitherror(
+            form.get("l", ""), Scanner.l, 0, Scanner.x_max
+        )
+        Scanner.t = chaineIntwitherror(
+            form.get("t", ""), Scanner.t, 0, Scanner.y_max
+        )
+        Scanner.x = chaineIntwitherror(
+            form.get("x", ""), Scanner.x, 0, Scanner.x_max
+        )
+        Scanner.y = chaineIntwitherror(
+            form.get("y", ""), Scanner.y, 0, Scanner.y_max
+        )
+        Scanner.quality = chaineIntwitherror(
+            form.get("quality", ""), Scanner.quality, 0, 90
+        )
 
         # Update other fields
         if "token" in form and form["token"] != "":
             Scanner.token = form["token"]
         Scanner.UseServer = chaineIntwitherror(
-            form["UseServer"], Scanner.UseServer, 0, 1
+            form.get("UseServer", "0"), Scanner.UseServer, 0, 1
         )
-        if form["StartDate"] != "":
+        if form.get("StartDate", "") != "":
             Scanner.StartDate = form["StartDate"]
-        Scanner.PeriodeS = parse_period(form["PeriodeS"])
+        Scanner.PeriodeS = parse_period(form.get("PeriodeS", "3600s"))
         Scanner.TimeBeforeScan = chaineIntwitherror(
-            form["TimeBeforeScan"], Scanner.TimeBeforeScan, 0, 60
+            form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60
         )
         Scanner.TimeAfterScan = chaineIntwitherror(
-            form["TimeAfterScan"], Scanner.TimeAfterScan, 0, 60
+            form.get("TimeAfterScan", "0"), Scanner.TimeAfterScan, 0, 60
         )
         Scanner.enable = 1 if "enable" in form else 0
 
         # Save the updated Scanner object
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
-        getLogger().warning("Saved form data for %s", Scanner.ScannerName)
+        getLogger().warning("Updated Scanner object: %s", Scanner.__dict__)
 
-    output_message = None
+        # Recalculate next start date
+        nextStartDateValue = calculate_and_set_next_date()
+        getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
+
+        return True, "Configuration saved successfully"
+
+    except Exception as e:
+        getLogger().error("Error processing form data: %s", str(e))
+        return False, f"Error saving configuration: {str(e)}"
+
+
+@app.route("/Scanner/<actionName>/<scan_num_str>", methods=["GET", "POST"])
+def action(actionName: str, scan_num_str: str):
+    Scanner = ScannerData()
+    listScannerconfigs = listConfigScanner()
+    i_scan = int(scan_num_str) - 1
+    Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
+    Scanner.ScannerName = f"Scanner-{i_scan + 1}"
+    getLogger().warning("Scanner n° : %s", str(i_scan + 1))
+    Scanner.printScanner()
 
     if actionName == "acqimg":
         InitGPIO()
@@ -272,70 +240,68 @@ def action(actionName: str, scan_num_str: str):
         Scanner.LastImgFile = result[0]
         Scanner.error = result[1]
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+        return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output="Image scan completed"))
 
-    if actionName == "GetConfig":
+    elif actionName == "GetConfig":
         result = ReadScannerConfigFromServer(Scanner)
         if result == 0:
             output_message = f"Configuration successfully downloaded from server for {Scanner.ScannerName}"
         else:
-            output_message = (
-                f"Error downloading configuration from server for {Scanner.ScannerName}"
-            )
+            output_message = f"Error downloading configuration from server for {Scanner.ScannerName}"
+        return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=output_message))
 
-    if actionName == "SendConfig":
-        # First save locally to ensure we have the latest data
-        Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
+    elif actionName == "SendConfig":
+        if request.method == "POST":
+            # Process form data and save locally
+            success, message = process_scanner_form_data(request.form, Scanner, listScannerconfigs, i_scan)
+            if not success:
+                return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=message))
 
-        # Capture the command that will be executed
-        hub_id = getHubId()
-        command = f"s3cmd --no-preserve sync {getConfigDir()}/{Scanner.ScannerName}.json s3://hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{Scanner.ScannerName}.json"
+            # Then send to server
+            result = SendScannerConfigToServer(Scanner)
+            if result == 0:
+                output_message = "Configuration sent to server successfully"
+            else:
+                output_message = f"Error sending configuration to server: {result}"
 
-        # Then send to server
-        result = SendScannerConfigToServer(Scanner)
+            return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=output_message))
 
-        if result == 0:
-            output_message = f"Configuration successfully sent to server for {Scanner.ScannerName}\nCommand: {command}"
-        else:
-            output_message = f"Error sending configuration to server for {Scanner.ScannerName}\nCommand: {command}"
+    elif actionName == "WriteConfig":
+        if request.method == "POST":
+            success, message = process_scanner_form_data(request.form, Scanner, listScannerconfigs, i_scan)
+            return redirect(url_for('ScannerPage', scan_num_str=scan_num_str, output=message))
 
-    # Update scanner parameters
-    Scanner.ScannerName = f"Scanner-{i_scan + 1}"
-    Scannerparam = updateScanParameters(Scanner)
-    # Format PeriodeS for display
-    Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
-
-    if output_message:
-        # Add the output message to the template parameters
-        Scannerparam["action_output"] = output_message
-
-    # Return the template with parameters
-    return render_template(
-        "image.html",
-        **Scannerparam,
-        scan_num_str=scan_num_str,
-        imagename=f"{i_scan + 1}.jpg",
-    )
+    return redirect(url_for('ScannerPage', scan_num_str=scan_num_str))
 
 
 @app.route("/Hub", methods=["POST", "GET"])
 def HubPage():
     Hub.read_config()
-    # Format Hub configuration for display
+    hub_info = get_hub_info()
+
+    # Format Hub configuration for display with all values
     hub_config = f"""Model: {Hub.model}
 MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent}%
-Temperature: {Hub.temperature}°C
+Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
+USB Space: {hub_info[2]}MB ({hub_info[3]}%)
+Temperature: {hub_info[4]:.1f}°C
 Ping: {Hub.ping}"""
 
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
 
+    # Get the pin array configuration
+    pin_array = get_pin_array()
+
+    # Get output message from query parameters if it exists
+    output = request.args.get('output', None)
+
     return render_template(
         "Hub.html",
         **updateServer(Hub),
         hub_config=hub_config,
+        pin_array=pin_array,
         use_server=Hub.use_server,
         connect_timeout=Hub.connect_timeout,
         max_time=Hub.max_time,
@@ -343,17 +309,19 @@ Ping: {Hub.ping}"""
         offline=Hub.offline,
         sync_images=Hub.sync_images,
         todo=Hub.todo,
+        output=output,
     )
 
 
 @app.route("/update_version", methods=["GET"])
 def update_version():
+    hub_info = get_hub_info()
     hub_config = f"""Model: {Hub.model}
 MAC Address: {Hub.macAddress}
 Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent}%
-Temperature: {Hub.temperature}°C
+Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
+USB Space: {hub_info[2]}MB ({hub_info[3]}%)
+Temperature: {hub_info[4]:.1f}°C
 Ping: {Hub.ping}"""
 
     if is_debug():
@@ -524,201 +492,59 @@ def update_app_config():
         )
 
 
+def process_hub_form_data(form):
+    """Process form data for Hub configuration and update Hub object.
+
+    Args:
+        form: The form data from the request
+
+    Returns:
+        tuple: (success, error_message) where success is a boolean and error_message is a string
+    """
+    try:
+        # Update Hub object with form data
+        Hub.use_server = "use_server" in form
+        # Parse numeric values with validation
+        Hub.connect_timeout = int(form.get("connect_timeout", 10))
+        Hub.max_time = int(form.get("max_time", 300))
+        Hub.delta_time = int(form.get("delta_time", 300))
+        # Handle checkboxes
+        Hub.offline = "offline" in form
+        Hub.sync_images = "sync_images" in form
+        Hub.todo = "todo" in form
+
+        # Save the Hub configuration locally
+        Hub.write_config()
+        return True, "Configuration saved successfully"
+    except Exception as e:
+        return False, f"Error processing form data: {str(e)}"
+
+
 @app.route("/write_config", methods=["GET", "POST"])
 def write_config():
-    try:
-        # If this is a POST request, update the Hub settings first
-        if request.method == "POST":
-            form = request.form
-            # Update Hub object with form data
-            Hub.use_server = "use_server" in form
-            # Parse numeric values with validation
-            Hub.connect_timeout = int(form.get("connect_timeout", 10))
-            Hub.max_time = int(form.get("max_time", 300))
-            Hub.delta_time = int(form.get("delta_time", 300))
-            # Handle checkboxes
-            Hub.offline = "offline" in form
-            Hub.sync_images = "sync_images" in form
-            Hub.todo = "todo" in form
-
-        # Save the Hub configuration
-        Hub.write_config()
-        hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent} GB
-Temperature: {Hub.temperature}°C
-Ping: {Hub.ping}"""
-
-        if is_debug():
-            hub_config += f"\nToken: {Hub.token}"
-
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output="Configuration saved locally",
-        )
-    except Exception as e:
-        # Recreate hub_config in the exception handler
-        hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent} GB
-Temperature: {Hub.temperature}°C
-Ping: {Hub.ping}"""
-
-        if is_debug():
-            hub_config += f"\nToken: {Hub.token}"
-
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=f"Error saving configuration locally: {str(e)}",
-        )
+    if request.method == "POST":
+        success, message = process_hub_form_data(request.form)
+        return redirect(url_for('HubPage', output=f"{'Success: ' if success else 'Error: '}{message}"))
+    return redirect(url_for('HubPage'))
 
 
-@app.route("/init_hub", methods=["GET", "POST"])
-def init_hub():
-    getLogger().warning("Start init-hub")
-    hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent}%
-Temperature: {Hub.temperature}°C
-Ping: {Hub.ping}"""
-
-    if is_debug():
-        hub_config += f"\nToken: {Hub.token}"
-    try:
-        # Run getTokens() to get authentication tokens
-        tokens_result = getTokens()
-        if tokens_result != 0:
-            return render_template(
-                "Hub.html",
-                **updateServer(Hub),
-                hub_config=hub_config,
-                use_server=Hub.use_server,
-                connect_timeout=Hub.connect_timeout,
-                max_time=Hub.max_time,
-                delta_time=Hub.delta_time,
-                offline=Hub.offline,
-                sync_images=Hub.sync_images,
-                todo=Hub.todo,
-                output="Failed to get tokens",
-            )
-
-        getLogger().warning("Start InitScanners")
-        # Run initScanners() to initialize scanners
-        initScanners()
-        getLogger().warning("End init-hub")
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output="Hub initialized successfully",
-        )
-    except (OSError, ValueError) as e:
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=f"Error: {str(e)}",
-        )
-
-
-@app.route("/poweroff", methods=["POST"])
-def stop_server():
-    result = run(
-        "sudo poweroff", shell=True, capture_output=True, text=True, check=False
-    )
-    return result.stdout
-
-
-@app.route("/send-hub-config", methods=["GET"])
+@app.route("/send-hub-config", methods=["POST"])
 def send_hub_config():
     try:
-        # First ensure we have the latest config saved locally
-        Hub.write_config()
+        # First process the form data and save locally
+        success, message = process_hub_form_data(request.form)
+        if not success:
+            return redirect(url_for('HubPage', output=message))
 
         # Then send to server
         result = SendHubConfigToServer()
-
-        hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent} GB
-Temperature: {Hub.temperature}°C
-Ping: {Hub.ping}"""
-
-        if is_debug():
-            hub_config += f"\nToken: {Hub.token}"
-
         if result == 0:
-            output = "Configuration successfully sent to server"
+            return redirect(url_for('HubPage', output="Configuration successfully sent to server"))
         else:
-            output = "Error sending configuration to server"
+            return redirect(url_for('HubPage', output="Error sending configuration to server"))
 
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=output,
-        )
     except Exception as e:
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=f"Error sending configuration to server: {str(e)}",
-        )
+        return redirect(url_for('HubPage', output=f"Error sending configuration to server: {str(e)}"))
 
 
 @app.route("/get-hub-config", methods=["GET"])
@@ -726,49 +552,74 @@ def get_hub_config():
     try:
         result = ReadHubConfigFromServer()
 
-        hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery Level: {Hub.batteryLevelPercent}%
-Disk Space: {Hub.diskSpacePercent} GB
-Temperature: {Hub.temperature}°C
-Ping: {Hub.ping}"""
-
-        if is_debug():
-            hub_config += f"\nToken: {Hub.token}"
+        # Reload the Hub configuration after downloading from server
+        Hub.read_config()
 
         if result == 0:
-            output = "Configuration successfully downloaded from server"
+            # Redirect to /Hub with success message
+            return redirect(url_for('HubPage', output="Configuration successfully downloaded from server"))
         else:
-            output = "Error downloading configuration from server"
+            # Redirect to /Hub with error message
+            return redirect(url_for('HubPage', output="Error downloading configuration from server"))
 
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=output,
-        )
     except Exception as e:
+        # Redirect to /Hub with error message
+        return redirect(url_for('HubPage', output=f"Error downloading configuration from server: {str(e)}"))
+
+
+@app.route("/init_hub", methods=["GET", "POST"])
+def init_hub():
+    getLogger().warning("Start init-hub")
+    try:
+        # Run getTokens() to get authentication tokens
+        tokens_result = getTokens()
+        if tokens_result != 0:
+            return redirect(url_for('HubPage', output="Failed to get tokens"))
+
+        getLogger().warning("Start InitScanners")
+        # Run initScanners() to initialize scanners
+        initScanners()
+        getLogger().warning("End init-hub")
+        return redirect(url_for('HubPage', output="Hub initialized successfully"))
+
+    except (OSError, ValueError) as e:
+        return redirect(url_for('HubPage', output=f"Error: {str(e)}"))
+
+
+@app.route("/poweroff", methods=["POST"])
+def stop_server():
+
+    if not is_raspberry_pi():
         return render_template(
             "Hub.html",
             **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=f"Error downloading configuration from server: {str(e)}",
+            output="Not on Raspberry Pi",
         )
+
+    # Before remove the USB key, we need to stop the server
+    cmdeject = "sudo eject /dev/sda"
+    result = run(
+        cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
+    )
+    getLogger().warning(cmdeject)
+
+    # Reset the verbosity level int the ConfigApp file
+    # otherwise, the Raspberry Pi will not poweroff
+    # if the log level stays to DEBUG
+    config = ConfigApp()
+    config.log_level = "WARNING"
+    config.save_config()
+    # On enlève également tout fichier DEBUG
+    try:
+        os.remove("DEBUG")
+        getLogger().warning("remove_image_files: removed DEBUG")
+    except (FileNotFoundError, PermissionError) as e:
+        getLogger().error("Error removing file DEBUG: %s", e)
+
+    result = run(
+        "sudo poweroff", shell=True, capture_output=True, text=True, check=False
+    )
+    return result.stdout
 
 
 if __name__ == "__main__":

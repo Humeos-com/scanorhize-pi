@@ -14,116 +14,148 @@
 </style>
 
 <div class="container">
-<form action = "#" method = "post" id="scanner-form">
-<div class="row">
-       <div class="col-md-6">
-              <div class="form-group mb-3">
-                     <input type="text" class="form-control" id="Scanner" name="Scanner" value={{scannerName}} placeholder={{scannerName}} readonly>
-              </div>
-              
-              <div class="form-check mb-3">
-                     <input type="checkbox" class="form-check-input" id="UseServer" name="UseServer" value="1" {% if UseServer == 1 %}checked{% endif %}>
-                     <label class="form-check-label" for="UseServer">Use Server</label>
-                     <small class="form-text text-muted">Download configuration from the platform after each scan</small>
-              </div>
-              
-              <div class="form-check mb-3">
-                     <input type="checkbox" class="form-check-input" id="enable" name="enable" value="1" {% if enable == 1 %}checked{% endif %}>
-                     <label class="form-check-label" for="enable">Scanner enabled</label>
-                     <small class="form-text text-muted">If disabled, this scanner will not be used</small>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="mode">Mode</label>
-                     <select class="form-control" id="mode" name="mode">
-                            <option selected>{{mode}}</option>
-                            <option value="1">{{mode1}}</option>
-                            <option value="2">{{mode2}}</option>
-                            <option value="3">{{mode3}}</option>
-                     </select>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="resolution">Resolution</label>
-                     <select class="form-control" id="resolution" name="resolution">
-                            <option selected>{{resolution}}</option>
-                            <option value="1">{{resolution1}}</option>
-                            <option value="2">{{resolution2}}</option>
-                            <option value="3">{{resolution3}}</option>
-                     </select>
-              </div>  
-              
-              <div class="form-group mb-3">
-                     <label for="l">Length (0..216.7mm)</label>
-                     <input type="text" class="form-control" id="l" name="l" placeholder={{l}}>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="t">Width (0..297.5mm)</label>
-                     <input type="text" class="form-control" id="t" name="t" placeholder={{t}}>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="x">X Position (0..216.7mm)</label>
-                     <input type="text" class="form-control" id="x" name="x" placeholder={{x}}>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="y">Y Position (0..297.5mm)</label>
-                     <input type="text" class="form-control" id="y" name="y" placeholder={{y}}>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="quality">Compression (0..100 no-loss)</label>
-                     <input type="text" class="form-control" id="quality" name="quality" value={{quality}} placeholder={{quality}}>
-              </div>
-       </div>
-       
-       <div class="col-md-6">
-              <div class="form-group mb-3">
-                     <label for="StartDate">Start Date (YYYY-MM-DDTHH:mm:ssZ)</label>
-                     <input type="text" class="form-control" id="StartDate" name="StartDate" value={{StartDate}} placeholder={{StartDate}}>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="PeriodeS">Period</label>
-                     <input type="text" class="form-control" id="PeriodeS" name="PeriodeS" value={{PeriodeS}} placeholder={{PeriodeS}}>
-                     <small class="form-text text-muted">Period between each scan. Can be in seconds or days. For example : 3600s or 0.5d</small>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="TimeBeforeScan">Time Before Scan (s)</label>
-                     <input type="text" class="form-control" id="TimeBeforeScan" name="TimeBeforeScan" value={{TimeBeforeScan}} placeholder={{TimeBeforeScan}}>
-              </div>
-              
-              <div class="form-group mb-3">
-                     <label for="TimeAfterScan">Time After Scan (s)</label>
-                     <input type="text" class="form-control" id="TimeAfterScan" name="TimeAfterScan" value={{TimeAfterScan}} placeholder={{TimeAfterScan}}>
-              </div>
-       </div>
+    <H1>Scanner Configuration</H1>
+    
+    <!-- Readonly Information Section -->
+    <pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">
+Scanner Name: {{scannerName}}
+Device: {{device}}
+Last Image Time: {{LastImgTime}}
+Last Image File: {{LastImgFile}}
+Token: {{token[:24]}}
+Project ID: {{projectId}}
+Sample ID: {{sampleId}}
+Campaign: {{Campaign}}
+</pre>
+
+    <!-- Configuration Form Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Scanner Settings</h4>
+        </div>
+        <div class="card-body">
+            <form action="/Scanner/WriteConfig/{{scan_num_str}}" method="post" id="scanner-form">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="UseServer" name="UseServer" value="1" {% if UseServer == 1 %}checked{% endif %}>
+                            <label class="form-check-label" for="UseServer">Use Server</label>
+                            <small class="form-text text-muted">Download configuration from the platform after each scan</small>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="enable" name="enable" value="1" {% if enable == 1 %}checked{% endif %}>
+                            <label class="form-check-label" for="enable">Scanner enabled</label>
+                            <small class="form-text text-muted">If disabled, this scanner will not be used</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="mode">Mode</label>
+                            <select class="form-control" id="mode" name="mode">
+                                <option selected>{{mode}}</option>
+                                <option value="1">{{mode1}}</option>
+                                <option value="2">{{mode2}}</option>
+                                <option value="3">{{mode3}}</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="resolution">Resolution</label>
+                            <select class="form-control" id="resolution" name="resolution">
+                                <option selected>{{resolution}}</option>
+                                <option value="1">{{resolution1}}</option>
+                                <option value="2">{{resolution2}}</option>
+                                <option value="3">{{resolution3}}</option>
+                            </select>
+                        </div>  
+                        
+                        <div class="form-group mb-3">
+                            <label for="l">Length (0..216.7mm)</label>
+                            <input type="text" class="form-control" id="l" name="l" placeholder={{l}}>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="t">Width (0..297.5mm)</label>
+                            <input type="text" class="form-control" id="t" name="t" placeholder={{t}}>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="x">X Position (0..216.7mm)</label>
+                            <input type="text" class="form-control" id="x" name="x" placeholder={{x}}>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="y">Y Position (0..297.5mm)</label>
+                            <input type="text" class="form-control" id="y" name="y" placeholder={{y}}>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="quality">Compression (0..100 no-loss)</label>
+                            <input type="text" class="form-control" id="quality" name="quality" value={{quality}} placeholder={{quality}}>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="StartDate">Start Date (YYYY-MM-DDTHH:mm:ssZ)</label>
+                            <input type="text" class="form-control" id="StartDate" name="StartDate" value={{StartDate}} placeholder={{StartDate}}>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="PeriodeS">Period</label>
+                            <input type="text" class="form-control" id="PeriodeS" name="PeriodeS" value={{PeriodeS}} placeholder={{PeriodeS}}>
+                            <small class="form-text text-muted">Period between each scan. Can be in seconds or days. For example : 3600s or 0.5d</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="TimeBeforeScan">Time Before Scan (s)</label>
+                            <input type="text" class="form-control" id="TimeBeforeScan" name="TimeBeforeScan" value={{TimeBeforeScan}} placeholder={{TimeBeforeScan}}>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="TimeAfterScan">Time After Scan (s)</label>
+                            <input type="text" class="form-control" id="TimeAfterScan" name="TimeAfterScan" value={{TimeAfterScan}} placeholder={{TimeAfterScan}}>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Write config</button> 
+                    <button type="button" id="send-to-server" class="btn btn-primary">Send conf to server</button>
+                    <a href="/Scanner/GetConfig/{{scan_num_str}}" class="btn btn-primary">Get conf from server</a>
+                    <a href="/Scanner/acqimg/{{scan_num_str}}" class="btn btn-primary">Image scan</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if output %}
+    <div class="alert alert-info mt-3">
+        <strong>Action Result:</strong> {{ output }}
+    </div>
+    {% endif %}
+
+    <!-- Image Display Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Scanner Preview</h4>
+        </div>
+        <div class="card-body text-center">
+            <img src="{{url_for('static', filename=imagename)}}" width="80%" alt="Take a scan"/>
+        </div>
+    </div>
+
+    <!-- Display Stream Section -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Display Stream</h4>
+        </div>
+        <div class="card-body">
+            <pre id="display" class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></pre>
+        </div>
+    </div>
 </div>
 
-<div class="mt-3">
-       <button type="submit" class="btn btn-primary">Write config</button> 
-       <button type="button" id="send-to-server" class="btn btn-primary">Send conf to server</button>
-       <a href="/Scanner/GetConfig/{{scan_num_str}}" class="btn btn-primary">Get conf from server</a>
-       <a href="/Scanner/acqimg/{{scan_num_str}}" class="btn btn-primary">Image scan</a>
-</div>
-
-<p>Last image time : {{LastImgTime}}</p> 
-<p>Token : {{token[:24]}}</p>
-<p>Device : {{device}}</p>
-
-{% if action_output %}
-<div class="alert alert-info mt-3">
-    <strong>Action Result:</strong> {{ action_output }}
-</div>
-{% endif %}
-
-<img src = " {{url_for('static', filename=imagename)}}"width="80%", alt="Take a scan"/>      
-</form>
-
-<pre id="display" class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></pre>
 <script>
 var display = document.getElementById('display');
 var xhr = new XMLHttpRequest();
@@ -144,11 +176,9 @@ document.getElementById('send-to-server').addEventListener('click', function() {
     form.submit();
 });
 </script>
-</div>
 
 {% endblock %}
-      
-   
+
 <script>
 $(document).ready(function(){
     $('[data-toggle="tooltip"]').tooltip();
