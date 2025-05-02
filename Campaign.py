@@ -71,9 +71,16 @@ def CopyImageToUSB(Scanner, FolderImage_):
 
 
 def USBSpace():
+    """Get the USB space
+
+    Returns:
+        int: free space in MB
+        int: free space in percentage
+        str: USB directory
+    """
     USB_DIR = getUsbDir()
     if not is_raspberry_pi():
-        return 4096, 98, USB_DIR
+        return 4096, 100, USB_DIR
 
     try:
         stat = os.statvfs(USB_DIR)
