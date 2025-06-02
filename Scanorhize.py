@@ -616,16 +616,20 @@ def get_hub_config():
 
 @app.route("/init_hub", methods=["GET", "POST"])
 def init_hub():
-    getLogger().warning("Start init-hub")
     try:
+        getLogger().warning("Start InitScanners")
+        # Run initScanners() to initialize scanners
+        # Init Scanners before getting tokens, because this operation
+        # can be completed without network
+        initScanners()
+        getLogger().warning("End InitScanners")
+
         # Run getTokens() to get authentication tokens
+        getLogger().warning("Start init-hub")
         tokens_result = getTokens()
         if tokens_result != 0:
             return redirect(url_for("HubPage", output="Failed to get tokens"))
 
-        getLogger().warning("Start InitScanners")
-        # Run initScanners() to initialize scanners
-        initScanners()
         getLogger().warning("End init-hub")
         return redirect(url_for("HubPage", output="Hub initialized successfully"))
 
