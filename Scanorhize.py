@@ -30,6 +30,7 @@ from Hub import (
 from ConfigApp import (
     getLogger,
     getDisplayFile,
+    getScanorhizeServer,
     is_debug,
     is_prod,
     ConfigApp,
@@ -57,11 +58,16 @@ try:
     has_internet = True
     getLogger().warning("Internet OK !")
     sync_time()
+    # On crée un tunnel SSH inverse pour la maintenance à distance
+    SSH_PORT = 2223
+    cmd = f"ssh -fN -R {SSH_PORT}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
+    run(cmd, shell=True, capture_output=True, text=True, check=False)
+    getLogger().warning("Tunnel SSH inverse créé sur le port %d pour le serveur %s", SSH_PORT, getScanorhizeServer())
 
 except RuntimeError as exc:
     getLogger().error("No internet connection: %s", exc)
 
-# init
+# A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
 SSID = GetWifiSSID()
 getLogger().warning("SSID: %s", SSID)
 IP = GetIP()
@@ -330,7 +336,7 @@ Ping: {Hub.ping}"""
     )
 
 
-@app.route("/update_version", methods=["GET"])
+@app.route("/update_version", methods=["POST", "GET"])
 def update_version():
     hub_info = get_hub_info()
     hub_config = f"""Model: {Hub.model}
@@ -357,12 +363,15 @@ Ping: {Hub.ping}"""
             sync_images=Hub.sync_images,
             todo=Hub.todo,
             output="No update, not on Raspberry Pi",
+            hub_info=hub_info,
+            SSID=SSID,
+            IP=IP
         )
     try:
-        getLogger().warning("Update version")
-        hub_id = Hub.macAddress.replace(":", "")
+        cmd_update = "s3cmd --no-preserve sync s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
+        getLogger().warning("Update version: %s", cmd_update)
         result = run(
-            f"s3cmd --no-preserve sync s3://hub-{hub_id}/home/pi/Scanorhize/ /home/pi/Scanorhize/",
+            cmd_update,
             shell=True,
             capture_output=True,
             text=True,
@@ -380,6 +389,9 @@ Ping: {Hub.ping}"""
             sync_images=Hub.sync_images,
             todo=Hub.todo,
             output=result.stdout,
+            hub_info=hub_info,
+            SSID=SSID,
+            IP=IP
         )
     except CalledProcessError as e:
         return render_template(
@@ -394,6 +406,9 @@ Ping: {Hub.ping}"""
             sync_images=Hub.sync_images,
             todo=Hub.todo,
             output=f"Command failed: {e.stderr}",
+            hub_info=hub_info,
+            SSID=SSID,
+            IP=IP
         )
 
 
@@ -617,6 +632,13 @@ def get_hub_config():
 @app.route("/init_hub", methods=["GET", "POST"])
 def init_hub():
     try:
+        Hub.read_config()
+        # Permet de mettre à jour les valeurs de Hub.macAddress et Hub.model
+        # dans les 2 cas suivants:
+        # 1. Le fichier Hub.json n'existe pas
+        # 2. Le fichier Hub.json provient d'un autre Hub
+        Hub.write_config()
+
         getLogger().warning("Start InitScanners")
         # Run initScanners() to initialize scanners
         # Init Scanners before getting tokens, because this operation

@@ -2,16 +2,13 @@
     "battery_file": "Battery.txt",
     "config_dir": "ConfigFile",
     "config_hub_file": "Hub.json",
-    "connect_timeout": 10,
     "display_file": "Display.txt",
-    "environment": "DEV",
     "image_dir": "static",
     "log_dir": "Log",
-    "log_level": "DEBUG",
+    "log_level": "INFO",
     "max_time": "300",
-    "next_date_file": "NextStartDate.json",
     "s3_bucket": "s3://scanorhize-images-prod",
-    "scanorhize_server": "scanorhize.duckdns.org",
+    "scanorhize_server": "backend-prod.humeos.com",
     "uhubctl": "/usr/sbin/uhubctl",
-    "usb_dir": "/Users/aa2/Projets/Scanorhize/raspberry/pi/media"
+    "usb_dir": "/media/pi/Image"
 }
