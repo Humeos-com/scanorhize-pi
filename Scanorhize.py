@@ -483,11 +483,21 @@ def update_app_config():
         new_log_level = request.form.get("log_level")
         new_usb_dir = request.form.get("usb_dir")
 
+        # Get hub info with error handling
+        try:
+            hub_info = get_hub_info()
+        except Exception as e:
+            getLogger().error("Error getting hub info: %s", str(e))
+            hub_info = [0, 0, 0, 0, 0]  # Default values if get_hub_info fails
+
         if new_log_level not in ["WARNING", "INFO", "DEBUG"]:
             return render_template(
                 "App.html",
                 app_config=ConfigApp().__dict__,
                 output="Invalid log level value. Must be WARNING, INFO, or DEBUG.",
+                hub_info=hub_info,
+                SSID=SSID,
+                IP=IP
             )
 
         # Get ConfigApp instance
@@ -520,13 +530,30 @@ def update_app_config():
             "scanorhize_server": config.scanorhize_server,
         }
 
-        return render_template("App.html", app_config=app_config, output=output)
+        return render_template(
+            "App.html",
+            app_config=app_config,
+            output=output,
+            hub_info=hub_info,
+            SSID=SSID,
+            IP=IP
+        )
 
     except Exception as e:
+        # Get hub info with error handling for error case too
+        try:
+            hub_info = get_hub_info()
+        except Exception as e2:
+            getLogger().error("Error getting hub info: %s", str(e2))
+            hub_info = [0, 0, 0, 0, 0]  # Default values if get_hub_info fails
+
         return render_template(
             "App.html",
             app_config=ConfigApp().__dict__,
             output=f"Error updating configuration: {str(e)}",
+            hub_info=hub_info,
+            SSID=SSID,
+            IP=IP
         )
 
 
