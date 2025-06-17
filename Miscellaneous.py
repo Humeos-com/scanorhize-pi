@@ -221,13 +221,13 @@ if __name__ == "__main__":
                 f"Basculer Scanner-{int_scan + 1} ? [Non=Entrée, sinon, Oui=o]: "
             )
             if value == "o":
-                state = ReadGPIOInput(get_ch_pin(int_scan))
-                if state:
-                    TurnUsbOn(int_scan, 1)
-                else:
-                    TurnUsbOff(int_scan, 1)
+                # state = ReadGPIOInput(get_ch_pin(int_scan))
+                # if state:
+                TurnUsbOn(int_scan, 1)
+                # else:
+                #    TurnUsbOff(int_scan, 1)
                 print(
-                    f"  bascule Scanner-{int_scan + 1} pin {get_ch_pin(int_scan)} {not state}"
+                    f"  bascule Scanner-{int_scan + 1} pin {get_ch_pin(int_scan)} On"
                 )
     except RuntimeError as e:
         print(f"RuntimeError: {e}")
