@@ -331,9 +331,11 @@ def SendParameters(Hub_: HubData):
     # print(battery,diskspace,temperature)
     hub_info = get_hub_info()
     json_data = {
+        "batteryVoltage": hub_info[0],
         "batteryLevelPercent": hub_info[1],
         "temperatureCelsius": hub_info[4],
         "availableMemoryGB": hub_info[2],
+        "diskUsagePercent": hub_info[3],
     }
 
     cmdPUT = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \

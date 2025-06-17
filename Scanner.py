@@ -227,9 +227,10 @@ class ScannerData:
             self.device = "NoScannerDetected"
             self.enable = 0
             self.UseServer = 0
+            self.projectId = ""
+            self.sampleId = ""
             self.token = "token"
-            getLogger().warning("scanSearch: No scanner detected - device: %s, enable: %d, error: %d, res: %d, message: '%s'",
-                              self.device, self.enable, self.error, res, scanimage_message)
+            getLogger().warning("scanSearch: No scanner detected")
 
         getLogger().warning("scanSearch: device %s", self.device)
         # TurnUsbOff(i_scan, self.TimeAfterScan)
