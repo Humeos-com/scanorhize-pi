@@ -239,7 +239,7 @@ def getTokens():
                     Scanner_.WriteScannerConfig(f"Scanner-{i}.json")
                 else:
                     getLogger().error("Missing token for %s", port_key)
-                    return 1
+                    continue
         return 0
 
     except (IndexError, ValueError, json.JSONDecodeError, KeyError) as e:

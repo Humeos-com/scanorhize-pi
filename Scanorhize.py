@@ -146,7 +146,7 @@ def ScannerPage(scan_num_str: str):
     Scannerparam = updateScanParameters(Scanner)
     Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
     getLogger().warning("Scanner n° : %s", str(i_scan + 1))
-    Scanner.printScanner()
+    # Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     return render_template(
         "Scanner.html",
@@ -234,7 +234,7 @@ def action(actionName: str, scan_num_str: str):
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     getLogger().warning("Scanner n° : %s", str(i_scan + 1))
-    Scanner.printScanner()
+    # Scanner.printScanner()
 
     if actionName == "acqimg":
         InitGPIO()

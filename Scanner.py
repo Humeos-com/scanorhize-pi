@@ -182,19 +182,20 @@ class ScannerData:
         ~/Scanorhize $
         """
 
+        getLogger().warning("scanSearch: Starting scanner detection for port %d", i_scan + 1)
         error = TurnUsbOn(i_scan, 5)
         # error = TurnUsbOn(i_scan, self.TimeBeforeScan)
         if error != 0:
             self.error = 1
+            getLogger().warning("scanSearch: TurnUsbOn failed with error %d", error)
             return self
 
         res = 1
         # attribut par défaut si on ne trouve rien
         scanimage_message = "No scanners were identified"
         if is_raspberry_pi():
-
             command = f"scanimage -f '%d' " f"| tee -a {DISPLAY_FILE}"
-            getLogger().warning("scanSearch: %s", command)
+            getLogger().warning("scanSearch: Executing command: %s", command)
             result = run(
                 command,
                 capture_output=True,
@@ -202,24 +203,33 @@ class ScannerData:
                 shell=True,
                 check=False,
             )
-            # print(result.returncode, result.stdout, result.stderr)
             res = result.returncode
             scanimage_message = result.stdout
+            getLogger().warning("scanSearch: Command result - returncode: %d, stdout: '%s', stderr: '%s'",
+                              res, scanimage_message, result.stderr)
             if len(scanimage_message) == 0:
                 res = 1
+                getLogger().warning("scanSearch: Empty scanimage output, setting res to 1")
         else:
             # fake scanimage message
             res = 0
             scanimage_message = """pixma:00000_ABABAB"""
-            # pour les Epson :
-            # epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
+            getLogger().warning("scanSearch: Using fake scanimage message: %s", scanimage_message)
 
-        self.device = "NoScannerDetected"
-        self.enable = 0
-        if res == 0:
+        if res == 0 and len(scanimage_message.strip()) > 0:
             self.error = 0
-            self.device = scanimage_message
+            self.device = scanimage_message.strip()
             self.enable = 1
+            getLogger().warning("scanSearch: Scanner detected successfully - device: %s, enable: %d, error: %d",
+                              self.device, self.enable, self.error)
+        else:
+            self.error = 1
+            self.device = "NoScannerDetected"
+            self.enable = 0
+            self.UseServer = 0
+            self.token = "token"
+            getLogger().warning("scanSearch: No scanner detected - device: %s, enable: %d, error: %d, res: %d, message: '%s'",
+                              self.device, self.enable, self.error, res, scanimage_message)
 
         getLogger().warning("scanSearch: device %s", self.device)
         # TurnUsbOff(i_scan, self.TimeAfterScan)
@@ -446,21 +456,25 @@ def listScannerSerials():
         serial = extract_serial(scanner.device)
         if serial:  # Only add non-empty serials
             listserials.append(serial)
+        else:
+            listserials.append("")
 
     getLogger().warning(str(listserials))
     return listserials
 
 
 def listConfigScanner():
-    try:
-        # de la forme Scanner-[1-9].json
-        listfile = [
-            f for f in os.listdir(getConfigDir()) if re.match(r"Scanner-[1-9].json", f)
-        ]
-        listfile.sort(reverse=False)
-        getLogger().warning(str(listfile))
-    except OSError:
-        listfile = ["Scanner-1.json", "Scanner-2.json", "Scanner-3.json"]
+
+    # Pour l'instant, on prend les 3 fichiers de configuration
+    # try:
+    #    # de la forme Scanner-[1-9].json
+    #    listfile = [
+    #        f for f in os.listdir(getConfigDir()) if re.match(r"^Scanner-[1-9].json$", f)
+    #    ]
+    #    listfile.sort(reverse=False)
+    #    getLogger().warning(str(listfile))
+    # except OSError:
+    listfile = ["Scanner-1.json", "Scanner-2.json", "Scanner-3.json"]
     return listfile
 
 
@@ -491,19 +505,22 @@ def initScanners():
     for CurrentScanner in listScannerconfigs_:
         scanner.ReadScannerConfig(CurrentScanner)
         scanner.scanSearch(i_scan)
+        # Only set timing parameters if scanner was detected successfully
         if scanner.error == 0:
-            # initialisation des paramètres du scanner
-            scanner.enable = 1
             scanner.TimeBeforeScan = (
                 TIME_BEFORE_SCAN_PIXMA if scanner.is_pixma() else TIME_BEFORE_SCAN_EPSON
             )
             scanner.TimeAfterScan = (
                 TIME_AFTER_SCAN_PIXMA if scanner.is_pixma() else TIME_AFTER_SCAN_EPSON
             )
+            getLogger().warning("Scanner-%d: Scanner detected and enabled", i_scan + 1)
         else:
-            scanner.enable = 0
-        if is_raspberry_pi():
-            scanner.WriteScannerConfig(CurrentScanner)
+            getLogger().warning("Scanner-%d: No scanner detected, disabled", i_scan + 1)
+
+        # Always write the configuration
+#        if is_raspberry_pi():
+        scanner.WriteScannerConfig(CurrentScanner)
+        getLogger().warning("Scanner-%d: Configuration written", i_scan + 1)
         i_scan += 1
     if i_scan == 0:
         getLogger().warning("initScanners: Aucun scanner trouvé")
