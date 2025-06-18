@@ -24,6 +24,7 @@ from gpio_utils import (
     turn_usb_off,
     read_gpio_config,
     read_gpio_input,
+    read_gpio_output,
 )
 from pin_config import get_ch_pin, CHRG_PIN, STDBY_PIN
 
@@ -203,6 +204,11 @@ def ReadGPIOInput(pin: int):
     return read_gpio_input(pin)
 
 
+def ReadGPIOOutput(pin: int):
+    """Read the state of a GPIO output pin"""
+    return read_gpio_output(pin)
+
+
 if __name__ == "__main__":
     print("Test unitaire Miscellaneous")
     InitGPIO()
@@ -221,19 +227,21 @@ if __name__ == "__main__":
                 f"Basculer Scanner-{int_scan + 1} ? [Non=Entrée, sinon, Oui=o]: "
             )
             if value == "o":
-                # state = ReadGPIOInput(get_ch_pin(int_scan))
-                # if state:
-                TurnUsbOn(int_scan, 1)
-                # else:
-                #    TurnUsbOff(int_scan, 1)
+                state = ReadGPIOOutput(get_ch_pin(int_scan))
+                if state:
+                    TurnUsbOff(int_scan, 1)
+                else:
+                    TurnUsbOn(int_scan, 1)
                 print(
-                    f"  bascule Scanner-{int_scan + 1} pin {get_ch_pin(int_scan)} On"
+                    f"  bascule Scanner-{int_scan + 1} pin {get_ch_pin(int_scan)} {state}"
                 )
     except RuntimeError as e:
         print(f"RuntimeError: {e}")
         EndGPIO()
-        sys.exit(0)
+        sys.exit(1)
 
-    disable4G()
+    # disable4G()
     # le EndGPIO remet les GPIO dans l'état d'origine, il éteint donc les relais
-    ## EndGPIO()
+    # ce qu'on ne veut pas si on doit scanner...
+    # EndGPIO()
+    sys.exit(0)

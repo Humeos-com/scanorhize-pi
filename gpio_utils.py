@@ -159,3 +159,23 @@ def read_gpio_input(pin: int):
 
 def read_gpio_config():
     return read_gpio_input(CONFIG_PIN)
+
+
+def read_gpio_output(pin: int):
+    """Read the state of a GPIO output pin
+
+    Args:
+        pin (int): The GPIO pin number to read
+
+    Returns:
+        int: 1 if the pin is HIGH, 0 if the pin is LOW
+    """
+    if not is_raspberry_pi():
+        return 0
+    try:
+        state = GPIO.input(pin)
+        getLogger().warning("GPIO output state pin %d: %d", pin, state)
+        return state
+    except IOError as e:
+        getLogger().error("read_gpio_output IOError: %s", e)
+        return 0
