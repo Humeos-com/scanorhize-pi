@@ -153,8 +153,9 @@ def disable4G():
     return disable_4g()
 
 
-def check_connectivity(max_attempts=12):
-    """Check connectivity to the server with retries"""
+def check_connectivity(max_attempts=25):
+    """Check connectivity to the server with retries
+    25 retries = 2 minutes"""
     res = 0
     iteration = 0
     while res == 0 and iteration < max_attempts:
