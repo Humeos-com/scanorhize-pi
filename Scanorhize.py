@@ -693,7 +693,12 @@ def stop_server():
     result = run(
         cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    getLogger().warning(cmdeject)
+    getLogger().warning("Eject command: %s", cmdeject)
+    if result.returncode == 0:
+        getLogger().warning("SD card ejected successfully")
+    else:
+        getLogger().warning("SD card eject failed (return code: %d, stderr: %s)",
+                          result.returncode, result.stderr)
 
     # Reset the verbosity level int the ConfigApp file
     # otherwise, the Raspberry Pi will not poweroff
