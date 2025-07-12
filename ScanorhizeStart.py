@@ -53,6 +53,7 @@ EndGPIO()
 nextStartDateValue = calculate_and_set_next_date()
 
 if config:
+    getLogger().warning("On passe en mode config")
     # En mode config on lance le serveur web Scanorhize et on quitte
     if enable4G():
         getLogger().warning("4G enabled")
