@@ -22,6 +22,7 @@ else:
 WITTY_PI_3_I2C_ADDRESS = 0x69
 WITTY_PI_4_I2C_ADDRESS = 0x8
 WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37  # 55 en décimal
+WITTY_PI_4_REASON_CLICK = 0x03
 
 
 class WittyPi:
@@ -54,6 +55,7 @@ class WittyPi:
             self.temperature = 0.0
             self.power_mode = 0
             self.firmware_revision = 0
+            self.reason_click = 0
 
             self.get_firmware_id()
             if self.firmware_id is None:
@@ -65,6 +67,7 @@ class WittyPi:
             self.get_output_current()
             self.get_temperature()
             self.get_firmware_revision()
+            self.get_reason_click()
 
             self.initialized = True  # Mark as initialized
 
@@ -133,6 +136,12 @@ class WittyPi:
         self.firmware_revision = self.read_register(12)
         return self.firmware_revision
 
+    def get_reason_click(self):
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0
+        self.reason_click = self.read_register(11)
+        return self.reason_click
+
     def read_register(self, register, len_=1):
 
         try:
@@ -165,6 +174,11 @@ class WittyPi:
     def is_WittyPi_4_L3V7(self):
 
         return self.firmware_id == WITTY_PI_4_L3V7_FIRMWARE_ID
+
+    def is_reason_click(self):
+        if self.i2c_bus is None or self.firmware_id is None:
+            return False
+        return self.reason_click == WITTY_PI_4_REASON_CLICK
 
     def __str__(self):
 
@@ -229,6 +243,11 @@ def get_power_mode():
 def ReadTemp():
 
     return WittyPi().get_temperature()
+
+
+def is_reason_click():
+
+    return WittyPi().is_reason_click()
 
 
 def main():

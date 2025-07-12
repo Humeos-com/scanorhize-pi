@@ -7,6 +7,7 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 import sys
 from subprocess import run, CalledProcessError
 
+from WittyPython import is_reason_click
 from WittyPy import doShutdown, setNextShutdownDate
 from Miscellaneous import (
     EndGPIO,
@@ -36,7 +37,7 @@ from Hub import (
 getLogger().warning("ScanorhizeStart.py")
 
 # On regarde si on est en mode configuration
-config = ReadGPIOConfig()
+config = not ReadGPIOConfig() or is_reason_click()  # 0 ou 1
 EndGPIO()
 
 # Etape 1 #############################################
@@ -51,7 +52,7 @@ EndGPIO()
 # le boitier à l'heure correcte.
 nextStartDateValue = calculate_and_set_next_date()
 
-if config == 0:
+if config:
     # En mode config on lance le serveur web Scanorhize et on quitte
     if enable4G():
         getLogger().warning("4G enabled")
