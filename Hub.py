@@ -162,7 +162,7 @@ def remove_image_files(folder: str):
 def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
     src = path.join(getUsbDir(), hub_.projectId)
-    cmd = f"s3cmd --no-preserve --no-check-md5 --quiet sync {src} {getS3Bucket()}"
+    cmd = f"s3cmd --no-preserve --no-progress sync {src} {getS3Bucket()}"
     getLogger().warning(cmd)
     try:
         result = run(
