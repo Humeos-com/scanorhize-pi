@@ -15,9 +15,11 @@ Les images seront envoyées par le processus ScanorhizeStart.py
 
 from time import sleep
 from os import path
+import argparse
+
 
 from ConfigApp import getLogger
-from Hub import getDeltaTime
+from Hub import getDeltaTime, getSyncImages, syncImageFiles, HubData
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Miscellaneous import (
@@ -26,6 +28,20 @@ from Miscellaneous import (
 )
 from Campaign import CopyImageToUSB, CreateFolderOnUSB
 from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
+
+parser = argparse.ArgumentParser(
+    prog="ScanorhizeProcess.py",
+    usage="%(prog)s [--force]",
+    epilog="""Lance l'aquisition des images. --force force l'acquisition même si la date de déclenchement n'est pas atteinte""",
+)
+parser.add_argument(
+    "-f", "--force",
+    action="store_true",
+    help="Force l'acquisition même si la date de déclenchement n'est pas atteinte",
+)
+
+args = parser.parse_args()
+force = bool(args.force)
 
 CurrentDate = GetCurrentDate()
 CurrentDateinS = DateToSeconds(CurrentDate)
@@ -57,10 +73,12 @@ for CurrentScanner in listScannerconfigs:
     )
     NextStartseconds = NextStartseconds - Scanner.PeriodeS
     # On déclenche l'acquisition si la date courante voisine à "DeltaTime près" de la date de déclenchement
-    if (
+    if force or (
         CurrentDateinS > DateOriginS
         and NextStartseconds <= CurrentDateinS <= NextStartseconds + getDeltaTime()
     ):
+        if force:
+            getLogger().warning("Force acquisition")
         # get image from scanner
         getLogger().warning("Scanner %s: start image acquisition", str(i_scan + 1))
         Scanner = scanAcq(Scanner, i_scan, CurrentDate)
@@ -87,3 +105,10 @@ for CurrentScanner in listScannerconfigs:
         )
     i_scan = i_scan + 1
 # fin for
+if force:
+    # On peut travailler sans synchroniser les images si le réseau est mauvais
+    # ou si les images sont trop grosses pour le réseau
+    Hub = HubData()
+    Hub.read_config()
+    if getSyncImages():
+        syncImageFiles(Hub)
