@@ -4,9 +4,13 @@ C'est le Hub qui synchronise les fichiers images et JSON sur le serveur
 """
 
 import os
+import sys
 from os import path
 from subprocess import run, SubprocessError, CalledProcessError
 import json
+import argparse
+from version import __version__
+
 from ConfigApp import (
     getConfigHubFile,
     getScanorhizeServer,
@@ -62,6 +66,8 @@ class HubData:
         # si self.todo = True, alors on va chercher le fichier todo.sh
         # et on va l'exécuter au réveil suivant
         self.todo: bool = False
+        # version du hub
+        self.version: str = __version__
 
         self.initialized = True  # Mark as initialized
         self.read_config()
@@ -92,6 +98,7 @@ class HubData:
         # On ecrase toujours ces 2 valeurs
         self.macAddress = getHwAddr()
         self.model = get_model()
+        self.version = __version__
         return self
 
     def print(self):
@@ -336,6 +343,7 @@ def SendParameters(Hub_: HubData):
         "temperatureCelsius": hub_info[4],
         "availableMemoryGB": hub_info[2],
         "diskUsagePercent": hub_info[3],
+        "version": Hub_.version,
     }
 
     cmdPUT = f"""curl -i --connect-timeout {getConnectTimeout()} --max-time {getMaxTime()} \
@@ -437,6 +445,21 @@ def get_hub_info():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="Hub.py",
+        usage="%(prog)s [--version]",
+        epilog="""Lance la synchronisation des fichiers images et JSON sur le serveur""",
+    )
+    parser.add_argument(
+        "-v", "--version",
+        action="store_true",
+        help="Affiche la version du programme",
+    )
+    args = parser.parse_args()
+    if args.version:
+        print(f"Hub.py version: {__version__}")
+        sys.exit(0)
+
     # pylint: disable=duplicate-code
     getTokens()
     # syncImageFiles()
