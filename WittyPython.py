@@ -88,9 +88,11 @@ class WittyPi:
         if self.i2c_bus is None or self.firmware_id is None:
             return 0.0
         if self.get_power_mode() != 0:
-            self.input_voltage = (
-                self.read_register(0x01) + self.read_register(0x02) / 100
-            )
+            reg_01 = self.read_register(0x01)
+            reg_02 = self.read_register(0x02)
+            if reg_01 is None or reg_02 is None:
+                self.input_voltage = 0.0
+            self.input_voltage = reg_01 + reg_02 / 100
         else:
             self.input_voltage = 0.0
         return self.input_voltage
@@ -99,6 +101,10 @@ class WittyPi:
 
         if self.i2c_bus is None or self.firmware_id is None:
             return 0.0
+        reg_03 = self.read_register(0x03)
+        reg_04 = self.read_register(0x04)
+        if reg_03 is None or reg_04 is None:
+            return 0.0
         self.output_voltage = self.read_register(0x03) + self.read_register(0x04) / 100
         return self.output_voltage
 
@@ -106,7 +112,11 @@ class WittyPi:
 
         if self.i2c_bus is None or self.firmware_id is None:
             return 0.0
-        self.output_current = self.read_register(0x05) + self.read_register(0x06) / 100
+        reg_05 = self.read_register(0x05)
+        reg_06 = self.read_register(0x06)
+        if reg_05 is None or reg_06 is None:
+            return 0.0
+        self.output_current = reg_05 + reg_06 / 100
         return self.output_current
 
     def get_power_mode(self):
