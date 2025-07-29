@@ -5,6 +5,8 @@ de la carte Raspberry Pi
 from time import sleep
 from logging import getLogger
 from OSUtils import is_raspberry_pi
+import argparse
+from version import __version__
 
 
 # pylint: disable=ungrouped-imports
@@ -273,5 +275,20 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="WittyPython.py",
+        usage="%(prog)s [--version]",
+        epilog="""Affiche les informations sur la carte Witty Pi""",
+    )
+    parser.add_argument(
+        "-v", "--version",
+        action="store_true",
+        help="Affiche la version du programme",
+    )
+
+    args = parser.parse_args()
+    if args.version:
+        print(f"WittyPython.py version: {__version__}")
+        sys.exit(0)
 
     main()

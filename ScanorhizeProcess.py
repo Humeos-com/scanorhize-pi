@@ -14,9 +14,10 @@ Les images seront envoyées par le processus ScanorhizeStart.py
 """
 
 from time import sleep
+import sys
 from os import path
 import argparse
-
+from version import __version__
 
 from ConfigApp import getLogger
 from Hub import getDeltaTime, getSyncImages, syncImageFiles, HubData
@@ -31,7 +32,7 @@ from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
 
 parser = argparse.ArgumentParser(
     prog="ScanorhizeProcess.py",
-    usage="%(prog)s [--force]",
+    usage="%(prog)s [--force] [--version]",
     epilog="""Lance l'aquisition des images. --force force l'acquisition même si la date de déclenchement n'est pas atteinte""",
 )
 parser.add_argument(
@@ -39,8 +40,17 @@ parser.add_argument(
     action="store_true",
     help="Force l'acquisition même si la date de déclenchement n'est pas atteinte",
 )
+parser.add_argument(
+    "-v", "--version",
+    action="store_true",
+    help="Affiche la version du programme",
+)
 
 args = parser.parse_args()
+if args.version:
+    print(f"ScanorhizeProcess.py version: {__version__}")
+    sys.exit(0)
+
 force = bool(args.force)
 
 CurrentDate = GetCurrentDate()

@@ -31,10 +31,26 @@ from Hub import (
     ReadHubConfigFromServer,
     get_hub_info,
 )
+import argparse
+from version import __version__
 
+parser = argparse.ArgumentParser(
+    prog="ScanorhizeStart.py",
+    usage="%(prog)s [--version]",
+    epilog="""Lance le scan des images""",
+)
+parser.add_argument(
+    "-v", "--version",
+    action="store_true",
+    help="Affiche la version du programme",
+)
+args = parser.parse_args()
+if args.version:
+    print(f"ScanorhizeStart.py version: {__version__}")
+    sys.exit(0)
 
 # Etape 0 #############################################
-getLogger().warning("ScanorhizeStart.py")
+getLogger().warning("ScanorhizeStart.py version: %s", __version__)
 
 # On regarde si on est en mode configuration
 config = not ReadGPIOConfig() or is_reason_click()  # 0 ou 1

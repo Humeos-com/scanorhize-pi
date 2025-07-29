@@ -1,9 +1,13 @@
 """Application Web pour configurer les scanners"""
 
 import os
+import sys
 from subprocess import run, CalledProcessError
 from time import sleep
 import random  # Add this import
+import argparse
+from version import __version__
+
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from Scanner import (
@@ -47,8 +51,23 @@ from Miscellaneous import (
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
+parser = argparse.ArgumentParser(
+    prog="Scanorhize.py",
+    usage="%(prog)s [--version]",
+    epilog="""Lance l'application web de gestion des scanners""",
+)
+parser.add_argument(
+    "-v", "--version",
+    action="store_true",
+    help="Affiche la version du programme",
+)
+args = parser.parse_args()
+if args.version:
+    print(f"Scanorhize.py version: {__version__}")
+    sys.exit(0)
+
 initDisplayFile()
-getLogger().warning("Start Scanorhize.py")
+getLogger().warning("Start Scanorhize.py version: %s", __version__)
 Hub = HubData()
 getLogger().warning("Launch Web app")
 app = Flask(__name__)
@@ -62,7 +81,8 @@ def get_common_template_vars():
         SSID=SSID,
         IP=IP,
         hub_info=get_hub_info(),
-        SSH_PORT=SSH_PORT
+        SSH_PORT=SSH_PORT,
+        version=__version__
     )
 
 try:
