@@ -6,10 +6,9 @@ from subprocess import run, CalledProcessError
 from time import sleep
 import random  # Add this import
 import argparse
-from version import __version__
-
-
 from flask import Flask, render_template, request, jsonify, redirect, url_for
+
+from version import __version__
 from Scanner import (
     ScannerData,
     ScannerPreview,
@@ -78,8 +77,8 @@ SSH_PORT = random.randint(2223, 2299)  # Random port between 2223-2299
 def get_common_template_vars():
     """Get common variables for templates with fresh hub_info"""
     return dict(
-        SSID=SSID,
-        IP=IP,
+        SSID=GetWifiSSID(),
+        IP=GetIP(),
         hub_info=get_hub_info(),
         SSH_PORT=SSH_PORT,
         version=__version__
@@ -99,10 +98,8 @@ except RuntimeError as exc:
     getLogger().error("No internet connection: %s", exc)
 
 # A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
-SSID = GetWifiSSID()
-getLogger().warning("SSID: %s", SSID)
-IP = GetIP()
-getLogger().warning("IP: %s", IP)
+getLogger().warning("SSID: %s", GetWifiSSID())
+getLogger().warning("IP: %s", GetIP())
 
 
 # This function does not allow caching of images from browser

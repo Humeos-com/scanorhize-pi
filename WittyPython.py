@@ -4,8 +4,9 @@ de la carte Raspberry Pi
 
 from time import sleep
 from logging import getLogger
-from OSUtils import is_raspberry_pi
 import argparse
+import sys
+from OSUtils import is_raspberry_pi
 from version import __version__
 
 
