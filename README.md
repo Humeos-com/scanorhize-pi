@@ -4,7 +4,8 @@
 Programmes qui sont installés sur le Raspberry
 
 ## Installation
-L'installation se fait par copie de la SDCard...ou par Ansible
+L'installation d'un Hub se fait par Ansible.
+Cette méthode permet de faire évoluer les composants, les configuration et assure la répétabilité du processus.
 
 ### Prérequis
 - Avoir un boitier Raspberry Pi 4 ou Pi 5 avec une carte WittyPi 3, 4 ou 4L3V7.
@@ -20,12 +21,9 @@ Selon les composants utilisés pour fabriquer le boitier, les GPIO utilisés son
 * STDBY_PIN: int = 6  # input to detect standby status
 
 #### Mode Configuration
-On peut mettre le boitier en mode configuration si on laisse le GPIO
-concernée sur le 0V (GND) au démarrage de l'application.
-Il faut donc laisser le bouton config appuyé pendant 2 minutes suite au démarrage du boitier.
-On entend alors un relai qui claque.
-Sur les anciens boitiers WittyPi_3, on utilise GPIO-17 (pin physique 11)
-Sur les nouveaux boitiers on utilise GPIO-16 (pin physique 36 + ground 34)<br>
+Le fait d'allumer le boitier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte WittyPi.
+En mode configuration le premier relai qui s'allume et le relai de la clé 4G.
+En mode nominal (acquisitions), le relai 1 de la clé 4G s'allume à la fin des acquisitions pour transmttre les images.
 
 ATTENTION: lorsqu'on lance le mode configuration le boitier s'arrête au bout de 20 minutes par sécurité (sinon il ne s'arrêterait pas et viderait la batterie)
 Il est recommandé de l'arrêter avant par l'interface Web, avec le bouton Poweroff
