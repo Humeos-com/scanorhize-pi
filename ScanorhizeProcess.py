@@ -36,12 +36,14 @@ parser = argparse.ArgumentParser(
     epilog="""Lance l'aquisition des images. --force force l'acquisition même si la date de déclenchement n'est pas atteinte""",
 )
 parser.add_argument(
-    "-f", "--force",
+    "-f",
+    "--force",
     action="store_true",
     help="Force l'acquisition même si la date de déclenchement n'est pas atteinte",
 )
 parser.add_argument(
-    "-v", "--version",
+    "-v",
+    "--version",
     action="store_true",
     help="Affiche la version du programme",
 )

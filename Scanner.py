@@ -182,7 +182,9 @@ class ScannerData:
         ~/Scanorhize $
         """
 
-        getLogger().warning("scanSearch: Starting scanner detection for port %d", i_scan + 1)
+        getLogger().warning(
+            "scanSearch: Starting scanner detection for port %d", i_scan + 1
+        )
         error = TurnUsbOn(i_scan, 5)
         # error = TurnUsbOn(i_scan, self.TimeBeforeScan)
         if error != 0:
@@ -205,23 +207,35 @@ class ScannerData:
             )
             res = result.returncode
             scanimage_message = result.stdout
-            getLogger().warning("scanSearch: Command result - returncode: %d, stdout: '%s', stderr: '%s'",
-                              res, scanimage_message, result.stderr)
+            getLogger().warning(
+                "scanSearch: Command result - returncode: %d, stdout: '%s', stderr: '%s'",
+                res,
+                scanimage_message,
+                result.stderr,
+            )
             if len(scanimage_message) == 0:
                 res = 1
-                getLogger().warning("scanSearch: Empty scanimage output, setting res to 1")
+                getLogger().warning(
+                    "scanSearch: Empty scanimage output, setting res to 1"
+                )
         else:
             # fake scanimage message
             res = 0
             scanimage_message = """pixma:00000_ABABAB"""
-            getLogger().warning("scanSearch: Using fake scanimage message: %s", scanimage_message)
+            getLogger().warning(
+                "scanSearch: Using fake scanimage message: %s", scanimage_message
+            )
 
         if res == 0 and len(scanimage_message.strip()) > 0:
             self.error = 0
             self.device = scanimage_message.strip()
             self.enable = 1
-            getLogger().warning("scanSearch: Scanner detected successfully - device: %s, enable: %d, error: %d",
-                              self.device, self.enable, self.error)
+            getLogger().warning(
+                "scanSearch: Scanner detected successfully - device: %s, enable: %d, error: %d",
+                self.device,
+                self.enable,
+                self.error,
+            )
         else:
             self.error = 1
             self.device = "NoScannerDetected"
@@ -519,7 +533,7 @@ def initScanners():
             getLogger().warning("Scanner-%d: No scanner detected, disabled", i_scan + 1)
 
         # Always write the configuration
-#        if is_raspberry_pi():
+        #        if is_raspberry_pi():
         scanner.WriteScannerConfig(CurrentScanner)
         getLogger().warning("Scanner-%d: Configuration written", i_scan + 1)
         i_scan += 1

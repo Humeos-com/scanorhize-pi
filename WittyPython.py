@@ -282,7 +282,8 @@ if __name__ == "__main__":
         epilog="""Affiche les informations sur la carte Witty Pi""",
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="store_true",
         help="Affiche la version du programme",
     )

@@ -2,6 +2,7 @@
    <head>
       <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
       <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>Humeos</title>
       {%block title%}{%endblock%}
       <style>
@@ -25,13 +26,13 @@
    </head>
    <body>         
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
             </button>
       <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
             <div class="navbar-nav"> 
                                          
-                        <a class="nav-link" href="/"> <img src="{{url_for('static',filename='Humeos_logotype_RGB_small.png')}}" height="60" align="left"/> <span class="sr-only">(current)</span></a>
+                        <a class="nav-link" href="/"> <img src="{{url_for('static',filename='Humeos_logotype_RGB_small.png')}}" height="60" align="left"/> <span class="visually-hidden">(current)</span></a>
                         <a class="nav-link" href="/Hub"><button type="button" class="btn btn-secondary btn-lg">Hub</button></a> 
                         <a class="nav-link" href="/Scanner/1"><button type="button" class="btn btn-secondary btn-lg">Scanner-1</button></a>
                         <a class="nav-link" href="/Scanner/2"><button type="button" class="btn btn-secondary btn-lg">Scanner-2</button></a> 
@@ -60,9 +61,7 @@
 {%block content%}{%endblock%}   
                   
           
-      <script src="{{ url_for('static', filename='js/jquery-3.3.1.slim.min.js') }}"></script>
-      <script src="{{ url_for('static', filename='js/popper.min.js') }}"></script>
-      <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>      
+      <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
       
       <script>
       // Add JavaScript for the Poweroff button

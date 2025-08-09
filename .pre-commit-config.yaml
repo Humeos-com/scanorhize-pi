@@ -6,4 +6,6 @@ repos:
         entry: python bump_version.py
         language: system
         files: '\.py$'
+        pass_filenames: false
+        stages: [pre-commit]
 

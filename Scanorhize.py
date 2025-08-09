@@ -56,7 +56,8 @@ parser = argparse.ArgumentParser(
     epilog="""Lance l'application web de gestion des scanners""",
 )
 parser.add_argument(
-    "-v", "--version",
+    "-v",
+    "--version",
     action="store_true",
     help="Affiche la version du programme",
 )
@@ -74,6 +75,7 @@ app = Flask(__name__)
 has_internet = False
 SSH_PORT = random.randint(2223, 2299)  # Random port between 2223-2299
 
+
 def get_common_template_vars():
     """Get common variables for templates with fresh hub_info"""
     return dict(
@@ -81,8 +83,9 @@ def get_common_template_vars():
         IP=GetIP(),
         hub_info=get_hub_info(),
         SSH_PORT=SSH_PORT,
-        version=__version__
+        version=__version__,
     )
+
 
 try:
     check_connectivity()
@@ -92,7 +95,11 @@ try:
     # On crée un tunnel SSH inverse pour la maintenance à distance
     cmd = f"ssh -fN -R {SSH_PORT}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
     run(cmd, shell=True, capture_output=True, text=True, check=False)
-    getLogger().warning("Tunnel SSH inverse créé sur le port %d pour le serveur %s", SSH_PORT, getScanorhizeServer())
+    getLogger().warning(
+        "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
+        SSH_PORT,
+        getScanorhizeServer(),
+    )
 
 except RuntimeError as exc:
     getLogger().error("No internet connection: %s", exc)
@@ -122,7 +129,7 @@ def index():
         imagename1="1.jpg",
         imagename2="2.jpg",
         imagename3="3.jpg",
-        **get_common_template_vars()
+        **get_common_template_vars(),
     )
 
 
@@ -180,7 +187,7 @@ def ScannerPage(scan_num_str: str):
         scan_num_str=scan_num_str,
         imagename=filename,
         output=output,
-        **get_common_template_vars()
+        **get_common_template_vars(),
     )
 
 
@@ -354,7 +361,7 @@ Ping: {Hub.ping}"""
         sync_images=Hub.sync_images,
         todo=Hub.todo,
         output=output,
-        **get_common_template_vars()
+        **get_common_template_vars(),
     )
 
 
@@ -385,7 +392,7 @@ Ping: {Hub.ping}"""
             sync_images=Hub.sync_images,
             todo=Hub.todo,
             output="No update, not on Raspberry Pi",
-            **get_common_template_vars()
+            **get_common_template_vars(),
         )
     try:
         cmd_update = "s3cmd --no-preserve sync s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
@@ -409,7 +416,7 @@ Ping: {Hub.ping}"""
             sync_images=Hub.sync_images,
             todo=Hub.todo,
             output=result.stdout,
-            **get_common_template_vars()
+            **get_common_template_vars(),
         )
     except CalledProcessError as e:
         return render_template(
@@ -424,7 +431,7 @@ Ping: {Hub.ping}"""
             sync_images=Hub.sync_images,
             todo=Hub.todo,
             output=f"Command failed: {e.stderr}",
-            **get_common_template_vars()
+            **get_common_template_vars(),
         )
 
 
@@ -449,9 +456,7 @@ def AppPage():
     }
 
     return render_template(
-        "App.html",
-        app_config=app_config,
-        **get_common_template_vars()
+        "App.html", app_config=app_config, **get_common_template_vars()
     )
 
 
@@ -509,7 +514,7 @@ def update_app_config():
                 "App.html",
                 app_config=ConfigApp().__dict__,
                 output="Invalid log level value. Must be WARNING, INFO, or DEBUG.",
-                **get_common_template_vars()
+                **get_common_template_vars(),
             )
 
         # Get ConfigApp instance
@@ -546,7 +551,7 @@ def update_app_config():
             "App.html",
             app_config=app_config,
             output=output,
-            **get_common_template_vars()
+            **get_common_template_vars(),
         )
 
     except Exception as e:
@@ -561,7 +566,7 @@ def update_app_config():
             "App.html",
             app_config=ConfigApp().__dict__,
             output=f"Error updating configuration: {str(e)}",
-            **get_common_template_vars()
+            **get_common_template_vars(),
         )
 
 
@@ -702,7 +707,7 @@ def stop_server():
             "Hub.html",
             **updateServer(Hub),
             output="Not on Raspberry Pi",
-            **get_common_template_vars()
+            **get_common_template_vars(),
         )
 
     # Before remove the USB key, we need to stop the server
@@ -714,8 +719,11 @@ def stop_server():
     if result.returncode == 0:
         getLogger().warning("SD card ejected successfully")
     else:
-        getLogger().warning("SD card eject failed (return code: %d, stderr: %s)",
-                          result.returncode, result.stderr)
+        getLogger().warning(
+            "SD card eject failed (return code: %d, stderr: %s)",
+            result.returncode,
+            result.stderr,
+        )
 
     # Reset the verbosity level int the ConfigApp file
     # otherwise, the Raspberry Pi will not poweroff

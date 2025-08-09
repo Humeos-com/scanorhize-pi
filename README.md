@@ -86,18 +86,31 @@ déclenché par la carte WittyPi.
 ## Fonctionnalités
 
 Il existe 2 modes de fonctionnement sur les boitiers :
-- le mode configuration qui permet de créer un point d'accès Wifi et de se connecter au Raspberry à travers une application Web
+- le mode configuration qui permet de créer un point d'accès Wifi et de se connecter au Raspberry à travers une application Web ou par SSH depuis le serveur backend-prod.humeos.com lorsque la connectivité 4G est correcte.
 - le mode nominal qui réveille le Raspberry pour faire les acquisitions puis éteint le boitier jusqu'à la nouvelle période.
 
 ### Mode configuration
-Pour se connecter au Raspberry en mode configuration, il faut se connecter à son Wifi : Scanorhize
-On obtient alors une IP en 192.168.0.x et on peut accéder au Raspberry sur l'IP 192.168.0.10.<br>
-A noter que l'IP dépend des clés 4G/Wifi. Selon le modèle on peut avoir une IP en 192.168.1.X.<br>
+Pour lancer le mode configuration, il suffit d'appuyer sur le bouton du boitier.<br>
+Pour se connecter au Raspberry en mode configuration, il faut se connecter à son Wifi: Scanorhize
+On obtient alors une IP en 192.168.1.x et on peut accéder au Raspberry sur l'IP 192.168.1.42<br>
 L'utilisateur du système est pi
 En mode configuration, on peut exécuter les commandes du Raspberry en se connecter en SSH ou bien utiliser le serveur Web Flask qui tourne sur le port 8080.<br>
 
 On accède à l'interface d'Administration locale du boitier par l'URL:<br>
-http://192.168.X.Y:8080
+http://192.168.1.42:8080
+
+On peut aussi accéder au Raspberry depuis le serveur backend-prod.humeos.com si on connaît le port utilisé par le Raspberry. On peut découvrir le port avec la commande suivante sur le serveur:
+```
+debian@d2-2-gra11:~$ sudo netstat -tanpl | grep ":22" | grep -v 2222
+tcp        0      0 127.0.0.1:2269          0.0.0.0:*               LISTEN      1040576/sshd: debia 
+tcp6       0      0 ::1:2269                :::*                    LISTEN      1040576/sshd: debia 
+debian@d2-2-gra11:~$ 
+```
+Ici, on voit que la connexion se trouve sur le port 2269.<br>
+Pour se connecter au Raspberry, on peut lancer un SSH tel que:
+```
+debian@d2-2-gra11:~$ ssh pi@localhost -p 2269
+```
 
 
 ### Mode nominal

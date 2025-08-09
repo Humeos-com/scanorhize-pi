@@ -451,7 +451,8 @@ if __name__ == "__main__":
         epilog="""Lance la synchronisation des fichiers images et JSON sur le serveur""",
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="store_true",
         help="Affiche la version du programme",
     )

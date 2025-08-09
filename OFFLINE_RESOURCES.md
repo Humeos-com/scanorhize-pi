@@ -4,7 +4,7 @@ This document explains how to manage external resources locally for offline oper
 
 ## Overview
 
-The Scanorhize application uses external CDN resources (Bootstrap, jQuery, Popper.js) that require internet connectivity. To ensure the application works when internet connection is broken, these resources have been downloaded locally.
+The Scanorhize application uses Bootstrap 5 for styling and components. To ensure the application works when internet connection is broken, these resources have been downloaded and served locally. Bootstrap 5's bundle already includes Popper 2, and jQuery is not required.
 
 ## Files Created
 
@@ -16,10 +16,8 @@ The Scanorhize application uses external CDN resources (Bootstrap, jQuery, Poppe
 
 The following resources are now served locally:
 
-- `static/css/bootstrap.min.css` - Bootstrap CSS framework
-- `static/js/jquery-3.3.1.slim.min.js` - jQuery library
-- `static/js/popper.min.js` - Popper.js for Bootstrap tooltips
-- `static/js/bootstrap.min.js` - Bootstrap JavaScript
+- `static/css/bootstrap.min.css` - Bootstrap CSS framework (v5.x)
+- `static/js/bootstrap.bundle.min.js` - Bootstrap JS bundle with Popper (v5.x)
 
 ## Usage
 
@@ -63,21 +61,19 @@ The following resources are now served locally:
 
 The `templates/base.html` file has been updated to use local resources:
 
-**Before:**
+**Before (example using CDN):**
 ```html
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 ```
 
-**After:**
+**After (local):**
 ```html
 <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-<script src="{{ url_for('static', filename='js/jquery-3.3.1.slim.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/popper.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
 ```
+
+Note: jQuery and the separate Popper include are not needed with Bootstrap 5’s bundle.
 
 ## Troubleshooting
 
@@ -97,6 +93,6 @@ If you encounter issues:
 
 ## Notes
 
-- The integrity checks from CDN have been removed since we're serving local files
+- Integrity attributes from CDN are not used for local files
 - All resources are minified versions for optimal performance
 - The application will work seamlessly in both online and offline modes

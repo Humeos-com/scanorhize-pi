@@ -175,12 +175,14 @@ document.getElementById('send-to-server').addEventListener('click', function() {
     form.action = "/Scanner/SendConfig/{{scan_num_str}}";
     form.submit();
 });
+
+// Bootstrap 5 tooltip init (ensure after DOM ready)
+document.addEventListener('DOMContentLoaded', function() {
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+});
 </script>
 
-{% endblock %}
-
-<script>
-$(document).ready(function(){
-    $('[data-toggle="tooltip"]').tooltip();
-});
-</script> 
+{% endblock %} 

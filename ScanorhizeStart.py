@@ -40,7 +40,8 @@ parser = argparse.ArgumentParser(
     epilog="""Lance le scan des images""",
 )
 parser.add_argument(
-    "-v", "--version",
+    "-v",
+    "--version",
     action="store_true",
     help="Affiche la version du programme",
 )
