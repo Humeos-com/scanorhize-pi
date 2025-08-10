@@ -2,10 +2,24 @@
 
 ## TODO
 
-Passer les commandes WittyPi en Python plutôt qu'en ligne de commande Shell
-Créer un mode "continue" pour tester l'acquisition sans faire le shutdown du Raspberry
-Créer un RAMDisk et modifier l'écriture des images
+Créer un RAMDisk et modifier l'écriture des images.
 
+
+## 2025-08-09 v0.9.10-beta 
+Tous les composants nécessaires à Flask (Bootstrap) deviennent des ressources locales. Ainsi, on peut voir l'interface Flask même s'il n'y a pas de connexion Internet. C'est le cas, lorsque la clé 4G n'a pas de connectivité.
+Il y a également un mode d'acquisition forcée, indépendant des alarmes, qui permet de lancer l'acquisition et tester ainsi le bon fonctionnement des scanners lors d'une intervention sur le Hub.
+Quand on allume le Hub avec le bouton, il passe automatiquement en mode configuration. C'est à dire que l'application Flask se lance sur http://192.168.1.42:8080 pour configurer le Hub. Dans le mode configuration le Hub s'éteint automatiquement au bout de 20 minutes si on oublie d'appuyer sur le bouton "Poweroff".
+
+## 2025-07-10 v0.9.0 stable 
+Découpage du fonctionnement de l'acquisition.
+Le programme principal ScanorhizeStart.py gére les heures de reveil et lance l'acquisition par ScanorhizeProcess.py.
+Si ce dernier rencontre un souci, plantage, etc... ScanorhizeStart.py continue et finit les tâches comme l'heure du prochain reveil puis éteint le Hub. Ainsi, lors d'un plantage sur l'acquisition, le Hub ne reste plus allumé...
+Mise en place de flags sur l'interface Flask de manière à pouvoir travailler sans connectivité.
+Création d'un tunnel SSH inverse sur le serveur backend-prod.humeos.com de manière à prendre la main sur le Hub en mode configuration.
+Une partie des commandes WittyPi passe désormais par le Python (WittyPython.py) afin d'éviter de lancer les Shells.
+
+## 2025-04-09 v0.8.0-beta S3
+Utilisation de S3 pour stocker les images
 
 ## 2025-02-19
 
