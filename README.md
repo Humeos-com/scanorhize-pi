@@ -5,7 +5,9 @@ Programmes qui sont installés sur le Raspberry
 
 ## Installation
 L'installation d'un Hub se fait par Ansible.
-Cette méthode permet de faire évoluer les composants, les configuration et assure la répétabilité du processus.
+Cette méthode permet de faire évoluer les composants, les configurations et assure la répétabilité du processus.<br>
+On peut également mettre à jour un Hub sans recopier toute la carte SD. On conserve ainsi la configuration des scanners et les logs tout en faisant évoluer le système.
+
 
 ### Prérequis
 - Avoir un boitier Raspberry Pi 4 ou Pi 5 avec une carte WittyPi 3, 4 ou 4L3V7.
@@ -21,9 +23,8 @@ Selon les composants utilisés pour fabriquer le boitier, les GPIO utilisés son
 * STDBY_PIN: int = 6  # input to detect standby status
 
 #### Mode Configuration
-Le fait d'allumer le boitier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte WittyPi.
-En mode configuration le premier relai qui s'allume et le relai de la clé 4G.
-En mode nominal (acquisitions), le relai 1 de la clé 4G s'allume à la fin des acquisitions pour transmttre les images.
+Le fait d'allumer le boitier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte WittyPi.<br>
+En mode configuration le premier relai qui s'allume et le relai de la clé 4G alors qu'en mode acquisition ce sont les relais des scanners actifs qui s'allument séquentiellement, puis la clé 4G s'allume en dernier pour la transmission des données.<br>
 
 ATTENTION: lorsqu'on lance le mode configuration le boitier s'arrête au bout de 20 minutes par sécurité (sinon il ne s'arrêterait pas et viderait la batterie)
 Il est recommandé de l'arrêter avant par l'interface Web, avec le bouton Poweroff
@@ -39,8 +40,7 @@ il faut couper le 5V et la batterie, ce qui n'est pas simple et en plus on perd
 l'heure sur l'horloge. On utilise donc un bouton qui agit sur GPIO-7 (pin physique 7) avec mise à la terre,
 pour faire les arrêts/relances, sans jamais couper l'alimentation. Ce qui peut conduire dans certains
 cas à des difficultés à éteindre ou allumer le boitier.
-Quand la pression sur le bouton poussoir ne produit aucun effet, on peut essayer de presser le bouton
-pendant 10 secondes.
+Quand la pression sur le bouton poussoir ne produit aucun effet, il faut presser le bouton pendant 10 secondes pour forcer l'arrêt ou le démarrage.
 
 #### Pour le relai Banggood initial
 pins BCM
@@ -90,11 +90,10 @@ Il existe 2 modes de fonctionnement sur les boitiers :
 - le mode nominal qui réveille le Raspberry pour faire les acquisitions puis éteint le boitier jusqu'à la nouvelle période.
 
 ### Mode configuration
-Pour lancer le mode configuration, il suffit d'appuyer sur le bouton du boitier.<br>
-Pour se connecter au Raspberry en mode configuration, il faut se connecter à son Wifi: Scanorhize
+Pour se connecter au Raspberry quand il est en  mode configuration, il faut se connecter à son Wifi: Scanorhize
 On obtient alors une IP en 192.168.1.x et on peut accéder au Raspberry sur l'IP 192.168.1.42<br>
-L'utilisateur du système est pi
-En mode configuration, on peut exécuter les commandes du Raspberry en se connecter en SSH ou bien utiliser le serveur Web Flask qui tourne sur le port 8080.<br>
+L'utilisateur du système est pi<br>
+En mode configuration, on peut exécuter les commandes du Raspberry en se connectant en SSH ou bien utiliser le serveur Web Flask qui tourne sur le port 8080, donc accessible sur http://192.168.1.42:8080<br>
 
 On accède à l'interface d'Administration locale du boitier par l'URL:<br>
 http://192.168.1.42:8080
@@ -107,7 +106,7 @@ tcp6       0      0 ::1:2269                :::*                    LISTEN      
 debian@d2-2-gra11:~$ 
 ```
 Ici, on voit que la connexion se trouve sur le port 2269.<br>
-Pour se connecter au Raspberry, on peut lancer un SSH tel que:
+Pour se connecter au Raspberry, on peut lancer un SSH de la forme:
 ```
 debian@d2-2-gra11:~$ ssh pi@localhost -p 2269
 ```

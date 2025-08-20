@@ -27,6 +27,10 @@ WITTY_PI_4_I2C_ADDRESS = 0x8
 WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37  # 55 en décimal
 WITTY_PI_4_REASON_CLICK = 0x03
 
+I2C_CONF_RECOVERY_VOLTAGE = 22
+I2C_CONF_OVER_TEMP_ACTION = 45
+I2C_CONF_OVER_TEMP_POINT = 46
+I2C_LM75B_TOS = 53
 
 class WittyPi:
     """Classe pour la carte Witty Pi qui permet de gérer l'alimentation du Raspberry Pi
@@ -59,7 +63,12 @@ class WittyPi:
             self.power_mode = 0
             self.firmware_revision = 0
             self.reason_click = 0
-
+            self.auto_on = 0
+            self.shutdown_temperature = 0
+            self.next_shutdown_time = 0
+            self.next_startup_time = 0
+             
+            # On commence par récupérer le type Witty Pi
             self.get_firmware_id()
             if self.firmware_id is None:
                 self.initialized = True
@@ -71,7 +80,10 @@ class WittyPi:
             self.get_temperature()
             self.get_firmware_revision()
             self.get_reason_click()
-
+            self.get_auto_on()
+            self.get_shutdown_temperature()
+            self.get_next_shutdown_time()
+            self.get_next_startup_time()
             self.initialized = True  # Mark as initialized
 
     def get_firmware_id(self):
@@ -155,10 +167,58 @@ class WittyPi:
         self.reason_click = self.read_register(11)
         return self.reason_click
 
+    def get_auto_on(self):
+        if self.firmware_id is None or self.firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID:
+            return 0
+        self.auto_on = self.read_register(I2C_CONF_RECOVERY_VOLTAGE)
+        if self.auto_on is None or self.auto_on == 0:
+            return 0
+        self.auto_on = 1
+        return self.auto_on
+    
+    def set_auto_on(self, auto_on):
+        if self.firmware_id is None or self.firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID:
+            return
+        self.write_register(I2C_CONF_RECOVERY_VOLTAGE, auto_on)
+        self.auto_on = auto_on
+        return self.auto_on
+    
+    def get_shutdown_temperature(self):
+        if self.firmware_id is None or self.firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID:
+            return 0
+        action = self.read_register(I2C_CONF_OVER_TEMP_ACTION)
+        if action is None or action == 0:
+            return "No action"
+        if action == 1:
+            # shutdown
+            temp = self.read_register(I2C_LM75B_TOS)
+            if temp > 127:
+                temp = temp - 256
+            self.shutdown_temperature = temp
+        return self.shutdown_temperature
+
+    def set_shutdown_temperature(self, shutdown_temperature):
+        if self.firmware_id is None or self.firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID:
+            return 0
+        self.write_register(I2C_CONF_OVER_TEMP_ACTION, 1)
+        self.write_register(I2C_LM75B_TOS, shutdown_temperature)
+        self.shutdown_temperature = shutdown_temperature
+        return self.shutdown_temperature
+
+    def get_next_shutdown_time(self):
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0
+        self.next_shutdown_time = self.read_register(15)
+        return self.next_shutdown_time
+
+    def get_next_startup_time(self):
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0
+        self.next_startup_time = self.read_register(16)
+        return self.next_startup_time
+
     def read_register(self, register, len_=1):
-
         try:
-
             if len_ == 1:
                 data = self.i2c_bus.read_byte_data(self.i2c_address, register)
             else:
@@ -170,6 +230,15 @@ class WittyPi:
             return None
 
         return data
+
+    def write_register(self, register, data):
+        try:
+            self.i2c_bus.write_byte_data(self.i2c_address, register, data)
+            return True
+        except OSError as e:
+            msg = f"write_register: Write error: {e}"
+            getLogger().error(msg)
+            return False
 
     def is_WittyPi_3(self):
         if self.i2c_bus is None or self.firmware_id is None:
@@ -263,11 +332,28 @@ def is_reason_click():
     return WittyPi().is_reason_click()
 
 
+def get_auto_on():
+
+    return WittyPi().get_auto_on()
+
+
+def get_shutdown_temperature():
+
+    return WittyPi().get_shutdown_temperature()
+
+
 def main():
 
     print(WittyPi())
     print(f"is_WittyPi_4_L3V7: {is_WittyPi_4_L3V7()}")
     print(ReadTemp())
+    print(f"auto_on: {get_auto_on()}")
+    print(f"shutdown_temperature: {get_shutdown_temperature()}")
+    WittyPi().set_auto_on(1)
+    print(f"auto_on: {get_auto_on()}")
+    WittyPi().set_shutdown_temperature(45)
+    print(f"shutdown_temperature: {get_shutdown_temperature()}")
+
 
     # for i in range(0, 5000):
     for i in range(0, 1):
