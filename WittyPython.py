@@ -342,25 +342,6 @@ def get_shutdown_temperature():
     return WittyPi().get_shutdown_temperature()
 
 
-def main():
-
-    print(WittyPi())
-    print(f"is_WittyPi_4_L3V7: {is_WittyPi_4_L3V7()}")
-    print(ReadTemp())
-    print(f"auto_on: {get_auto_on()}")
-    print(f"shutdown_temperature: {get_shutdown_temperature()}")
-    WittyPi().set_auto_on(1)
-    print(f"auto_on: {get_auto_on()}")
-    WittyPi().set_shutdown_temperature(45)
-    print(f"shutdown_temperature: {get_shutdown_temperature()}")
-
-
-    # for i in range(0, 5000):
-    for i in range(0, 1):
-        print(f"{i}:{WittyPi().get_output_current():.3f}", flush=True)
-        sleep(1)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="WittyPython.py",
@@ -373,10 +354,38 @@ if __name__ == "__main__":
         action="store_true",
         help="Affiche la version du programme",
     )
+    parser.add_argument(
+        "-P",
+        "--poweron",
+        action="store_true",
+        help="Set auto-start on power on (default: False)",
+    )
+    parser.add_argument(
+        "-T",
+        "--temperature",
+        type=int,
+        help="Set shutdown temperature (default: 70°C)",
+    )
 
     args = parser.parse_args()
     if args.version:
         print(f"WittyPython.py version: {__version__}")
         sys.exit(0)
 
-    main()
+    print(WittyPi())
+    print(f"is_WittyPi_4_L3V7: {is_WittyPi_4_L3V7()}")
+    print(ReadTemp())
+    print(f"auto_on: {get_auto_on()}")
+    print(f"shutdown_temperature: {get_shutdown_temperature()}")
+    if args.poweron:
+        WittyPi().set_auto_on(0)
+        print(f"auto_on: {get_auto_on()}")
+    if args.temperature:
+        WittyPi().set_shutdown_temperature(args.temperature)
+        print(f"shutdown_temperature: {get_shutdown_temperature()}")
+
+    # for i in range(0, 5000)
+    for i in range(0, 1):
+        print(f"{i}:{WittyPi().get_output_current():.3f}", flush=True)
+        sleep(1)
+
