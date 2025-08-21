@@ -18,15 +18,17 @@ def _run(args):
 
 def staged_python_changes_exist() -> bool:
     """Return True if there are staged .py changes excluding version.py and this script."""
-    result = _run([
-        "git",
-        "diff",
-        "--cached",
-        "--name-only",
-        "--diff-filter=AM",
-        "--",
-        "*.py",
-    ])
+    result = _run(
+        [
+            "git",
+            "diff",
+            "--cached",
+            "--name-only",
+            "--diff-filter=AM",
+            "--",
+            "*.py",
+        ]
+    )
     files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     exclude = {"version.py", Path(__file__).name}
     return any(Path(f).name not in exclude for f in files)
@@ -40,14 +42,16 @@ def version_staged() -> bool:
 
 def unstaged_python_changes_exist() -> bool:
     """Return True if there are unstaged .py changes (working tree) excluding version.py and this script."""
-    result = _run([
-        "git",
-        "diff",
-        "--name-only",
-        "--diff-filter=AM",
-        "--",
-        "*.py",
-    ])
+    result = _run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            "--diff-filter=AM",
+            "--",
+            "*.py",
+        ]
+    )
     files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     exclude = {"version.py", Path(__file__).name}
     return any(Path(f).name not in exclude for f in files)

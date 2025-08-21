@@ -6,6 +6,7 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 
 import sys
 from subprocess import run, CalledProcessError
+import argparse
 
 from WittyPython import is_reason_click
 from WittyPy import doShutdown, setNextShutdownDate
@@ -26,12 +27,10 @@ from Hub import (
     ReadScannerConfigFromServer,
     getOffline,
     getSyncImages,
-    getTodo,
     SendHubConfigToServer,
     ReadHubConfigFromServer,
     get_hub_info,
 )
-import argparse
 from version import __version__
 
 parser = argparse.ArgumentParser(

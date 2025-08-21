@@ -16,7 +16,6 @@ from version import __version__
 if is_raspberry_pi():
     from smbus import SMBus
 else:
-    import sys
     import fake_rpi
 
     sys.modules["smbus"] = fake_rpi.smbus
@@ -31,6 +30,7 @@ I2C_CONF_RECOVERY_VOLTAGE = 22
 I2C_CONF_OVER_TEMP_ACTION = 45
 I2C_CONF_OVER_TEMP_POINT = 46
 I2C_LM75B_TOS = 53
+
 
 class WittyPi:
     """Classe pour la carte Witty Pi qui permet de gérer l'alimentation du Raspberry Pi
@@ -67,7 +67,7 @@ class WittyPi:
             self.shutdown_temperature = 0
             self.next_shutdown_time = 0
             self.next_startup_time = 0
-             
+
             # On commence par récupérer le type Witty Pi
             self.get_firmware_id()
             if self.firmware_id is None:
@@ -175,14 +175,14 @@ class WittyPi:
             return 0
         self.auto_on = 1
         return self.auto_on
-    
+
     def set_auto_on(self, auto_on):
         if self.firmware_id is None or self.firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID:
             return
         self.write_register(I2C_CONF_RECOVERY_VOLTAGE, auto_on)
         self.auto_on = auto_on
         return self.auto_on
-    
+
     def get_shutdown_temperature(self):
         if self.firmware_id is None or self.firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID:
             return 0
@@ -388,4 +388,3 @@ if __name__ == "__main__":
     for i in range(0, 1):
         print(f"{i}:{WittyPi().get_output_current():.3f}", flush=True)
         sleep(1)
-
