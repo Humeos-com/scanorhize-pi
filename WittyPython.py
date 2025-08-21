@@ -53,7 +53,9 @@ class WittyPi:
                 self.i2c_bus = SMBus(1)
             except FileNotFoundError:
                 self.i2c_bus = None
-                getLogger().error("I2C bus not available")
+                getLogger().error("ERROR: I2C bus not available")
+                self.initialized = True
+                return
             self.i2c_address = WITTY_PI_3_I2C_ADDRESS
             self.firmware_id = 0
             self.input_voltage = 0.0

@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
 """
 Utility functions for Witty Pi management and system operations
-Converted from utilities.sh
+Converted from utilities.sh (UUGEAR) to Python
 """
 
 import os
+import sys
 from subprocess import run, CalledProcessError, CompletedProcess
 import time
 from logging import getLogger
 from typing import Optional, Union
 from version import __version__
+from OSUtils import is_raspberry_pi
 
 # pylint: disable=ungrouped-imports
 # pylint: disable=import-error
 # Impossible de grouper les imports car les imports conditionnels ne sont pas supportés
-try:
+if is_raspberry_pi():
+    from smbus import SMBus
+else:
+    import fake_rpi
+
+    sys.modules["smbus"] = fake_rpi.smbus
     from smbus import SMBus
 
-    I2C_AVAILABLE = True
-except ImportError:
-    # Fallback for non-Raspberry Pi systems
-    I2C_AVAILABLE = False
-    SMBus = None
-
 # I2C constants
+WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37  # 55 en décimal
+
+I2C_MC_ADDRESS_WITTY_PI_3 = 0x69
+I2C_MC_ADDRESS_WITTY_PI_4 = 0x08
 I2C_MC_ADDRESS = 0x08
 I2C_ID = 0
 I2C_VOLTAGE_IN_I = 1
@@ -125,33 +130,181 @@ REASON_USB_5V_CONNECTED = "0x09"
 REASON_POWER_CONNECTED = "0x0a"
 REASON_REBOOT = "0x0b"
 
-# Global variables
-TIME_UNKNOWN = 0
 
-# I2C bus instance
-i2c_bus = None
+class WittyPi:
+    """Classe pour la carte Witty Pi qui permet de gérer les paramètres de la carte"""
+
+    _instance = None  # Class variable to store the single instance
+
+    def __new__(cls):
+        """Ensure only one instance is created (Singleton pattern)."""
+        if cls._instance is None:
+            cls._instance = super(WittyPi, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        """Initialize the instance if not already initialized."""
+        if not hasattr(self, "initialized"):  # Prevent re-initialization
+            try:
+                self.i2c_bus = SMBus(1)
+            except FileNotFoundError:
+                getLogger().error("ERROR: I2C bus not available")
+                self.i2c_bus = None
+                self.initialized = True
+                return
+
+            self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_3
+            self.firmware_id = 0
+            # For lazy initialisation
+            self.boot_config_file = None
+
+            # On commence par récupérer le type Witty Pi
+            self.get_firmware_id()
+            if self.firmware_id is None:
+                self.initialized = True
+                return
+
+            self.initialized = True
+
+    def get_firmware_id(self):
+        # on teste d'abord la carte Witty Pi 3
+        self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_3
+        self.firmware_id = self.i2c_read_byte(0x00, 1)
+        if self.firmware_id is not None:
+            getLogger().warning("Witty Pi 3 board found.")
+            return self.firmware_id
+
+        getLogger().warning("No Witty Pi 3 board found, trying Witty Pi 4.")
+        self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_4
+        self.firmware_id = self.i2c_read_byte(0x00, 1)
+        if self.firmware_id is not None:
+            getLogger().warning("Witty Pi 4 board found.")
+            return self.firmware_id
+
+        getLogger().error("ERROR: No Witty Pi board found.")
+        return None
+
+    def get_boot_config_file(self):
+        """Get the appropriate boot config file path based on OS."""
+        if self.boot_config_file is None:
+            try:
+                result = run(
+                    ["lsb_release", "-si"], capture_output=True, text=True, check=True
+                )
+                if result.stdout.strip() == "Ubuntu":
+                    self.boot_config_file = "/boot/firmware/usercfg.txt"
+                else:
+                    self.boot_config_file = "/boot/config.txt"
+            except (CalledProcessError, FileNotFoundError):
+                self.boot_config_file = "/boot/config.txt"
+        return self.boot_config_file
+
+    def i2c_read_byte(self, register: int, retry: int = 3) -> Optional[int]:
+        """Read a single byte from I2C register using SMBus."""
+        if not self.i2c_bus:
+            return None
+
+        try:
+            data = self.i2c_bus.read_byte_data(self.i2c_address, register)
+            return data
+        except (OSError, IOError) as e:
+            if retry > 1:
+                time.sleep(1)
+                message = f"I2C read {self.i2c_address:02X}:{register:02X} failed, retrying {retry + 1}..."
+                getLogger().warning(message)
+                return self.i2c_read_byte(register, retry - 1)
+
+            message = f"I2C read {self.i2c_address:02X}:{register:02X} failed after {retry} retries: {e}"
+            getLogger().error(message)
+            return None
+
+    def i2c_read_word(self, register: int, retry: int = 3) -> Optional[int]:
+        """Read a word (16-bit) from I2C register using SMBus."""
+        if not self.i2c_bus:
+            return None
+
+        try:
+            data = self.i2c_bus.read_word_data(self.i2c_address, register)
+            return data
+        except (OSError, IOError) as e:
+            if retry > 1:
+                time.sleep(1)
+                message = f"I2C read word {self.i2c_address:02X}:{register:02X} failed, retrying {retry + 1}..."
+                getLogger().warning(message)
+                return self.i2c_read_word(register, retry - 1)
+
+            message = f"I2C read word {self.i2c_address:02X}:{register:02X} failed after {retry} retries: {e}"
+            getLogger().error(message)
+            return None
+
+    def i2c_write_byte(self, register: int, value: int, retry: int = 0) -> bool:
+        """Write a single byte to I2C register using SMBus."""
+        if not self.i2c_bus:
+            return False
+
+        try:
+            self.i2c_bus.write_byte_data(self.i2c_address, register, value)
+            # Verify write
+            result = self.i2c_read_byte(register)
+            if result == value:
+                return True
+            return False
+        except (OSError, IOError) as e:
+            if retry < 3:
+                time.sleep(1)
+                message = f"I2C write {self.i2c_address:02X}:{register:02X} {value:02X} failed, retrying {retry + 1}..."
+                getLogger().warning(message)
+                return self.i2c_write_byte(register, value, retry + 1)
+
+            message = f"I2C write {self.i2c_address:02X}:{register:02X} {value:02X} failed after {retry} retries: {e}"
+            getLogger().error(message)
+            return False
+
+
+def get_power_mode() -> int:
+    """Get current power mode using direct I2C access."""
+    result = WittyPi().i2c_read_byte(I2C_POWER_MODE)
+    return result if result is not None else 0
+
+
+def get_input_voltage() -> float:
+    """Get input voltage using direct I2C access."""
+    if get_power_mode() != 0:
+        i = WittyPi().i2c_read_byte(I2C_VOLTAGE_IN_I)
+        d = WittyPi().i2c_read_byte(I2C_VOLTAGE_IN_D)
+        if i is not None and d is not None:
+            return float(i) + float(d) / 100
+    return 0.0
+
+
+def get_output_voltage() -> float:
+    """Get output voltage using direct I2C access."""
+    i = WittyPi().i2c_read_byte(I2C_VOLTAGE_OUT_I)
+    d = WittyPi().i2c_read_byte(I2C_VOLTAGE_OUT_D)
+    if i is not None and d is not None:
+        return float(i) + float(d) / 100
+    return 0.0
+
+
+def get_output_current() -> float:
+    """Get output current using direct I2C access."""
+    i = WittyPi().i2c_read_byte(I2C_CURRENT_OUT_I)
+    d = WittyPi().i2c_read_byte(I2C_CURRENT_OUT_D)
+    if i is not None and d is not None:
+        return float(i) + float(d) / 100
+    return 0.0
 
 
 def init_i2c_bus():
-    """Initialize I2C bus connection."""
-    global i2c_bus
-    if I2C_AVAILABLE and i2c_bus is None:
-        try:
-            i2c_bus = SMBus(1)  # Use I2C bus 1
-            getLogger().info("I2C bus initialized successfully")
-        except (OSError, IOError) as e:
-            getLogger().error("Failed to initialize I2C bus: %s", e)
-            i2c_bus = None
-    return i2c_bus is not None
+    return WittyPi().i2c_bus is not None
 
 
 def close_i2c_bus():
     """Close I2C bus connection."""
-    global i2c_bus
-    if i2c_bus is not None:
+    if WittyPi().i2c_bus is not None:
         try:
-            i2c_bus.close()
-            i2c_bus = None
+            WittyPi().i2c_bus.close()
+            WittyPi().i2c_bus = None
             getLogger().info("I2C bus closed")
         except (OSError, IOError) as e:
             getLogger().error("Error closing I2C bus: %s", e)
@@ -159,17 +312,7 @@ def close_i2c_bus():
 
 # Determine boot config file based on OS
 def get_boot_config_file() -> str:
-    """Get the appropriate boot config file path based on OS."""
-    try:
-        result = run(["lsb_release", "-si"], capture_output=True, text=True, check=True)
-        if result.stdout.strip() == "Ubuntu":
-            return "/boot/firmware/usercfg.txt"
-        return "/boot/config.txt"
-    except (CalledProcessError, FileNotFoundError):
-        return "/boot/config.txt"
-
-
-BOOT_CONFIG_FILE = get_boot_config_file()
+    return WittyPi().get_boot_config_file()
 
 
 def run_command(cmd: list, capture_output: bool = True) -> CompletedProcess:
@@ -186,14 +329,19 @@ def one_wire_confliction() -> bool:
     if HALT_PIN == 4:
         if (
             run_command(
-                ["grep", "-qe", r"^\s*dtoverlay=w1-gpio\s*$", BOOT_CONFIG_FILE]
+                ["grep", "-qe", r"^\s*dtoverlay=w1-gpio\s*$", get_boot_config_file()]
             ).returncode
             == 0
         ):
             return True
         if (
             run_command(
-                ["grep", "-qe", r"^\s*dtoverlay=w1-gpio-pullup\s*$", BOOT_CONFIG_FILE]
+                [
+                    "grep",
+                    "-qe",
+                    r"^\s*dtoverlay=w1-gpio-pullup\s*$",
+                    get_boot_config_file(),
+                ]
             ).returncode
             == 0
         ):
@@ -205,7 +353,10 @@ def one_wire_confliction() -> bool:
     ]
 
     for pattern in patterns:
-        if run_command(["grep", "-qe", pattern, BOOT_CONFIG_FILE]).returncode == 0:
+        if (
+            run_command(["grep", "-qe", pattern, get_boot_config_file()]).returncode
+            == 0
+        ):
             return True
 
     return False
@@ -240,16 +391,7 @@ def get_network_timestamp() -> int:
 
 def is_mc_connected() -> bool:
     """Check if the microcontroller is connected via I2C."""
-    if not init_i2c_bus():
-        return False
-
-    try:
-        # Try to read the firmware ID register
-        firmware_id = i2c_read_byte(I2C_MC_ADDRESS, 0x00)
-        return firmware_id is not None
-    except (OSError, IOError) as e:
-        getLogger().error("Error checking I2C connection: %s", e)
-        return False
+    return WittyPi().firmware_id is not None
 
 
 def get_pi_model() -> str:
@@ -334,92 +476,10 @@ def trim(text: str) -> str:
     return text.strip()
 
 
-def i2c_read_byte(address: int, register: int, retry: int = 0) -> Optional[int]:
-    """Read a single byte from I2C register using SMBus."""
-    if not init_i2c_bus():
-        return None
-
-    try:
-        data = i2c_bus.read_byte_data(address, register)
-        return data
-    except (OSError, IOError) as e:
-        if retry < 3:
-            time.sleep(1)
-            message = (
-                f"I2C read {address:02X}:{register:02X} failed, retrying {retry + 1}..."
-            )
-            getLogger().warning(message)
-            return i2c_read_byte(address, register, retry + 1)
-        else:
-            message = f"I2C read {address:02X}:{register:02X} failed after {retry} retries: {e}"
-            getLogger().error(message)
-            return None
-        getLogger().error("I2C read error: %s", e)
-        return None
-
-
-def i2c_read_word(address: int, register: int, retry: int = 0) -> Optional[int]:
-    """Read a word (16-bit) from I2C register using SMBus."""
-    if not init_i2c_bus():
-        return None
-
-    try:
-        data = i2c_bus.read_word_data(address, register)
-        return data
-    except (OSError, IOError) as e:
-        if retry < 3:
-            time.sleep(1)
-            message = f"I2C read word {address:02X}:{register:02X} failed, retrying {retry + 1}..."
-            getLogger().warning(message)
-            return i2c_read_word(address, register, retry + 1)
-        else:
-            message = f"I2C read word {address:02X}:{register:02X} failed after {retry} retries: {e}"
-            getLogger().error(message)
-            return None
-        getLogger().error("I2C read word error: %s", e)
-        return None
-
-
-def i2c_write_byte(address: int, register: int, value: int, retry: int = 0) -> bool:
-    """Write a single byte to I2C register using SMBus."""
-    if not init_i2c_bus():
-        return False
-
-    try:
-        i2c_bus.write_byte_data(address, register, value)
-
-        # Verify write
-        result = i2c_read_byte(address, register)
-        if result == value:
-            return True
-    except (OSError, IOError) as e:
-        if retry < 3:
-            time.sleep(1)
-            message = f"I2C write {address:02X}:{register:02X} {value:02X} failed, retrying {retry + 1}..."
-            getLogger().warning(message)
-            return i2c_write_byte(address, register, value, retry + 1)
-        message = f"I2C write {address:02X}:{register:02X} {value:02X} failed after {retry} retries: {e}"
-        getLogger().error(message)
-        return False
-    return False
-
-
-def i2c_read(bus: int, address: int, register: int, retry: int = 0) -> Optional[int]:
-    """Read from I2C register - compatibility function for existing code."""
-    return i2c_read_byte(address, register, retry)
-
-
-def i2c_write(
-    bus: int, address: int, register: int, value: int, retry: int = 0
-) -> bool:
-    """Write to I2C register - compatibility function for existing code."""
-    return i2c_write_byte(address, register, value, retry)
-
-
-def get_temperature() -> str:
+def get_temperature() -> float:
     """Get temperature from LM75B sensor using direct I2C access."""
     try:
-        data = i2c_read_word(I2C_MC_ADDRESS, I2C_LM75B_TEMPERATURE)
+        data = WittyPi().i2c_read_word(I2C_LM75B_TEMPERATURE)
         if data is not None:
             # Swap bytes and shift right by 5
             data = (((data & 0xFF) << 8) | ((data & 0xFF00) >> 8)) >> 5
@@ -430,26 +490,24 @@ def get_temperature() -> str:
 
             celsius = data * 0.125
 
-            # Convert to Fahrenheit
-            fahrenheit = celsius * 1.8 + 32
-            return f"{celsius:.1f}°C / {fahrenheit:.1f}°F"
+            return float(celsius)
     except (OSError, IOError, ValueError, IndexError) as e:
         getLogger().error("Error reading temperature: %s", e)
 
-    return "Error reading temperature"
+    return 0.0
 
 
 def clear_alarm_flags(ctrl2_value: Optional[int] = None):
     """Clear alarm flags using direct I2C access."""
     if ctrl2_value is None:
-        ctrl2_value = i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_CTRL2)
+        ctrl2_value = WittyPi().i2c_read_byte(I2C_RTC_CTRL2)
 
     if ctrl2_value is not None:
         ctrl2_value &= 0xBF  # Clear bit 6
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_CTRL2, ctrl2_value)
+        WittyPi().i2c_write_byte(I2C_RTC_CTRL2, ctrl2_value)
 
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_FLAG_ALARM1, 0)
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_FLAG_ALARM2, 0)
+    WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM1, 0)
+    WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM2, 0)
 
 
 def do_shutdown(halt_pin: int, has_mc: bool):
@@ -471,87 +529,51 @@ def do_shutdown(halt_pin: int, has_mc: bool):
         os.remove("/boot/wittypi.lock")
 
 
-def get_power_mode() -> int:
-    """Get current power mode using direct I2C access."""
-    result = i2c_read_byte(I2C_MC_ADDRESS, I2C_POWER_MODE)
-    return result if result is not None else 0
-
-
-def get_input_voltage() -> float:
-    """Get input voltage using direct I2C access."""
-    if get_power_mode() != 0:
-        i = i2c_read_byte(I2C_MC_ADDRESS, I2C_VOLTAGE_IN_I)
-        d = i2c_read_byte(I2C_MC_ADDRESS, I2C_VOLTAGE_IN_D)
-        if i is not None and d is not None:
-            return float(i) + float(d) / 100
-    return 0.0
-
-
-def get_output_voltage() -> float:
-    """Get output voltage using direct I2C access."""
-    i = i2c_read_byte(I2C_MC_ADDRESS, I2C_VOLTAGE_OUT_I)
-    d = i2c_read_byte(I2C_MC_ADDRESS, I2C_VOLTAGE_OUT_D)
-    if i is not None and d is not None:
-        return float(i) + float(d) / 100
-    return 0.0
-
-
-def get_output_current() -> float:
-    """Get output current using direct I2C access."""
-    i = i2c_read_byte(I2C_MC_ADDRESS, I2C_CURRENT_OUT_I)
-    d = i2c_read_byte(I2C_MC_ADDRESS, I2C_CURRENT_OUT_D)
-    if i is not None and d is not None:
-        return float(i) + float(d) / 100
-    return 0.0
-
-
 def get_low_voltage_threshold() -> str:
     """Get low voltage threshold using direct I2C access."""
-    low_volt = i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_LOW_VOLTAGE)
+    low_volt = WittyPi().i2c_read_byte(I2C_CONF_LOW_VOLTAGE)
     if low_volt == 255:
         return "disabled"
-    else:
-        return f"{low_volt / 10:.1f}V"
+    return f"{low_volt / 10:.1f}V"
 
 
 def get_recovery_voltage_threshold() -> str:
     """Get recovery voltage threshold using direct I2C access."""
-    rec_volt = i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_RECOVERY_VOLTAGE)
+    rec_volt = WittyPi().i2c_read_byte(I2C_CONF_RECOVERY_VOLTAGE)
     if rec_volt == 255:
         return "disabled"
-    else:
-        return f"{rec_volt / 10:.1f}V"
+    return f"{rec_volt / 10:.1f}V"
 
 
 def set_low_voltage_threshold(value: int):
     """Set low voltage threshold using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_LOW_VOLTAGE, value)
+    WittyPi().i2c_write_byte(I2C_CONF_LOW_VOLTAGE, value)
 
 
 def set_recovery_voltage_threshold(value: int):
     """Set recovery voltage threshold using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_RECOVERY_VOLTAGE, value)
+    WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE, value)
 
 
 def clear_low_voltage_threshold():
     """Clear low voltage threshold using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_LOW_VOLTAGE, 0xFF)
+    WittyPi().i2c_write_byte(I2C_CONF_LOW_VOLTAGE, 0xFF)
 
 
 def clear_recovery_voltage_threshold():
     """Clear recovery voltage threshold using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_RECOVERY_VOLTAGE, 0xFF)
+    WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE, 0xFF)
 
 
 def get_over_temperature_action() -> int:
     """Get over temperature action using direct I2C access."""
-    result = i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_OVER_TEMP_ACTION)
+    result = WittyPi().i2c_read_byte(I2C_CONF_OVER_TEMP_ACTION)
     return hex2dec(result) if result is not None else 0
 
 
 def get_over_temperature_point() -> int:
     """Get over temperature point using direct I2C access."""
-    temp = i2c_read_byte(I2C_MC_ADDRESS, I2C_LM75B_TOS)
+    temp = WittyPi().i2c_read_byte(I2C_LM75B_TOS)
     if temp is not None:
         if temp > 127:
             temp = temp - 256
@@ -561,13 +583,13 @@ def get_over_temperature_point() -> int:
 
 def get_below_temperature_action() -> int:
     """Get below temperature action using direct I2C access."""
-    result = i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_BELOW_TEMP_ACTION)
+    result = WittyPi().i2c_read_byte(I2C_CONF_BELOW_TEMP_ACTION)
     return hex2dec(result) if result is not None else 0
 
 
 def get_below_temperature_point() -> int:
     """Get below temperature point using direct I2C access."""
-    temp = i2c_read_byte(I2C_MC_ADDRESS, I2C_LM75B_THYST)
+    temp = WittyPi().i2c_read_byte(I2C_LM75B_THYST)
     if temp is not None:
         if temp > 127:
             temp = temp - 256
@@ -609,49 +631,49 @@ def below_temperature_action(
 
 def set_over_temperature_action(action: int, temperature: int):
     """Set over temperature action and point using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_OVER_TEMP_ACTION, action)
+    WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION, action)
 
     # Handle negative temperatures
     temp_value = temperature
     if temperature < 0:
         temp_value = temperature + 256
 
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_LM75B_TOS, temp_value)
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_OVER_TEMP_POINT, temp_value)
+    WittyPi().i2c_write_byte(I2C_LM75B_TOS, temp_value)
+    WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_POINT, temp_value)
 
 
 def set_below_temperature_action(action: int, temperature: int):
     """Set below temperature action and point using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_BELOW_TEMP_ACTION, action)
+    WittyPi().i2c_write_byte(I2C_CONF_BELOW_TEMP_ACTION, action)
 
     # Handle negative temperatures
     temp_value = temperature
     if temperature < 0:
         temp_value = temperature + 256
 
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_LM75B_THYST, temp_value)
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_BELOW_TEMP_POINT, temp_value)
+    WittyPi().i2c_write_byte(I2C_LM75B_THYST, temp_value)
+    WittyPi().i2c_write_byte(I2C_CONF_BELOW_TEMP_POINT, temp_value)
 
 
 def clear_over_temperature_action():
     """Clear over temperature action using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_OVER_TEMP_ACTION, 0x00)
+    WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION, 0x00)
 
 
 def clear_below_temperature_action():
     """Clear below temperature action using direct I2C access."""
-    i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_BELOW_TEMP_ACTION, 0x00)
+    WittyPi().i2c_write_byte(I2C_CONF_BELOW_TEMP_ACTION, 0x00)
 
 
 def get_rtc_timestamp() -> int:
     """Get RTC timestamp using direct I2C access."""
     try:
-        sec = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_SECONDS) or 0)
-        minutes = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_MINUTES) or 0)
-        hour = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_HOURS) or 0)
-        date = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_DAYS) or 0)
-        month = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_MONTHS) or 0)
-        year = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_RTC_YEARS) or 0)
+        sec = bcd2dec(WittyPi().i2c_read_byte(I2C_RTC_SECONDS) or 0)
+        minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_RTC_MINUTES) or 0)
+        hour = bcd2dec(WittyPi().i2c_read_byte(I2C_RTC_HOURS) or 0)
+        date = bcd2dec(WittyPi().i2c_read_byte(I2C_RTC_DAYS) or 0)
+        month = bcd2dec(WittyPi().i2c_read_byte(I2C_RTC_MONTHS) or 0)
+        year = bcd2dec(WittyPi().i2c_read_byte(I2C_RTC_YEARS) or 0)
 
         if year == 0:  # Invalid year
             return -1
@@ -672,10 +694,10 @@ def get_rtc_timestamp() -> int:
 def get_startup_time() -> str:
     """Get startup time using direct I2C access."""
     try:
-        sec = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_SECOND_ALARM1) or 0)
-        minutes = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_MINUTE_ALARM1) or 0)
-        hour = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_HOUR_ALARM1) or 0)
-        date = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_DAY_ALARM1) or 0)
+        sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM1) or 0)
+        minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_ALARM1) or 0)
+        hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_ALARM1) or 0)
+        date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_ALARM1) or 0)
         return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
     except (OSError, IOError, ValueError, IndexError) as e:
         getLogger().error("Error reading startup time: %s", e)
@@ -685,10 +707,10 @@ def get_startup_time() -> str:
 def get_shutdown_time() -> str:
     """Get shutdown time using direct I2C access."""
     try:
-        sec = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_SECOND_ALARM2) or 0)
-        minutes = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_MINUTE_ALARM2) or 0)
-        hour = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_HOUR_ALARM2) or 0)
-        date = bcd2dec(i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_DAY_ALARM2) or 0)
+        sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM2) or 0)
+        minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_ALARM2) or 0)
+        hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_ALARM2) or 0)
+        date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_ALARM2) or 0)
         return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
     except (OSError, IOError, ValueError, IndexError) as e:
         getLogger().error("Error reading shutdown time: %s", e)
@@ -698,10 +720,10 @@ def get_shutdown_time() -> str:
 def set_startup_time(date: int, hour: int, minute: int, second: int):
     """Set startup time using direct I2C access."""
     try:
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_SECOND_ALARM1, dec2bcd(second))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_MINUTE_ALARM1, dec2bcd(minute))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_HOUR_ALARM1, dec2bcd(hour))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_DAY_ALARM1, dec2bcd(date))
+        WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second))
+        WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, dec2bcd(minute))
+        WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, dec2bcd(hour))
+        WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, dec2bcd(date))
     except (OSError, IOError) as e:
         getLogger().error("Error setting startup time: %s", e)
 
@@ -709,10 +731,10 @@ def set_startup_time(date: int, hour: int, minute: int, second: int):
 def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access."""
     try:
-        i2c_read_byte(I2C_MC_ADDRESS, I2C_CONF_SECOND_ALARM2, dec2bcd(second))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_MINUTE_ALARM2, dec2bcd(minute))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_HOUR_ALARM2, dec2bcd(hour))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_DAY_ALARM2, dec2bcd(date))
+        WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second))
+        WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, dec2bcd(minute))
+        WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, dec2bcd(hour))
+        WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date))
     except (OSError, IOError) as e:
         getLogger().error("Error setting shutdown time: %s", e)
 
@@ -720,10 +742,10 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
 def clear_startup_time():
     """Clear startup time using direct I2C access."""
     try:
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_SECOND_ALARM1, 0x00)
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_MINUTE_ALARM1, 0x00)
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_HOUR_ALARM1, 0x00)
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_DAY_ALARM1, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, 0x00)
     except (OSError, IOError) as e:
         getLogger().error("Error clearing startup time: %s", e)
 
@@ -731,10 +753,10 @@ def clear_startup_time():
 def clear_shutdown_time():
     """Clear shutdown time using direct I2C access."""
     try:
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_SECOND_ALARM2, 0x00)
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_MINUTE_ALARM2, 0x00)
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_HOUR_ALARM2, 0x00)
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_CONF_DAY_ALARM2, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, 0x00)
+        WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, 0x00)
     except (OSError, IOError) as e:
         getLogger().error("Error clearing shutdown time: %s", e)
 
@@ -785,18 +807,14 @@ def system_to_rtc():
         time_struct = time.localtime(sys_ts)
 
         # Write to RTC registers using direct I2C access
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_DAYS, dec2bcd(time_struct.tm_mday))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_WEEKDAYS, dec2bcd(time_struct.tm_wday))
-        i2c_write_byte(I2C_MC_ADDRESS, I2C_RTC_MONTHS, dec2bcd(time_struct.tm_mon))
-        i2c_write_byte(
-            I2C_MC_ADDRESS, I2C_RTC_YEARS, dec2bcd(time_struct.tm_year % 100)
-        )
+        WittyPi().i2c_write_byte(I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec))
+        WittyPi().i2c_write_byte(I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min))
+        WittyPi().i2c_write_byte(I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour))
+        WittyPi().i2c_write_byte(I2C_RTC_DAYS, dec2bcd(time_struct.tm_mday))
+        WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS, dec2bcd(time_struct.tm_wday))
+        WittyPi().i2c_write_byte(I2C_RTC_MONTHS, dec2bcd(time_struct.tm_mon))
+        WittyPi().i2c_write_byte(I2C_RTC_YEARS, dec2bcd(time_struct.tm_year % 100))
 
-        global TIME_UNKNOWN
-        TIME_UNKNOWN = 2
         getLogger().info("  Done :-)")
     except (OSError, IOError) as e:
         getLogger().error("  Error writing to RTC: %s", e)
@@ -811,8 +829,6 @@ def rtc_to_system():
             run_command(["sudo", "timedatectl", "set-ntp", "0"])
             run_command(["sudo", "date", "-s", f"@{rtc_ts}"])
 
-            global TIME_UNKNOWN
-            TIME_UNKNOWN = 0
             getLogger().info("  Done :-)")
         else:
             getLogger().warning("  RTC time is invalid, cannot set system time")
@@ -873,7 +889,7 @@ if __name__ == "__main__":
         print(f"Kernel: {get_kernel()}")
         print(f"Architecture: {get_arch()}")
         print(f"System Time: {get_sys_time()}")
-        print(f"I2C Available: {I2C_AVAILABLE}")
+        print(f"I2C Available: {init_i2c_bus()}")
         print(f"MC Connected: {is_mc_connected()}")
         print(f"Internet Available: {has_internet()}")
         print(f"One Wire Conflict: {one_wire_confliction()}")
