@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Interroge la carte Witty Pi pour obtenir des informations sur l'alimentation
 de la carte Raspberry Pi
 """

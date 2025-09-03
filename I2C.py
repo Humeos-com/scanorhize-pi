@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Lecture de l'état de la batterie via la carte SparkFun Battery Babysitter avec le bus I2C"""
 
 from OSUtils import is_raspberry_pi

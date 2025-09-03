@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Permet de gérer l'environnement matériel OS, cartes, etc.
 Utilise le pattern Singleton pour stocker la configuration

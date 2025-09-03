@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Fait l'acquisition des images selon les paramètres des scanners
 Si cette tâche est lancée, c'est suite à un réveil du WittyPi.

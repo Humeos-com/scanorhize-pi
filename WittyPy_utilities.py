@@ -199,6 +199,9 @@ class WittyPi:
                 self.boot_config_file = "/boot/config.txt"
         return self.boot_config_file
 
+    def is_WittyPi_4_L3V7(self):
+        return self.firmware_id == WITTY_PI_4_L3V7_FIRMWARE_ID
+
     def i2c_read_byte(self, register: int, retry: int = 3) -> Optional[int]:
         """Read a single byte from I2C register using SMBus."""
         if not self.i2c_bus:
@@ -529,20 +532,30 @@ def do_shutdown(halt_pin: int, has_mc: bool):
         os.remove("/boot/wittypi.lock")
 
 
-def get_low_voltage_threshold() -> str:
+def get_low_voltage_threshold() -> float:
     """Get low voltage threshold using direct I2C access."""
     low_volt = WittyPi().i2c_read_byte(I2C_CONF_LOW_VOLTAGE)
     if low_volt == 255:
-        return "disabled"
-    return f"{low_volt / 10:.1f}V"
+        return 0.0
+    return low_volt / 10.0
 
 
-def get_recovery_voltage_threshold() -> str:
+def get_recovery_voltage_threshold() -> float:
     """Get recovery voltage threshold using direct I2C access."""
+    # Pour les cartes WittyPi 4 L3V7, on a:
+    # 0 => pas d'action sur l'alimentation
+    # 1 => on démarre sur l'alimentation
+    # Pour les cartes WittyPi 4, on a:
+    # 0 si aucune valeur n'est définie
+    # ou un voltage en float si une valeur est définie
     rec_volt = WittyPi().i2c_read_byte(I2C_CONF_RECOVERY_VOLTAGE)
+    if WittyPi().is_WittyPi_4_L3V7():
+        if rec_volt > 0:
+            return 1.0
+        return 0.0
     if rec_volt == 255:
-        return "disabled"
-    return f"{rec_volt / 10:.1f}V"
+        return 0.0
+    return rec_volt / 10.0
 
 
 def set_low_voltage_threshold(value: int):
@@ -552,6 +565,16 @@ def set_low_voltage_threshold(value: int):
 
 def set_recovery_voltage_threshold(value: int):
     """Set recovery voltage threshold using direct I2C access."""
+    if WittyPi().is_WittyPi_4_L3V7():
+        if value > 0:
+            value = 1
+        else:
+            value = 0
+    else:
+        if value == 0:
+            value = 255
+        else:
+            value = int(value * 10)
     WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE, value)
 
 
@@ -881,7 +904,7 @@ if __name__ == "__main__":
 
     if args.version:
         print(f"utilities.py version: {__version__}")
-        exit(0)
+        sys.exit(0)
 
     if args.check:
         print(f"Pi Model: {get_pi_model()}")

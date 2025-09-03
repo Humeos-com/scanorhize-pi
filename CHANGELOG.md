@@ -4,6 +4,10 @@
 
 Créer un RAMDisk et modifier l'écriture des images.
 
+## 2025-08-21
+Passage en Python de l'interface WittyPy avec le programme WittyPy_utilities.py
+Ce programme permet d'afficher les valeurs de la carte WittyPi et de configurer la carte.
+Ainsi, on peut configurer la carte WittyPi par Ansible sans passer par WittyPi.sh
 
 ## 2025-08-09 v0.9.10-beta 
 Tous les composants nécessaires à Flask (Bootstrap) deviennent des ressources locales. Ainsi, on peut voir l'interface Flask même s'il n'y a pas de connexion Internet. C'est le cas, lorsque la clé 4G n'a pas de connectivité.

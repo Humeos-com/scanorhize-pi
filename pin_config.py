@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Configuration des pins GPIO pour les scanners
 """
@@ -27,13 +28,14 @@ else:
 
 # Pour le relai SBComponent RelayPi-V2
 # pins BCM
-# Ch1Pin = 19  # Scanner1
-# Ch2Pin = 13  # Scanner2
+# Ch1Pin = 19  # Clé 4G
+# Ch2Pin = 13  # Scanner1
 # Attention pour ces 2 pins, il faut supprimer les jumpers jaunes
 # et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
-# Ch3Pin = 22  # Scanner3
-# Ch4Pin = 27  # Clé 4G
-# PinArray = [19, 13, 22, 27]
+# Ch3Pin = 22  # Scanner2
+# Ch4Pin = 27  # Scanner3
+# PinArray = [19, 13, 22, 27] << ce qu'on voudrait faire pour
+# avoir en premier la clé 4G, puis autant de ports qu'on veut avec un range[1,N]
 # configuration des ports USB de la carte Big 7
 DEFAULT_PIN_ARRAY = [13, 22, 27, 19]
 

@@ -1,0 +1,23 @@
+---
+description: use getLogger
+globs: ["*.py"]
+alwaysApply: true
+---
+
+## Error logging
+use getLogger without f strings to log errors and warnings
+
+###example
+        try:
+            return self.i2c_bus.read_byte_data(0x69, 0x00) == 0x11
+        except (OSError, IOError) as e:
+            getLogger().warning("Error reading WittyPi: %s", e)
+
+## Exception handling
+on except always explicit the kind of exception and use getLogger to log the exception
+
+###example
+        try:
+            return self.i2c_bus.read_byte_data(0x69, 0x00) == 0x11
+        except (OSError, IOError) as e:
+            getLogger().warning("Error reading WittyPi: %s", e)

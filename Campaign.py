@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Archive les fichiers au format JP2
 """

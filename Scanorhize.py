@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Application Web pour configurer les scanners"""
 
 import os

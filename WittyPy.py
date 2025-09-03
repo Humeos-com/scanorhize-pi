@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Gestionnaire du scheduleur RTC de la carte WittyPi.
 On utilise les commandes Shell fournies par WittyPi.

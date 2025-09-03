@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Gestion du Hub et communication avec la plateforme Web
 C'est le Hub qui synchronise les fichiers images et JSON sur le serveur
@@ -22,7 +23,8 @@ from Campaign import getUsbDir, USBSpace
 from OSUtils import get_os, get_model, is_raspberry_pi
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
-from WittyPython import ReadTemp
+from WittyPy_utilities import set_over_temperature_action, get_temperature
+# from WittyPython import ReadTemp
 from utils import write_json_to_file
 from pin_config import DEFAULT_PIN_ARRAY
 from Miscellaneous import ReadBatVoltCap
@@ -62,6 +64,11 @@ class HubData:
         # On synchronise les images ou non
         # si self.offline = True, alors on ne synchronise pas les images
         self.sync_images: bool = True
+        # Action à faire si on dépasse la température
+        # 0: None, 1: Shutdown, 2: Startup
+        self.over_temperature_action: int = 1
+        # Point de température à partir duquel on dépasse la température
+        self.over_temperature_point: int = 60
         # todo.sh to run ?
         # si self.todo = True, alors on va chercher le fichier todo.sh
         # et on va l'exécuter au réveil suivant
@@ -98,6 +105,7 @@ class HubData:
         # On ecrase toujours ces 2 valeurs
         self.macAddress = getHwAddr()
         self.model = get_model()
+        set_over_temperature_action(self.over_temperature_action, self.over_temperature_point)
         self.version = __version__
         return self
 
@@ -440,7 +448,7 @@ def get_hub_info():
         battery_info[1],  # battery percent
         usb_space_info[0],  # USB space in MB
         usb_space_info[1],  # USB space percent
-        ReadTemp(),  # temperature
+        get_temperature(),  # temperature
     ]
 
 

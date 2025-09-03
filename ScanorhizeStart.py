@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Lance le scanner et programme le prochain réveil
 On gère les GPIO pour la carte 4G depuis ce programme
 Si jamais il y a un plantage de ScanorhizeProcess.py,

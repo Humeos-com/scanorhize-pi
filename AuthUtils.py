@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Permet de gérer l'authentification des boitiers
 Utilise le pattern Singleton pour stocker le token JWT et les infos du boitier
