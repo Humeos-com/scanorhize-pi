@@ -63,6 +63,7 @@ Pin Array: {{ pin_array }}</pre>
 				
 				<div class="mt-3">
 					<button type="submit" class="btn btn-primary" formaction="{{url_for('init_hub')}}">Init Hub</button> 
+					<button type="submit" class="btn btn-primary" formaction="{{url_for('scan_acq')}}">Force scan</button> 
 					<button type="submit" class="btn btn-primary" formaction="{{url_for('write_config')}}">Write config</button>
 					<button type="submit" class="btn btn-primary" formaction="{{url_for('update_version')}}">Update version</button>
 					<button type="submit" class="btn btn-primary" id="send-to-server">Send conf to server</button>

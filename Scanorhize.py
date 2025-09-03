@@ -88,6 +88,23 @@ def get_common_template_vars():
     )
 
 
+def get_hub_config_string():
+    """Generate hub configuration string for display"""
+    hub_info = get_hub_info()
+    hub_config = f"""Model: {Hub.model}
+MAC Address: {Hub.macAddress}
+Project ID: {Hub.projectId}
+Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
+USB Space: {hub_info[2]}MB ({hub_info[3]}%)
+Temperature: {hub_info[4]:.1f}°C
+Ping: {Hub.ping}"""
+
+    if is_debug():
+        hub_config += f"\nToken: {Hub.token}"
+
+    return hub_config
+
+
 try:
     check_connectivity()
     has_internet = True
@@ -121,8 +138,8 @@ def add_header(response):
 @app.route("/", methods=["POST", "GET"])
 def index():
     if request.method == "POST":
-        cmd = "sudo pkill -f ScanorhizeProcess.py"
-        run(cmd, shell=True, capture_output=True, text=True, check=False)
+        cmd_pkill = "sudo pkill -f ScanorhizeProcess.py"
+        run(cmd_pkill, shell=True, capture_output=True, text=True, check=False)
 
     return render_template(
         "index.html",
@@ -329,19 +346,9 @@ def action(actionName: str, scan_num_str: str):
 @app.route("/Hub", methods=["POST", "GET"])
 def HubPage():
     Hub.read_config()
-    hub_info = get_hub_info()
 
     # Format Hub configuration for display with all values
-    hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
-USB Space: {hub_info[2]}MB ({hub_info[3]}%)
-Temperature: {hub_info[4]:.1f}°C
-Ping: {Hub.ping}"""
-
-    if is_debug():
-        hub_config += f"\nToken: {Hub.token}"
+    hub_config = get_hub_config_string()
 
     # Get the pin array configuration
     pin_array = get_pin_array()
@@ -368,33 +375,10 @@ Ping: {Hub.ping}"""
 
 @app.route("/update_version", methods=["POST", "GET"])
 def update_version():
-    hub_info = get_hub_info()
-    hub_config = f"""Model: {Hub.model}
-MAC Address: {Hub.macAddress}
-Project ID: {Hub.projectId}
-Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
-USB Space: {hub_info[2]}MB ({hub_info[3]}%)
-Temperature: {hub_info[4]:.1f}°C
-Ping: {Hub.ping}"""
-
-    if is_debug():
-        hub_config += f"\nToken: {Hub.token}"
 
     if not is_raspberry_pi():
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output="No update, not on Raspberry Pi",
-            **get_common_template_vars(),
-        )
+        return redirect(url_for("HubPage", output="No update, not on Raspberry Pi"))
+
     try:
         cmd_update = "s3cmd --no-preserve sync s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
         getLogger().warning("Update version: %s", cmd_update)
@@ -405,35 +389,13 @@ Ping: {Hub.ping}"""
             text=True,
             check=False,
         )
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=result.stdout,
-            **get_common_template_vars(),
+
+        return redirect(
+            url_for("HubPage", output=f"Update version OK: {result.stdout}")
         )
+
     except CalledProcessError as e:
-        return render_template(
-            "Hub.html",
-            **updateServer(Hub),
-            hub_config=hub_config,
-            use_server=Hub.use_server,
-            connect_timeout=Hub.connect_timeout,
-            max_time=Hub.max_time,
-            delta_time=Hub.delta_time,
-            offline=Hub.offline,
-            sync_images=Hub.sync_images,
-            todo=Hub.todo,
-            output=f"Command failed: {e.stderr}",
-            **get_common_template_vars(),
-        )
+        return redirect(url_for("HubPage", output=f"Command failed: {e.stderr}"))
 
 
 @app.route("/App", methods=["GET"])
@@ -503,13 +465,6 @@ def update_app_config():
         new_log_level = request.form.get("log_level")
         new_usb_dir = request.form.get("usb_dir")
 
-        # Get hub info with error handling
-        try:
-            hub_info = get_hub_info()
-        except Exception as e:
-            getLogger().error("Error getting hub info: %s", str(e))
-            hub_info = [0, 0, 0, 0, 0]  # Default values if get_hub_info fails
-
         if new_log_level not in ["WARNING", "INFO", "DEBUG"]:
             return render_template(
                 "App.html",
@@ -556,13 +511,6 @@ def update_app_config():
         )
 
     except Exception as e:
-        # Get hub info with error handling for error case too
-        try:
-            hub_info = get_hub_info()
-        except Exception as e2:
-            getLogger().error("Error getting hub info: %s", str(e2))
-            hub_info = [0, 0, 0, 0, 0]  # Default values if get_hub_info fails
-
         return render_template(
             "App.html",
             app_config=ConfigApp().__dict__,
@@ -625,10 +573,10 @@ def send_hub_config():
             return redirect(
                 url_for("HubPage", output="Configuration successfully sent to server")
             )
-        else:
-            return redirect(
-                url_for("HubPage", output="Error sending configuration to server")
-            )
+
+        return redirect(
+            url_for("HubPage", output="Error sending configuration to server")
+        )
 
     except Exception as e:
         return redirect(
@@ -698,6 +646,19 @@ def init_hub():
 
     except (OSError, ValueError) as e:
         return redirect(url_for("HubPage", output=f"Error: {str(e)}"))
+
+
+@app.route("/scan_acq", methods=["GET", "POST"])
+def scan_acq():
+    getLogger().warning("Force scanners acquisition")
+    try:
+        cmd_acq = "python3 ScanorhizeProcess.py -f"
+        getLogger().warning("Scan Acq: %s", cmd_acq)
+        result = run(cmd_acq, shell=True, capture_output=True, text=True, check=False)
+        return redirect(url_for("HubPage", output="Scanners acquisition OK"))
+
+    except CalledProcessError as e:
+        return redirect(url_for("HubPage", output=f"Command failed: {e.stderr}"))
 
 
 @app.route("/poweroff", methods=["POST"])

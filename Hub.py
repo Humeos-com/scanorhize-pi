@@ -24,6 +24,7 @@ from OSUtils import get_os, get_model, is_raspberry_pi
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 from WittyPy_utilities import set_over_temperature_action, get_temperature
+
 # from WittyPython import ReadTemp
 from utils import write_json_to_file
 from pin_config import DEFAULT_PIN_ARRAY
@@ -105,7 +106,9 @@ class HubData:
         # On ecrase toujours ces 2 valeurs
         self.macAddress = getHwAddr()
         self.model = get_model()
-        set_over_temperature_action(self.over_temperature_action, self.over_temperature_point)
+        set_over_temperature_action(
+            self.over_temperature_action, self.over_temperature_point
+        )
         self.version = __version__
         return self
 

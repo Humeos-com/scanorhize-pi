@@ -67,7 +67,7 @@ if res != 0:
 # init
 Scanner = ScannerData()
 listScannerconfigs = listConfigScanner()
-scanning = 0
+scanning_error = 0
 
 i_scan = 0
 for CurrentScanner in listScannerconfigs:
@@ -96,7 +96,6 @@ for CurrentScanner in listScannerconfigs:
         getLogger().warning("Scanner %s: start image acquisition", str(i_scan + 1))
         Scanner = scanAcq(Scanner, i_scan, CurrentDate)
         Scanner.WriteScannerConfig(CurrentScanner)
-        scanning = 1
         if Scanner.error == 0:
             getLogger().warning("Image acquisition Ok")
             sleep(5)  # Voir si on peut réduire ce timer
@@ -107,8 +106,11 @@ for CurrentScanner in listScannerconfigs:
                 getLogger().warning("Image copied to USB")
             else:
                 getLogger().error("Error in copy to USB")
+                scanning_error = 1
+
         else:
             getLogger().error("Image acquisition Error")
+            scanning_error = 1
     else:
         getLogger().warning(
             "Scanner %s: no acquisition. DateStart %s too far from NextStartDate %s",
@@ -125,3 +127,5 @@ if force:
     Hub.read_config()
     if getSyncImages():
         syncImageFiles(Hub)
+
+sys.exit(scanning_error)
