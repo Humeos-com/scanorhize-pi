@@ -9,8 +9,8 @@ import sys
 from subprocess import run, CalledProcessError
 import argparse
 
-from WittyPython import is_reason_click
-from WittyPy import doShutdown, setNextShutdownDate
+from WittyPy_utilities import is_reason_click
+from WittyPy_utilities import doShutdown, setNextShutdownDate
 from Miscellaneous import (
     EndGPIO,
     enable4G,

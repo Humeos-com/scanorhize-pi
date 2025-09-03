@@ -25,7 +25,6 @@ from Hub import (
     SendScannerConfigToServer,
     GetWifiSSID,
     GetIP,
-    updateServer,
     HubData,
     getTokens,
     ReadHubConfigFromServer,
@@ -48,6 +47,7 @@ from Miscellaneous import (
     check_connectivity,
     sync_time,
 )
+from WittyPy_utilities import doShutdown
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
@@ -97,13 +97,13 @@ Project ID: {Hub.projectId}
 Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
 USB Space: {hub_info[2]}MB ({hub_info[3]}%)
 Temperature: {hub_info[4]:.1f}°C
-Ping: {Hub.ping}"""
+Over Temperature Action: {Hub.over_temperature_action}
+Over Temperature Point: {Hub.over_temperature_point}"""
 
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
 
     return hub_config
-
 
 try:
     check_connectivity()
@@ -358,7 +358,6 @@ def HubPage():
 
     return render_template(
         "Hub.html",
-        **updateServer(Hub),
         hub_config=hub_config,
         pin_array=pin_array,
         use_server=Hub.use_server,
@@ -667,7 +666,6 @@ def stop_server():
     if not is_raspberry_pi():
         return render_template(
             "Hub.html",
-            **updateServer(Hub),
             output="Not on Raspberry Pi",
             **get_common_template_vars(),
         )
@@ -700,10 +698,8 @@ def stop_server():
     except (FileNotFoundError, PermissionError) as e:
         getLogger().error("Error removing file DEBUG: %s", e)
 
-    result = run(
-        "sudo poweroff", shell=True, capture_output=True, text=True, check=False
-    )
-    return result.stdout
+    doShutdown()
+    return "OK"
 
 
 if __name__ == "__main__":

@@ -25,7 +25,6 @@ from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 from WittyPy_utilities import set_over_temperature_action, get_temperature
 
-# from WittyPython import ReadTemp
 from utils import write_json_to_file
 from pin_config import DEFAULT_PIN_ARRAY
 from Miscellaneous import ReadBatVoltCap
@@ -46,7 +45,6 @@ class HubData:
         if hasattr(self, "initialized"):  # Skip if already initialized
             return
 
-        self.ping: int = 0
         self.projectId: str = ""
         self.macAddress: str = "00:00:00:00:00:00"
         self.token: str = "token_bidon"
@@ -69,7 +67,7 @@ class HubData:
         # 0: None, 1: Shutdown, 2: Startup
         self.over_temperature_action: int = 1
         # Point de température à partir duquel on dépasse la température
-        self.over_temperature_point: int = 60
+        self.over_temperature_point: int = 62
         # todo.sh to run ?
         # si self.todo = True, alors on va chercher le fichier todo.sh
         # et on va l'exécuter au réveil suivant
@@ -140,19 +138,20 @@ def getSyncImages():
     return HubData().sync_images
 
 
+def getOverTemperatureAction():
+    return HubData().over_temperature_action
+
+
+def getOverTemperaturePoint():
+    return HubData().over_temperature_point
+
+
 def getTodo():
     return HubData().todo
 
 
 def getUseServer():
     return HubData().use_server
-
-
-def updateServer(server: HubData):
-    server_param = {
-        "ping": server.ping,
-    }
-    return server_param
 
 
 def getHubId():

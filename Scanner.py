@@ -6,13 +6,12 @@ Gestion des Scanners
 import os
 from os import path
 import sys
-import re
 import json
 from subprocess import run
 
 
 from DateUtils import GetCurrentDate, DateToSeconds, SecondsToDate, CalculNextStartDate
-from WittyPy import SetNextStartDate, setNextShutdownDate
+from WittyPy_utilities import SetNextStartDate, setNextShutdownDate
 from Miscellaneous import (
     InitGPIO,
     TurnUsbOn,

@@ -10,6 +10,8 @@ from subprocess import run, CalledProcessError, CompletedProcess
 import time
 from logging import getLogger
 from typing import Optional, Union
+from datetime import datetime, timedelta
+
 from version import __version__
 from OSUtils import is_raspberry_pi
 
@@ -23,6 +25,9 @@ else:
 
     sys.modules["smbus"] = fake_rpi.smbus
     from smbus import SMBus
+
+# Java Zoned Timestamp, with TZ=UTC
+JAVA_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 # I2C constants
 WITTY_PI_4_L3V7_FIRMWARE_ID = 0x37  # 55 en décimal
@@ -155,6 +160,7 @@ class WittyPi:
 
             self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_3
             self.firmware_id = 0
+            self.reason_click = 0
             # For lazy initialisation
             self.boot_config_file = None
 
@@ -164,6 +170,7 @@ class WittyPi:
                 self.initialized = True
                 return
 
+            self.get_reason_click()
             self.initialized = True
 
     def get_firmware_id(self):
@@ -184,6 +191,12 @@ class WittyPi:
         getLogger().error("ERROR: No Witty Pi board found.")
         return None
 
+    def get_reason_click(self) -> int:
+        if self.i2c_bus is None or self.firmware_id is None:
+            return 0
+        self.reason_click = self.i2c_read_byte(11)
+        return self.reason_click
+
     def get_boot_config_file(self):
         """Get the appropriate boot config file path based on OS."""
         if self.boot_config_file is None:
@@ -199,8 +212,17 @@ class WittyPi:
                 self.boot_config_file = "/boot/config.txt"
         return self.boot_config_file
 
-    def is_WittyPi_4_L3V7(self):
+    def is_WittyPi_3(self) -> bool:
+        return self.i2c_address == I2C_MC_ADDRESS_WITTY_PI_3
+
+    def is_WittyPi_4(self) -> bool:
+        return self.i2c_address == I2C_MC_ADDRESS_WITTY_PI_4
+
+    def is_WittyPi_4_L3V7(self) -> bool:
         return self.firmware_id == WITTY_PI_4_L3V7_FIRMWARE_ID
+
+    def is_reason_click(self) -> bool:
+        return self.reason_click == REASON_CLICK
 
     def i2c_read_byte(self, register: int, retry: int = 3) -> Optional[int]:
         """Read a single byte from I2C register using SMBus."""
@@ -298,7 +320,23 @@ def get_output_current() -> float:
     return 0.0
 
 
-def init_i2c_bus():
+def is_WittyPi_3() -> bool:
+    return WittyPi().is_WittyPi_3()
+
+
+def is_WittyPi_4() -> bool:
+    return WittyPi().is_WittyPi_4()
+
+
+def is_WittyPi_4_L3V7() -> bool:
+    return WittyPi().is_WittyPi_4_L3V7()
+
+
+def is_reason_click() -> bool:
+    return WittyPi().is_reason_click()
+
+
+def init_i2c_bus() -> bool:
     return WittyPi().i2c_bus is not None
 
 
@@ -527,9 +565,13 @@ def do_shutdown(halt_pin: int, has_mc: bool):
 
     # Check for lock file
     if not os.path.exists("/boot/wittypi.lock"):
-        run_command(["shutdown", "-h", "now"])
+        run_command(["sudo", "shutdown", "-h", "now"])
     else:
         os.remove("/boot/wittypi.lock")
+
+
+def doShutdown():
+    return do_shutdown(HALT_PIN, is_mc_connected())
 
 
 def get_low_voltage_threshold() -> float:
@@ -751,6 +793,51 @@ def set_startup_time(date: int, hour: int, minute: int, second: int):
         getLogger().error("Error setting startup time: %s", e)
 
 
+def SetNextStartDate(date):  # date en UTC!!
+    """Set the next startup time for the WittyPi.
+    If the parsing of the date fails, the next day is used as default.
+    Args:
+        date (str): Date string in format "YYYY-MM-DDTHH:mm:ssZ"
+    Returns:
+        int: Result of WriteWittyFunction call, or 0 if not on Raspberry Pi
+    """
+
+    if not is_raspberry_pi():
+        return 0
+    # Get current date plus one day for defaults
+    tomorrow = datetime.utcnow() + timedelta(days=1)
+    defaults = {
+        "year": tomorrow.year,
+        "month": tomorrow.month,
+        "day": tomorrow.day,
+        "hour": tomorrow.hour,
+        "mins": tomorrow.minute,
+        "secs": tomorrow.second,
+    }
+
+    # Parse date components with error handling
+    try:
+        # Extract components using string slicing
+        components = {
+            "year": int(date[0:4]),
+            "month": int(date[5:7]),
+            "day": int(date[8:10]),
+            "hour": int(date[11:13]),
+            "mins": int(date[14:16]),
+            "secs": int(date[17:19]),
+        }
+    except (ValueError, IndexError) as e:
+        # Use tomorrow's date if parsing fails
+        components = defaults
+        getLogger().error("Error parsing date: %s", e)
+
+    # Format the time string
+    arg = f"{components['day']:02d} {components['hour']:02d} {components['mins']:02d} {components['secs']:02d}"
+
+    # Only proceed if running on Raspberry Pi
+
+    return WriteWittyFunction("set_startup_time", arg)
+
 def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access."""
     try:
@@ -760,6 +847,24 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
         WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date))
     except (OSError, IOError) as e:
         getLogger().error("Error setting shutdown time: %s", e)
+
+
+def setNextShutdownDate(date: str):
+    """_summary_
+    Args:
+        date (str): Date in JAVA format
+    Returns:
+        result: Date in WittyPi format "DD HH MM SS"
+    """
+    if not is_raspberry_pi():
+        return 0
+    try:
+        date_obj = datetime.strptime(date, JAVA_FORMAT)
+        date = date_obj.strftime("%d %H %M %S")
+    except ValueError:
+        date = "01 06 25 00"
+    datew = date.split(" ")
+    return set_shutdown_time(int(datew[0]), int(datew[1]), int(datew[2]), int(datew[3]))
 
 
 def clear_startup_time():

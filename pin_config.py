@@ -5,7 +5,7 @@ Configuration des pins GPIO pour les scanners
 
 import json
 from os import path
-from WittyPython import is_WittyPi_3
+from WittyPy_utilities import is_WittyPi_3
 from ConfigApp import getConfigHubFile, getLogger
 
 # Charging and standby pins for WittyPi

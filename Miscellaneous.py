@@ -5,10 +5,8 @@ import sys
 from subprocess import run, SubprocessError, CalledProcessError
 from time import sleep
 
-# import logging
-
 from DateUtils import GetCurrentDate
-from WittyPython import (
+from WittyPy_utilities import (
     is_WittyPi_4_L3V7,
     get_input_voltage,
     get_output_voltage,
