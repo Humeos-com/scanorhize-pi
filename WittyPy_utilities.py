@@ -799,7 +799,7 @@ def SetNextStartDate(date):  # date en UTC!!
     Args:
         date (str): Date string in format "YYYY-MM-DDTHH:mm:ssZ"
     Returns:
-        int: Result of WriteWittyFunction call, or 0 if not on Raspberry Pi
+        int: Result of set_startup_time call, or 0 if not on Raspberry Pi
     """
 
     if not is_raspberry_pi():
@@ -831,12 +831,10 @@ def SetNextStartDate(date):  # date en UTC!!
         components = defaults
         getLogger().error("Error parsing date: %s", e)
 
-    # Format the time string
-    arg = f"{components['day']:02d} {components['hour']:02d} {components['mins']:02d} {components['secs']:02d}"
+    return set_startup_time(
+        components["day"], components["hour"], components["mins"], components["secs"]
+    )
 
-    # Only proceed if running on Raspberry Pi
-
-    return WriteWittyFunction("set_startup_time", arg)
 
 def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access."""

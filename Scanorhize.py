@@ -47,7 +47,7 @@ from Miscellaneous import (
     check_connectivity,
     sync_time,
 )
-from WittyPy_utilities import doShutdown
+from WittyPy_utilities import setNextShutdownDate
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
@@ -104,6 +104,7 @@ Over Temperature Point: {Hub.over_temperature_point}"""
         hub_config += f"\nToken: {Hub.token}"
 
     return hub_config
+
 
 try:
     check_connectivity()
@@ -698,7 +699,9 @@ def stop_server():
     except (FileNotFoundError, PermissionError) as e:
         getLogger().error("Error removing file DEBUG: %s", e)
 
-    doShutdown()
+    run(
+        "sudo poweroff", capture_output=True, universal_newlines=True, shell=True, check=False
+    )
     return "OK"
 
 
