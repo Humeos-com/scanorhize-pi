@@ -123,17 +123,17 @@ INTERNET_SERVER = (
 )
 
 # Reasons for startup/shutdown
-REASON_ALARM1 = "0x01"
-REASON_ALARM2 = "0x02"
-REASON_CLICK = "0x03"
-REASON_LOW_VOLTAGE = "0x04"
-REASON_VOLTAGE_RESTORE = "0x05"
-REASON_OVER_TEMPERATURE = "0x06"
-REASON_BELOW_TEMPERATURE = "0x07"
-REASON_ALARM1_DELAYED = "0x08"
-REASON_USB_5V_CONNECTED = "0x09"
-REASON_POWER_CONNECTED = "0x0a"
-REASON_REBOOT = "0x0b"
+REASON_ALARM1 = 0x01
+REASON_ALARM2 = 0x02
+REASON_CLICK = 0x03
+REASON_LOW_VOLTAGE = 0x04
+REASON_VOLTAGE_RESTORE = 0x05
+REASON_OVER_TEMPERATURE = 0x06
+REASON_BELOW_TEMPERATURE = 0x07
+REASON_ALARM1_DELAYED = 0x08
+REASON_USB_5V_CONNECTED = 0x09
+REASON_POWER_CONNECTED = 0x0
+REASON_REBOOT = 0x0B
 
 
 class WittyPi:
@@ -696,6 +696,12 @@ def below_temperature_action(
 
 def set_over_temperature_action(action: int, temperature: int):
     """Set over temperature action and point using direct I2C access."""
+    if (
+        WittyPi().firmware_id is None
+        or WittyPi().firmware_id != WITTY_PI_4_L3V7_FIRMWARE_ID
+    ):
+        return
+
     WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION, action)
 
     # Handle negative temperatures
