@@ -154,7 +154,6 @@ def read_gpio_input(pin: int):
         getLogger().error("IOError: %s", e)
         state_ = 1
 
-    getLogger().warning("Etat GPIO %d: %d", pin, state_)
     return state_
 
 
