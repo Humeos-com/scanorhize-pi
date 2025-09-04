@@ -700,7 +700,11 @@ def stop_server():
         getLogger().error("Error removing file DEBUG: %s", e)
 
     run(
-        "sudo poweroff", capture_output=True, universal_newlines=True, shell=True, check=False
+        "sudo poweroff",
+        capture_output=True,
+        universal_newlines=True,
+        shell=True,
+        check=False,
     )
     return "OK"
 

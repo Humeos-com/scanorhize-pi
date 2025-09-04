@@ -23,4 +23,7 @@ on except always explicit the kind of exception and use getLogger to log the exc
             getLogger().warning("Error reading WittyPi: %s", e)
 
 ## Coding standard
-Try to follow the DRY (Don't Repeat Yourself) principle to avoid code duplication
+
+### Try to follow the DRY (Don't Repeat Yourself) principle to avoid code duplication
+### The coding style should comply with Black formatter https://black.readthedocs.io/en/stable/
+
