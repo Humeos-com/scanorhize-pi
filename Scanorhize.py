@@ -47,7 +47,7 @@ from Miscellaneous import (
     check_connectivity,
     sync_time,
 )
-from WittyPy_utilities import setNextShutdownDate
+from WittyPy_utilities import get_shutdown_time, get_startup_time
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
@@ -79,13 +79,13 @@ SSH_PORT = random.randint(2223, 2299)  # Random port between 2223-2299
 
 def get_common_template_vars():
     """Get common variables for templates with fresh hub_info"""
-    return dict(
-        SSID=GetWifiSSID(),
-        IP=GetIP(),
-        hub_info=get_hub_info(),
-        SSH_PORT=SSH_PORT,
-        version=__version__,
-    )
+    return {
+        "SSID": GetWifiSSID(),
+        "IP": GetIP(),
+        "hub_info": get_hub_info(),
+        "SSH_PORT": SSH_PORT,
+        "version": __version__,
+    }
 
 
 def get_hub_config_string():
@@ -98,7 +98,9 @@ Battery: {hub_info[0]:.2f}V ({hub_info[1]}%)
 USB Space: {hub_info[2]}MB ({hub_info[3]}%)
 Temperature: {hub_info[4]:.1f}°C
 Over Temperature Action: {Hub.over_temperature_action}
-Over Temperature Point: {Hub.over_temperature_point}"""
+Over Temperature Point: {Hub.over_temperature_point}°C
+Get Shutdown Time: {get_shutdown_time()}
+Get Startup Time: {get_startup_time()}"""
 
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
@@ -127,6 +129,19 @@ except RuntimeError as exc:
 getLogger().warning("SSID: %s", GetWifiSSID())
 getLogger().warning("IP: %s", GetIP())
 
+# On initialise le Hub
+Hub.read_config()
+Hub.write_config()
+getLogger().warning("Start InitScanners")
+# Run initScanners() to initialize scanners
+# Init Scanners before getting tokens, because this operation
+# can be completed without network
+initScanners()
+getLogger().warning("End InitScanners")
+
+# Run getTokens() to get authentication tokens
+getLogger().warning("getTokens")
+getTokens()
 
 # This function does not allow caching of images from browser
 @app.after_request
@@ -655,7 +670,16 @@ def scan_acq():
         cmd_acq = "python3 ScanorhizeProcess.py -f"
         getLogger().warning("Scan Acq: %s", cmd_acq)
         result = run(cmd_acq, shell=True, capture_output=True, text=True, check=False)
-        return redirect(url_for("HubPage", output="Scanners acquisition OK"))
+        if result.returncode == 0:
+            getLogger().warning("Scan Acq: OK")
+            return redirect(url_for("HubPage", output="Scanners acquisition OK"))
+
+        getLogger().warning(
+            "Scan Acq: failed (return code: %d, stderr: %s)",
+            result.returncode,
+            result.stderr,
+        )
+        return redirect(url_for("HubPage", output="Scanners acquisition failed"))
 
     except CalledProcessError as e:
         return redirect(url_for("HubPage", output=f"Command failed: {e.stderr}"))
