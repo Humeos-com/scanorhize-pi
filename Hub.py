@@ -402,38 +402,46 @@ def SendParameters(Hub_: HubData):
 
 
 def GetWifiSSID():
+    SSID = "No SSID"
     if not is_raspberry_pi():
-        return "No SSID"
-    cmd = "sudo iwgetid"
+        return SSID
+    cmd = "sudo iwgetid -r"
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
-        # print(result.returncode, result.stdout, result.stderr)
-        x = (result.stdout).split('"')
+        if result.returncode != 0:
+            getLogger().error("Error GetWifiSSID: return: %s error: %s", result.returncode, result.stderr)
+            return SSID
+        SSID = result.stdout
     except (SubprocessError, CalledProcessError) as e:
-        print(f"Error: {e}")
-        x = ["", "", ""]
-    # print(x)
-    SSID = x[1]
-    # print(SSID)
+        getLogger().error("Error GetWifiSSID: %s", e)
+        return SSID
+
     return SSID
 
 
 def GetIP():
-    if get_os() == "MacOS":
-        cmd = "ipconfig getifaddr en13"
-        return "192.168.2.20"
-
+    IP="0.0.0.0"
+    if not is_raspberry_pi():
+        return IP
     cmd = "hostname -I"
-    result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
-    # print(result.returncode, result.stdout, result.stderr)
-    x = (result.stdout).split()
-    # print(x)
-    IP = x[0]
-    print(IP)
+    try:
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+        )
+        if result.returncode != 0:
+            getLogger().error("Error GetIP: return: %s error: %s", result.returncode, result.stderr)
+            return IP
+        x = (result.stdout).split()
+        if not x:  # Check if list is empty
+            getLogger().warning("GetIP: No IP address found in hostname -I output")
+            return IP
+        IP = x[0]
+    except (SubprocessError, CalledProcessError) as e:
+        getLogger().error("Error GetIP: %s", e)
+        return IP
+
     return IP
 
 

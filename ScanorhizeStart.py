@@ -76,7 +76,7 @@ if config:
         getLogger().warning("4G enabled")
 
     # En principe, on éteint le Raspberry Pi depuis l'application Web Scanorhize.py
-    cmd = "nohup python3 Scanorhize.py > /dev/null 2>&1 &"
+    cmd = "nohup python3 Scanorhize.py >> Log/Scanorhize.log 2>&1 &"
     getLogger().warning(cmd)
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
