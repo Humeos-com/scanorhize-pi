@@ -186,7 +186,6 @@ class ScannerData:
             "scanSearch: Starting scanner detection for port %d", i_scan + 1
         )
         error = TurnUsbOn(i_scan, 5)
-        # error = TurnUsbOn(i_scan, self.TimeBeforeScan)
         if error != 0:
             self.error = 1
             getLogger().warning("scanSearch: TurnUsbOn failed with error %d", error)
@@ -247,7 +246,6 @@ class ScannerData:
             getLogger().warning("scanSearch: No scanner detected")
 
         getLogger().warning("scanSearch: device %s", self.device)
-        # TurnUsbOff(i_scan, self.TimeAfterScan)
         TurnUsbOff(i_scan, 0)
         if self.error > 0:
             getLogger().error("scanSearch: error: %s, %s", result.stdout, result.stderr)
@@ -375,9 +373,6 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
                 res = 12
             scanner.error = res
         i += 1
-        # if res != 0:
-        #    TurnUsbOff(i_scan)
-        #    TurnUsbOn(i_scan, scanner.TimeBeforeScan)
     # On a un timer de manière à ce que le charriot des Canon LIDE 400
     # revienne à la position de départ
     TurnUsbOff(i_scan, scanner.TimeAfterScan)
@@ -392,7 +387,6 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         f"{imagepathtiff} "
         f"{imagepathjp2000} | tee -a {DISPLAY_FILE}"
     )
-    # print(commandconv)
     getLogger().warning("scanAcq: Start conversion jp2: %s", commandconv)
     result = run(
         commandconv,
@@ -493,21 +487,6 @@ def listConfigScanner():
     return listfile
 
 
-def setupScanners():
-    """Recupère les numeros de série des scanners"""
-    scanner = ScannerData()
-    listScannerconfigs_ = listConfigScanner()
-    i_scan = 0
-    for CurrentScanner in listScannerconfigs_:
-        scanner.ReadScannerConfig(CurrentScanner)
-        scanner.scanSearch(i_scan)
-        if is_raspberry_pi():
-            scanner.WriteScannerConfig(CurrentScanner)
-        i_scan += 1
-    if i_scan == 0:
-        getLogger().warning("setupScanners: Aucun scanner trouvé")
-
-
 def initScanners():
     """Operation à l'initialisation du Hub.
     Lorsqu'il n'y a aucun fichier de configuration.
@@ -533,7 +512,6 @@ def initScanners():
             getLogger().warning("Scanner-%d: No scanner detected, disabled", i_scan + 1)
 
         # Always write the configuration
-        #        if is_raspberry_pi():
         scanner.WriteScannerConfig(CurrentScanner)
         getLogger().warning("Scanner-%d: Configuration written", i_scan + 1)
         i_scan += 1
