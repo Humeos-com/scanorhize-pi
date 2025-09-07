@@ -12,8 +12,10 @@ fi
 
 while [ true ]
 do
-    sleep 30
-    WIRED_CONNECTION=$(nmcli -t --field UUID,DEVICE  connection show --active | grep "eth1")
+    sleep 10
+    # usb0 sur les Raspberry Pi 4
+    # eth1 sur les Raspberry Pi 5
+    WIRED_CONNECTION=$(nmcli -t --field UUID,DEVICE  connection show --active | grep "eth1\|usb0")
     if [ "bidon" = "bidon$WIRED_CONNECTION" ]
     then
         echo "Wired connection not found."
