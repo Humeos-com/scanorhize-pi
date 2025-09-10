@@ -17,12 +17,19 @@ from Miscellaneous import (
     disable4G,
     check_connectivity,
     ReadGPIOConfig,
+    sync_time,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 from ConfigApp import is_debug, getLogger
-from Scanner import listConfigScanner, ScannerData, calculate_and_set_next_date
+from Scanner import (
+    initScanners,
+    listConfigScanner,
+    ScannerData,
+    calculate_and_set_next_date,
+)
 from Hub import (
     HubData,
+    getTokens,
     SendParameters,
     syncImageFiles,
     ReadScannerConfigFromServer,
@@ -31,6 +38,11 @@ from Hub import (
     SendHubConfigToServer,
     ReadHubConfigFromServer,
     get_hub_info,
+    syncLogFiles,
+    GetWifiSSID,
+    GetIP,
+    getScanorhizeServer,
+    getSSHPort,
 )
 from version import __version__
 
@@ -71,9 +83,43 @@ nextStartDateValue = calculate_and_set_next_date()
 
 if config:
     getLogger().warning("On passe en mode config")
+
+    # Run initScanners() to initialize scanners
+    # Init Scanners before getting tokens, because this operation
+    # can be completed without network
+    # En plus, il faut faire l'init sans la 4G car sinon on dépasse la consommation
+    # maximale de la carte WittyPi, surtout si la batterie est faible
+    getLogger().warning("Start InitScanners")
+    initScanners()
+    getLogger().warning("End InitScanners")
+
     # En mode config on lance le serveur web Scanorhize et on quitte
     if enable4G():
         getLogger().warning("4G enabled")
+
+    try:
+        check_connectivity()
+        has_internet = True
+        getLogger().warning("Internet OK !")
+        sync_time()
+        syncLogFiles()
+        # On crée un tunnel SSH inverse pour la maintenance à distance
+        cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
+        run(cmd, shell=True, capture_output=True, text=True, check=False)
+        getLogger().warning(
+            "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
+            getSSHPort(),
+            getScanorhizeServer(),
+        )
+        getLogger().warning("getTokens")
+        getTokens()
+
+    except RuntimeError as exc:
+        getLogger().error("No internet connection: %s", exc)
+
+    # A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
+    getLogger().warning("SSID: %s", GetWifiSSID())
+    getLogger().warning("IP: %s", GetIP())
 
     # En principe, on éteint le Raspberry Pi depuis l'application Web Scanorhize.py
     cmd = "nohup python3 Scanorhize.py >> Log/Scanorhize.log 2>&1 &"

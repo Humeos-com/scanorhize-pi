@@ -4,8 +4,7 @@
 import os
 import sys
 from subprocess import run, CalledProcessError
-from time import sleep
-import random  # Add this import
+from time import sleep  # Add this import
 import argparse
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 
@@ -25,17 +24,15 @@ from Hub import (
     SendScannerConfigToServer,
     GetWifiSSID,
     GetIP,
+    getSSHPort,
     HubData,
-    getTokens,
     ReadHubConfigFromServer,
     SendHubConfigToServer,
     get_hub_info,
-    syncLogFiles,
 )
 from ConfigApp import (
     getLogger,
     getDisplayFile,
-    getScanorhizeServer,
     is_debug,
     is_prod,
     ConfigApp,
@@ -45,8 +42,6 @@ from Miscellaneous import (
     chaineIntwitherror,
     InitGPIO,
     initDisplayFile,
-    check_connectivity,
-    sync_time,
 )
 from WittyPy_utilities import get_shutdown_time, get_startup_time
 from OSUtils import is_raspberry_pi
@@ -75,7 +70,6 @@ getLogger().warning("Launch Web app")
 app = Flask(__name__)
 
 has_internet = False
-SSH_PORT = random.randint(2223, 2299)  # Random port between 2223-2299
 
 
 def get_common_template_vars():
@@ -84,7 +78,7 @@ def get_common_template_vars():
         "SSID": GetWifiSSID(),
         "IP": GetIP(),
         "hub_info": get_hub_info(),
-        "SSH_PORT": SSH_PORT,
+        "SSH_PORT": getSSHPort(),
         "version": __version__,
     }
 
@@ -109,42 +103,10 @@ Get Startup Time: {get_startup_time()}"""
     return hub_config
 
 
-try:
-    check_connectivity()
-    has_internet = True
-    getLogger().warning("Internet OK !")
-    sync_time()
-    syncLogFiles()
-    # On crée un tunnel SSH inverse pour la maintenance à distance
-    cmd = f"ssh -fN -R {SSH_PORT}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
-    run(cmd, shell=True, capture_output=True, text=True, check=False)
-    getLogger().warning(
-        "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
-        SSH_PORT,
-        getScanorhizeServer(),
-    )
-
-except RuntimeError as exc:
-    getLogger().error("No internet connection: %s", exc)
-
-# A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
-getLogger().warning("SSID: %s", GetWifiSSID())
-getLogger().warning("IP: %s", GetIP())
-
 # On initialise le Hub
 Hub.read_config()
 Hub.write_config()
-getLogger().warning("Start InitScanners")
-# Run initScanners() to initialize scanners
-# Init Scanners before getting tokens, because this operation
-# can be completed without network
-initScanners()
-getLogger().warning("End InitScanners")
 
-if has_internet:
-    # Run getTokens() to get authentication tokens
-    getLogger().warning("getTokens")
-    getTokens()
 
 # This function does not allow caching of images from browser
 @app.after_request

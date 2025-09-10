@@ -9,6 +9,7 @@ import sys
 from os import path
 from subprocess import run, SubprocessError, CalledProcessError
 import json
+import random
 import argparse
 from version import __version__
 
@@ -68,7 +69,9 @@ class HubData:
         # 0: None, 1: Shutdown, 2: Startup
         self.over_temperature_action: int = 1
         # Point de température à partir duquel on dépasse la température
-        self.over_temperature_point: int = 62
+        self.over_temperature_point: int = 68
+        # Reverse tunnel SSH port pour la maintenance à distance
+        self.ssh_port: int = random.randint(2223, 2299)  # Random port between 2223-2299
         # todo.sh to run ?
         # si self.todo = True, alors on va chercher le fichier todo.sh
         # et on va l'exécuter au réveil suivant
@@ -145,6 +148,10 @@ def getOverTemperatureAction():
 
 def getOverTemperaturePoint():
     return HubData().over_temperature_point
+
+
+def getSSHPort():
+    return HubData().ssh_port
 
 
 def getTodo():
@@ -432,7 +439,11 @@ def GetWifiSSID():
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
         if result.returncode != 0:
-            getLogger().error("Error GetWifiSSID: return: %s error: %s", result.returncode, result.stderr)
+            getLogger().error(
+                "Error GetWifiSSID: return: %s error: %s",
+                result.returncode,
+                result.stderr,
+            )
             return SSID
         SSID = result.stdout
     except (SubprocessError, CalledProcessError) as e:
@@ -443,7 +454,7 @@ def GetWifiSSID():
 
 
 def GetIP():
-    IP="0.0.0.0"
+    IP = "0.0.0.0"
     if not is_raspberry_pi():
         return IP
     cmd = "hostname -I"
@@ -452,7 +463,9 @@ def GetIP():
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
         if result.returncode != 0:
-            getLogger().error("Error GetIP: return: %s error: %s", result.returncode, result.stderr)
+            getLogger().error(
+                "Error GetIP: return: %s error: %s", result.returncode, result.stderr
+            )
             return IP
         x = (result.stdout).split()
         if not x:  # Check if list is empty
