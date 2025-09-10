@@ -18,6 +18,7 @@ from ConfigApp import (
     getLogger,
     getS3Bucket,
     getConfigDir,
+    getLogDir,
 )
 from Campaign import getUsbDir, USBSpace
 from OSUtils import get_model, is_raspberry_pi
@@ -189,6 +190,26 @@ def syncImageFiles(hub_: HubData):
         remove_image_files(src)
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncImageFiles from %s: %s", src, e)
+
+
+def syncLogFiles():
+    """Synchronise les fichiers de logs sur S3"""
+    log_dir = getLogDir()
+    hub_id = getHubId()
+    s3_log_path = f"s3://hubs/hub-{hub_id}/home/pi/Scanorhize/"
+
+    cmd = f"s3cmd --no-preserve --no-progress sync {log_dir} {s3_log_path}"
+    getLogger().warning("Syncing log files: %s", cmd)
+
+    try:
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+        )
+        getLogger().warning("SyncLogFiles: %s", result.stdout)
+        return 0
+    except (SubprocessError, CalledProcessError) as e:
+        getLogger().error("SyncLogFiles error: %s", e)
+        return 1
 
 
 def getTokens():

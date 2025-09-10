@@ -30,6 +30,7 @@ from Hub import (
     ReadHubConfigFromServer,
     SendHubConfigToServer,
     get_hub_info,
+    syncLogFiles,
 )
 from ConfigApp import (
     getLogger,
@@ -113,6 +114,7 @@ try:
     has_internet = True
     getLogger().warning("Internet OK !")
     sync_time()
+    syncLogFiles()
     # On crée un tunnel SSH inverse pour la maintenance à distance
     cmd = f"ssh -fN -R {SSH_PORT}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
     run(cmd, shell=True, capture_output=True, text=True, check=False)
