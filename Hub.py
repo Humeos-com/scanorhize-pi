@@ -20,7 +20,7 @@ from ConfigApp import (
     getConfigDir,
 )
 from Campaign import getUsbDir, USBSpace
-from OSUtils import get_os, get_model, is_raspberry_pi
+from OSUtils import get_model, is_raspberry_pi
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
 from WittyPy_utilities import set_over_temperature_action, get_temperature

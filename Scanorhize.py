@@ -139,9 +139,10 @@ getLogger().warning("Start InitScanners")
 initScanners()
 getLogger().warning("End InitScanners")
 
-# Run getTokens() to get authentication tokens
-getLogger().warning("getTokens")
-getTokens()
+if has_internet:
+    # Run getTokens() to get authentication tokens
+    getLogger().warning("getTokens")
+    getTokens()
 
 # This function does not allow caching of images from browser
 @app.after_request

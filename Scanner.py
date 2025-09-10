@@ -240,9 +240,10 @@ class ScannerData:
             self.device = "NoScannerDetected"
             self.enable = 0
             self.UseServer = 0
-            self.projectId = ""
-            self.sampleId = ""
-            self.token = "token"
+            # On ne reinitalise pas tous les attributs car on peut être offline
+            # self.projectId = ""
+            # self.sampleId = ""
+            # self.token = "token"
             getLogger().warning("scanSearch: No scanner detected")
 
         getLogger().warning("scanSearch: device %s", self.device)
