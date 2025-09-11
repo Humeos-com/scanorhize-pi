@@ -245,26 +245,49 @@ def syncLogFiles():
 
 
 def runTodo():
-    """Run the todo.sh if it exists in the .. (/home/pi) directory"""
-    if os.path.exists("../todo.sh"):
-        getLogger().warning("Run Todo.sh")
+    """Run the todo.sh if it exists in the .. (/home/pi) directory and has execute permissions"""
+    todo_path = "../todo.sh"
+
+    # Check if file exists
+    if not os.path.exists(todo_path):
+        getLogger().warning("todo.sh not found at %s", todo_path)
+        return
+
+    # Check if file has execute permissions
+    if not os.access(todo_path, os.X_OK):
+        getLogger().error(
+            "todo.sh exists but does not have execute permissions: %s", todo_path
+        )
         try:
-            result = run(
-                "../todo.sh", shell=True, capture_output=True, text=True, check=False
+            # Try to add execute permissions
+            os.chmod(todo_path, 0o755)
+            getLogger().warning("Added execute permissions to todo.sh")
+        except OSError as e:
+            getLogger().error("Failed to add execute permissions to todo.sh: %s", e)
+            return
+
+    getLogger().warning("Run todo.sh")
+    try:
+        result = run(todo_path, shell=True, capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            getLogger().warning("../todo.sh executed successfully")
+            getLogger().warning("../todo.sh: %s", result.stdout)
+        else:
+            getLogger().error(
+                "Failed to execute todo.sh: return code: %s, %s",
+                result.returncode,
+                result.stderr,
             )
-            if result.returncode == 0:
-                getLogger().warning("../todo.sh executed successfully")
-                getLogger().warning("../todo.sh: %s", result.stdout)
-            else:
-                getLogger().error(
-                    "Failed to execute todo.sh: return code: %s, %s",
-                    result.returncode,
-                    result.stderr,
-                )
-        except CalledProcessError as exc:
-            getLogger().error("Failed to execute todo.sh: %s", exc.stderr)
-        os.rename("../todo.sh", "../todo.sh.done")
-        getLogger().warning("Todo.sh executed successfully")
+    except CalledProcessError as exc:
+        getLogger().error("Failed to execute todo.sh: %s", exc.stderr)
+        return
+
+    # Rename the file after successful execution
+    try:
+        os.rename(todo_path, "../todo.sh.done")
+        getLogger().warning("todo.sh executed successfully and renamed to todo.sh.done")
+    except OSError as e:
+        getLogger().error("Failed to rename todo.sh to todo.sh.done: %s", e)
 
 
 def getTokens():

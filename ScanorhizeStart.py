@@ -6,7 +6,6 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 """
 
 import sys
-import os
 from subprocess import run, CalledProcessError
 import argparse
 
@@ -110,7 +109,7 @@ if config:
         getLogger().warning("Internet OK !")
         sync_time()
         runTodo()
-    
+
         # On recupère eventuellement le todo.sh
         if TodoEnabled():
             getTodo()
