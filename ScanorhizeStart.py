@@ -6,9 +6,11 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 """
 
 import sys
+import os
 from subprocess import run, CalledProcessError
 import argparse
 
+from OSUtils import is_raspberry_pi
 from WittyPy_utilities import is_reason_click
 from WittyPy_utilities import doShutdown, setNextShutdownDate
 from Miscellaneous import (
@@ -39,6 +41,10 @@ from Hub import (
     ReadHubConfigFromServer,
     get_hub_info,
     syncLogFiles,
+    TodoEnabled,
+    getTodo,
+    setTodo,
+    runTodo,
     GetWifiSSID,
     GetIP,
     getScanorhizeServer,
@@ -81,6 +87,7 @@ EndGPIO()
 # le boitier à l'heure correcte.
 nextStartDateValue = calculate_and_set_next_date()
 
+
 if config:
     getLogger().warning("On passe en mode config")
 
@@ -102,6 +109,14 @@ if config:
         has_internet = True
         getLogger().warning("Internet OK !")
         sync_time()
+        runTodo()
+    
+        # On recupère eventuellement le todo.sh
+        if TodoEnabled():
+            getTodo()
+            setTodo(False)
+
+        SendHubConfigToServer()
         syncLogFiles()
         # On crée un tunnel SSH inverse pour la maintenance à distance
         cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
@@ -201,9 +216,14 @@ if not getOffline():
         # On lance un sous programme qui met à jour toutes les données sur la plateforme
         # On échange avec la plateforme Web pour envoyer les images et les paramètres
 
+        runTodo()
+        # On recupère eventuellement le todo.sh
+        if TodoEnabled():
+            getTodo()
+            setTodo(False)
+
         # On récupère les configs des scanners depuis la plateforme / le S3 ??
         # selon le flag Scanner.UseServer
-
         SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
         SendHubConfigToServer()
         if Hub.use_server:
@@ -267,6 +287,11 @@ setNextShutdownDate(date_new)
 # sauf s'il y a un fichier /boot/wittypi.lock
 # Donc on ajoute un poweroff en plus...
 getLogger().warning("doShutdown until: %s", nextStartDateValue)
+
+if not is_raspberry_pi():
+    getLogger().warning("Not a Raspberry Pi, so no poweroff")
+    sys.exit(0)
+
 doShutdown()
 cmd = "sudo poweroff"
 getLogger().warning(cmd)

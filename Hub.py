@@ -154,8 +154,33 @@ def getSSHPort():
     return HubData().ssh_port
 
 
-def getTodo():
+def TodoEnabled():
     return HubData().todo
+
+
+def setTodo(todo: bool):
+    HubData().todo = todo
+    HubData().write_config()
+
+
+def getTodo():
+    if TodoEnabled():
+        # Download todo.sh from s3
+        hub_id = getHubId()
+        cmd = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/todo.sh ../todo.sh"
+        getLogger().warning(cmd)
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+        )
+        if result.returncode != 0:
+            getLogger().error(
+                "Failed to download todo.sh: return code: %s, %s",
+                result.returncode,
+                result.stderr,
+            )
+            return 1
+        getLogger().warning("todo.sh downloaded successfully")
+    return 0
 
 
 def getUseServer():
@@ -217,6 +242,29 @@ def syncLogFiles():
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncLogFiles error: %s", e)
         return 1
+
+
+def runTodo():
+    """Run the todo.sh if it exists in the .. (/home/pi) directory"""
+    if os.path.exists("../todo.sh"):
+        getLogger().warning("Run Todo.sh")
+        try:
+            result = run(
+                "../todo.sh", shell=True, capture_output=True, text=True, check=False
+            )
+            if result.returncode == 0:
+                getLogger().warning("../todo.sh executed successfully")
+                getLogger().warning("../todo.sh: %s", result.stdout)
+            else:
+                getLogger().error(
+                    "Failed to execute todo.sh: return code: %s, %s",
+                    result.returncode,
+                    result.stderr,
+                )
+        except CalledProcessError as exc:
+            getLogger().error("Failed to execute todo.sh: %s", exc.stderr)
+        os.rename("../todo.sh", "../todo.sh.done")
+        getLogger().warning("Todo.sh executed successfully")
 
 
 def getTokens():
