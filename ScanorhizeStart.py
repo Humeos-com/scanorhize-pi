@@ -115,6 +115,9 @@ if config:
             getTodo()
             setTodo(False)
 
+        Hub = HubData()
+        Hub.read_config()
+        SendParameters(Hub)
         SendHubConfigToServer()
         syncLogFiles()
         # On crée un tunnel SSH inverse pour la maintenance à distance
