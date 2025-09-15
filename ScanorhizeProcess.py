@@ -42,6 +42,7 @@ parser.add_argument(
     action="store_true",
     help="Force l'acquisition même si la date de déclenchement n'est pas atteinte",
 )
+# pylint: disable=duplicate-code
 parser.add_argument(
     "-v",
     "--version",

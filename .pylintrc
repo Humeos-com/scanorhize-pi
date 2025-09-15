@@ -3,7 +3,8 @@
 disable=
     missing-docstring,
     invalid-name,
-    line-too-long
+    line-too-long,
+    broad-exception-caught
 
 [DESIGN]
 

@@ -53,9 +53,9 @@ def update_template_file(file_path):
                 f.write(content)
             print(f"✓ Updated {file_path}")
             return True
-        else:
-            print(f"- No changes needed for {file_path}")
-            return False
+
+        print(f"- No changes needed for {file_path}")
+        return False
 
     except Exception as e:
         print(f"✗ Error updating {file_path}: {e}")

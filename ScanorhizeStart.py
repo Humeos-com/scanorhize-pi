@@ -62,6 +62,7 @@ parser.add_argument(
     action="store_true",
     help="Affiche la version du programme",
 )
+# pylint: disable=duplicate-code
 args = parser.parse_args()
 if args.version:
     print(f"ScanorhizeStart.py version: {__version__}")

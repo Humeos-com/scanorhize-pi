@@ -5,7 +5,6 @@ Unit tests for pin_config.py
 
 import unittest
 import json
-import os
 from unittest.mock import patch, mock_open, MagicMock
 from pin_config import (
     CHRG_PIN,

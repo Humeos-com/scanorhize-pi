@@ -53,6 +53,7 @@ parser = argparse.ArgumentParser(
     usage="%(prog)s [--version]",
     epilog="""Lance l'application web de gestion des scanners""",
 )
+# pylint: disable=duplicate-code
 parser.add_argument(
     "-v",
     "--version",
@@ -279,7 +280,7 @@ def action(actionName: str, scan_num_str: str):
             )
         )
 
-    elif actionName == "GetConfig":
+    if actionName == "GetConfig":
         result = ReadScannerConfigFromServer(Scanner)
         if result == 0:
             output_message = f"Configuration successfully downloaded from server for {Scanner.ScannerName}"
@@ -291,7 +292,7 @@ def action(actionName: str, scan_num_str: str):
             url_for("ScannerPage", scan_num_str=scan_num_str, output=output_message)
         )
 
-    elif actionName == "SendConfig":
+    if actionName == "SendConfig":
         if request.method == "POST":
             # Process form data and save locally
             success, message = process_scanner_form_data(
@@ -313,7 +314,7 @@ def action(actionName: str, scan_num_str: str):
                 url_for("ScannerPage", scan_num_str=scan_num_str, output=output_message)
             )
 
-    elif actionName == "WriteConfig":
+    if actionName == "WriteConfig":
         if request.method == "POST":
             success, message = process_scanner_form_data(
                 request.form, Scanner, listScannerconfigs, i_scan
@@ -583,11 +584,11 @@ def get_hub_config():
                     output="Configuration successfully downloaded from server",
                 )
             )
-        else:
-            # Redirect to /Hub with error message
-            return redirect(
-                url_for("HubPage", output="Error downloading configuration from server")
-            )
+
+        # Redirect to /Hub with error message
+        return redirect(
+            url_for("HubPage", output="Error downloading configuration from server")
+        )
 
     except Exception as e:
         # Redirect to /Hub with error message

@@ -573,6 +573,7 @@ if __name__ == "__main__":
         usage="%(prog)s [--version]",
         epilog="""Lance la synchronisation des fichiers images et JSON sur le serveur""",
     )
+    # pylint: disable=duplicate-code
     parser.add_argument(
         "-v",
         "--version",

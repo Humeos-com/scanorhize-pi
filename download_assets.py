@@ -4,7 +4,6 @@ Script to download external CDN resources locally for offline operation
 """
 
 import os
-from pathlib import Path
 import requests
 
 # Define the external resources to download (Bootstrap 5)
