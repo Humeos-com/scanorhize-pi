@@ -1,41 +1,41 @@
 # Scanorhize - Hubs
 
 ## Description
-Dans le projet Scanorhize, les Hubs sont les boitiers qui contrôlent les scanners et qui transmettent les images à la plateforme Web.<br/>
-Ils sont composés d'un Raspberry Pi, d'une une carte Witty Pi pour l'horloge temps réel, d'une carte relais et d'une carte Big 7 pour avoir des ports USB additonnels.<br/>
-La contrainte essentielle des Hubs est la gestion de l'alimentation qui doit être minimale afin qu'ils puissent fonctionner en autonomie le plus lonngtemps possible.<br/>
+Dans le projet Scanorhize, les Hubs sont les boîtiers qui contrôlent les scanners et qui transmettent les images à la plateforme Web.<br/>
+Ils sont composés d'un Raspberry Pi, d'une une carte Witty Pi pour l'horloge temps réel, d'une carte relais et d'une carte Big 7 pour avoir des ports USB additionnels.<br/>
+La contrainte essentielle des Hubs est la gestion de l'alimentation qui doit être minimale afin qu'ils puissent fonctionner en autonomie le plus longtemps possible.<br/>
 A cette fin on utilise une carte horloge temps réel, la carte Witty Pi, qui est programmée pour des réveils périodiques. Au réveil, le Raspberry démarre, sans alimenter aucun port USB des scanners ni de la clé 4G pour la communication Internet.<br/>
-Le Rasberry va faire ses acquisition en allumant les scanners un par un grâce à la carte relai. Une fois les acquisitions terminées, le Raspberry allume la clé 4G pour envoyer des données et récupérer certains éléments selon la configuration du Hub.
+Le Raspberry va faire ses acquisition en allumant les scanners un par un grâce à la carte relai. Une fois les acquisitions terminées, le Raspberry allume la clé 4G pour envoyer des données et récupérer certains éléments selon la configuration du Hub.
 
 
 ## Premiers pas
-La première étape consiste à mettre le Hub en mode configuration afin de contrôler ou modifier son paramètrage. Lorsque le Hub est éteint, il faut appuyer sur le bouton qui se trouve près des connecteurs USB, pour démarrer le Hub en mode configuration.<br/>
+La première étape consiste à mettre le Hub en mode configuration afin de contrôler ou modifier son paramétrage. Lorsque le Hub est éteint, il faut appuyer sur le bouton qui se trouve près des connecteurs USB, pour démarrer le Hub en mode configuration.<br/>
 Le Hub va essayer de détecter les scanners qui sont branchés sur ses ports USB, puis va lancer une application Web pour sa configuration. Cette application est accessible par le Wifi "Scanorhize" sur l'Url: http://192.168.1.42:8080/ <br/>
-Saisir les période de réveil pour chacun des scanners, enregistrer les configurations sur le serveur.<br/>
+Saisir les périodes de réveils pour chacun des scanners, enregistrer les configurations sur le serveur.<br/>
 Une fois tous les paramètres saisis, les scanners et le Hub en place, on peut aller sur le menu "Hub", pour lancer une acquisition afin de s'assurer que tout fonctionne bien.<br/>
-Enfin, il faut éteindre le Hub afin de préserver la batterie. Cliquer sur le bouton rouge "Power off". On ne doit plus voir aucune led allumée sur le Hub.<br/>
+Enfin, il faut éteindre le Hub afin de préserver la batterie. Cliquer sur le bouton rouge "Power off". On ne doit plus voir aucune led allumée sur le Hub après quelques secondes.<br/>
 Par la suite, le Hub va se réveiller selon sa programmation, faire des acquisitions et envoyer ses données au serveur.
 
 
 ## Détail du fonctionnement
-Au démarrage du Raspberry, on lance la commande /home/pi/Scanorhize/StartScanorhize.sh<br/>
-Ce shell lance ScanorhizeStart.py qui gère les heures de reveil et d'endormissement du Hub et qui selon le mode de démarrage (apui sur le bouton ON/OFF ou réveil programmé) va lancer l'aquisition des images par le scanner ou le serveur Web en mode configuration.<br/>
+Au démarrage du Raspberry, on lance la commande `/home/pi/Scanorhize/StartScanorhize.sh`<br/>
+Ce shell lance ScanorhizeStart.py qui gère les heures de réveil et d'endormissement du Hub et qui selon le mode de démarrage (appui sur le bouton ON/OFF ou réveil programmé) va lancer l'acquisition des images par le scanner ou le serveur Web en mode configuration.<br/>
 Le serveur Flask est lancé par la commande Scanorhize.py et l'acquisition par ScanorhizeProcess.py
 
 
 #### Mode Configuration
-Le fait d'allumer le boitier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte Witty Pi.<br/>
+Le fait d'allumer le boîtier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte Witty Pi.<br/>
 En mode configuration, le relai de chaque scanner s'allume afin de détecter les scanners branchés sur le Hub. En dernier lieu, c'est le relai de la clé 4G qui s'allume.
 
 > [!WARNING]
-> Lorsqu'on lance le mode configuration le boitier s'arrête au bout de 20 minutes par sécurité (sinon il ne s'arrêterait pas et viderait la batterie)
-> Il est recommandé de l'arrêter avant par l'interface Web, avec le bouton Poweroff, ou avec le bouton ON/OFF du boitier.
+> Lorsqu'on lance le mode configuration le boîtier s'arrête au bout de 20 minutes par sécurité (sinon il ne s'arrêterait pas et viderait la batterie)
+> Il est recommandé de l'arrêter avant par l'interface Web, avec le bouton "Poweroff", ou avec le bouton ON/OFF du boîtier.
 
 #### Mode nominal (acquisitions)
-Le mode nominal réveille le Hub pour faire les acquisitions puis éteint le boitier jusqu'au prochain réveil programmé.
+Le mode nominal réveille le Hub pour faire les acquisitions puis éteint le boîtier jusqu'au prochain réveil programmé.
 
-#### Démarrage / Arrêt du boitier
-On utilise donc un bouton qui agit sur GPIO-7 (pin physique 7) avec mise à la terre, pour faire les arrêts/relances, sans jamais couper l'alimentation. Ce qui peut conduire dans certains cas à des difficultés à éteindre ou allumer le boitier.
+#### Démarrage / Arrêt du boîtier
+On utilise donc un bouton qui agit sur GPIO-7 (pin physique 7) avec mise à la terre, pour faire les arrêts/relances, sans jamais couper l'alimentation. Ce qui peut conduire dans certains cas à des difficultés à éteindre ou allumer le boîtier.
 
 > [!TIP]
 > Quand la pression sur le bouton poussoir ne produit aucun effet, il faut presser le bouton pendant au moins 10 secondes pour forcer l'arrêt ou le démarrage.
@@ -66,7 +66,7 @@ On obtient ces valeurs quand seule la batterie est branchée. Si on est sur l'al
 > Le Raspberry Pi 5 a dispose d'une horloge temps réel. On peut donc l'activer, à condition de ne pas utiliser le réveil profond (`POWER_OFF_ON_HALT=1`). Mais dans ce cas la consommation du Raspberry est de l'ordre de 1W (200mA), ce qui rédhibitoire pour notre projet.  
 
 > [!NOTE]
-> La carte UUGear Mega 4 dispose de 4 ports PPPS dont l'alimentation peut être gérée par le bus USB (Per-Port Power Switching). Malheureusement, pour que le driver de la carte fonctionne, il faut que les ports soient allumés au boot du Raspberry (mode impossible à modifier selon UUGear). L'appel de courant au démarrage des 3 scanners et de la clé 4G est alors beaucoup trop élevé pour les batteries, donc le Raspberry ne démarre pas. 
+> La carte UUGEAR Mega 4 dispose de 4 ports PPPS dont l'alimentation peut être gérée par le bus USB (Per-Port Power Switching). Malheureusement, pour que le driver de la carte fonctionne, il faut que les ports soient allumés au boot du Raspberry (mode impossible à modifier selon UUGEAR). L'appel de courant au démarrage des 3 scanners et de la clé 4G est alors beaucoup trop élevé pour les batteries, donc le Raspberry ne démarre pas. 
 
 La carte relai permet de couper l'alimentation des ports USB de la carte Big 7. Ainsi, au démarrage du Raspberry, aucun port USB de la carte Big 7 n'est alimenté. Le Raspberry démarre sans aucun périphérique, hormis sa carte SD externe, et la consommation est minimal au boot. La valeurs de consommation restent sous 2A en pic et arrivent à 0,8/0,9A pour un Raspberry Pi 4 et 0,6/0,7A pour un Raspberry Pi 5 sans charge.
 Lorsqu'on active les relais 1 par 1, on ne dépasse jamais 2A en pic.
@@ -86,11 +86,11 @@ Il n'a pas besoin de timeout après la mise sous tension pour effectuer un scan 
 Ce scanner est moins bien adapté pour les Hubs, car:
 - il nécessite plus de courant à la mise sous tension, il dépasse souvent 1A, ce qui empêche parfois l'allumage du Hub lorsque les batteries sont faibles.
 - Avant de scanner, il faut attendre environ 30 à 40s après la mise sous tension et 5 à 10s après le scan pour couper l'alimentation afin que le charriot revienne à sa position initiale, ce qui augmente la durée des acquisitions et donc la consommation du Hub.
-- Lorsqu'on branche le scanner avec un cable USB Bulgin de 5m de long, on a beaucoup d'erreurs, car la tension du port USB en bout de ligne est trop faible.
+- Lorsqu'on branche le scanner avec un câble USB Bulgin de 5m de long, on a beaucoup d'erreurs, car la tension du port USB en bout de ligne est trop faible.
 
 
 ### Configuration du GPIO
-Selon les composants utilisés pour le boitier, les GPIO utilisés sont différents.
+Selon les composants utilisés pour le boîtier, les GPIO utilisés sont différents.
 
 #### Pour le relai Banggood
 pins BCM
@@ -103,9 +103,9 @@ pins BCM
 #### Pour le relai SBComponent RelayPi-V2
 pins BCM
 - Ch1Pin = 13  # Scanner1
-- Ch2Pin = 22  # Scanner2<br>
+- Ch2Pin = 22  # Scanner2
 Attention pour ces 2 pins, il faut supprimer les jumpers jaunes
-et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dupont
+et câbler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des câbles Dupont
 - Ch3Pin = 27  # Scanner3
 - Ch4Pin = 19  # Clé 4G
 - PinArray = [13, 22, 27, 19]
@@ -113,7 +113,7 @@ et cabler GPIO 27 et 22 (board pins 13 et 15) sur les relais avec des cables Dup
 #### Pour l'alimentation de la carte WittyPi L3V7
 Pins BCM
 - CHRG_PIN = 5  # input to detect charging status
-- STDBY_PIN = 6  # input to detect standby status<br>
+- STDBY_PIN = 6  # input to detect standby status
 Pour les explications, voir le programme wittyPi.sh fourni par UUGEAR
 
 #### Carte USB Big 7
@@ -146,11 +146,11 @@ On accède à l'interface d'Administration locale du Hub par l'URL:<br>
 http://192.168.1.42:8080
 
 #### Accès SSH
-On peut aussi accéder au Raspberry depuis le serveur backend-prod.humeos.com si on connaît le port utilisé par le Raspberry. Le port est affiché sur l'interface Web en haut à droite dans toutes les pages. Si on n'a pas accès à l'interface Web, on peut découvrir le port avec la commande suivante sur le serveur backend-prod.humeos.com:
+On peut aussi accéder au Raspberry depuis le serveur `backend-prod.humeos.com` si on connaît le port utilisé par le Raspberry. Le port est affiché sur l'interface Web en haut à droite dans toutes les pages. Si on n'a pas accès à l'interface Web, on peut découvrir le port avec la commande suivante sur le serveur `backend-prod.humeos.com`:
 ```
 debian@d2-2-gra11:~$ sudo netstat -tanpl | grep ":22" | grep -v 2222
-tcp        0      0 127.0.0.1:2269          0.0.0.0:*               LISTEN      1040576/sshd: debia 
-tcp6       0      0 ::1:2269                :::*                    LISTEN      1040576/sshd: debia 
+tcp        0      0 127.0.0.1:2269          0.0.0.0:*               LISTEN      1040576/sshd: debian 
+tcp6       0      0 ::1:2269                :::*                    LISTEN      1040576/sshd: debian
 debian@d2-2-gra11:~$ 
 ```
 Ici, on voit que la connexion se trouve sur le port 2269.<br/>
@@ -161,7 +161,7 @@ debian@d2-2-gra11:~$ ssh pi@localhost -p 2269
 Les clés d'accès sont configurées sur le compte de l'utilisateur debian sur le serveur backend-prod.humeos.com et permettent d'accèder au Hub sans mot de passe.
 
 #### Modification des configurations sur le bucket S3
-Selon le mode `Use Server`, les Hubs et les scanners vont chercher leur configuration sur le bucket S3. On peut ainsi modifier les configurations sans passer en mode configuration, donc sans toucher les boitiers.
+Selon le mode `Use Server`, les Hubs et les scanners vont chercher leur configuration sur le bucket S3. On peut ainsi modifier les configurations sans passer en mode configuration, donc sans toucher les boîtiers.
 
 Pour chaque Hub, on trouve les configurations sur le bucket `s3://hubs`
 ```
@@ -180,14 +180,24 @@ En mode nominal, le Hub se réveille, lance les acquisitions une par une, allume
 ## Problèmes et Diagnostics
 
 ### On ne reçoit plus d'images du Hub
-Plusieurs raisons, dont les plus courantes sont :
-- Les batteries sont trop faibles pour démarrer le Hub
+Les causes les plus courantes sont :
+- La batterie est trop faible pour démarrer le Hub
 - La communication par la clé 4G est mauvaise
 - L'abonnement de la carte SIM est épuisé, il n'y plus de data. Il faut éviter ce cas, car, la communication peut rester bloquée lors d'un transfert et vider la batterie pendant les timeouts.
 - Le programme d'acquisition a planté, laissant le Hub réveillé jusqu'à l'endormissement de secours qui a lieu au bout de 20 minutes
 
 ### Diagnostics
+
+#### Les leds
+- Lorsque le bloc de batteries est en charge par la powerbank, la led bleue s'allume de manière fixe sur la carte Witty Pi
+- Lorsque la led bleue de la carte Witty Pi clignote, c'est que la batterie est déconnectée
+- Lorsque la led verte de la carte Witty Pi est allumée, c'est que le 5V est branché (powerbank ou alimentation externe)
+- La diode blanche à coté du bouton de la carte Witty Pi, clignote lorsque le Hub est endormi.
+- Lorsque le Hub est réveillé, on voit des led rouges sur les cartes Relais, Raspberry et Big 7. La led verte sur le Raspberry indique les lectures/écritures sur le stockage.
+- La led de la clé 4G est verte lorsqu'elle est connectée à l'Internet
 - Si les voyants du Hub restent rouges mais qu'il ne se passe rien ou que le Hub s'éteint quelques secondes après l'allumage, c'est qu'il n'a plus assez de batterie. Pour forcer l'extinction du Hub, appuyer sur le bouton plus de 10 secondes.
+
+#### La connectivité
 - Les clés 4G sont moins performantes qu'un téléphone mobile. Ce n'est pas parce qu'on capte bien dans une zone que le Hub va bien fonctionner. Il faut tester ou mieux aller sur l'interface de la clé 4G. On peut se connecter sur le Wifi Scanorhize et voir la configuration de la clé 4G sur l'URL: http://192.168.1.1/ On voit l'état de la 4G en haut de la page à droite, une fois authentifié.
 
 ## Contribuer
@@ -196,4 +206,4 @@ Plusieurs raisons, dont les plus courantes sont :
 
 ## Crédits
 
-# test
+# Tests
