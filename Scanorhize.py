@@ -44,6 +44,7 @@ from Miscellaneous import (
     InitGPIO,
     initDisplayFile,
 )
+from utils import sanitize_output
 from WittyPy_utilities import get_shutdown_time, get_startup_time
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -122,7 +123,7 @@ def add_header(response):
 def index():
     if request.method == "POST":
         cmd_pkill = "sudo pkill -f ScanorhizeProcess.py"
-        run(cmd_pkill, shell=True, capture_output=True, text=True, check=False)
+        run(cmd_pkill, shell=False, capture_output=False, text=True, check=False)
 
     return render_template(
         "index.html",
@@ -173,8 +174,8 @@ def ScannerPage(scan_num_str: str):
     i_scan = int(scan_num_str) - 1
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
 
-    # Get output message from query parameters if it exists
-    output = request.args.get("output", None)
+    # Get output message from query parameters if it exists and sanitize it
+    output = sanitize_output(request.args.get("output", None))
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
@@ -289,7 +290,11 @@ def action(actionName: str, scan_num_str: str):
                 f"Error downloading configuration from server for {Scanner.ScannerName}"
             )
         return redirect(
-            url_for("ScannerPage", scan_num_str=scan_num_str, output=output_message)
+            url_for(
+                "ScannerPage",
+                scan_num_str=scan_num_str,
+                output=sanitize_output(output_message),
+            )
         )
 
     if actionName == "SendConfig":
@@ -300,7 +305,11 @@ def action(actionName: str, scan_num_str: str):
             )
             if not success:
                 return redirect(
-                    url_for("ScannerPage", scan_num_str=scan_num_str, output=message)
+                    url_for(
+                        "ScannerPage",
+                        scan_num_str=scan_num_str,
+                        output=sanitize_output(message),
+                    )
                 )
 
             # Then send to server
@@ -311,7 +320,11 @@ def action(actionName: str, scan_num_str: str):
                 output_message = f"Error sending configuration to server: {result}"
 
             return redirect(
-                url_for("ScannerPage", scan_num_str=scan_num_str, output=output_message)
+                url_for(
+                    "ScannerPage",
+                    scan_num_str=scan_num_str,
+                    output=sanitize_output(output_message),
+                )
             )
 
     if actionName == "WriteConfig":
@@ -320,7 +333,11 @@ def action(actionName: str, scan_num_str: str):
                 request.form, Scanner, listScannerconfigs, i_scan
             )
             return redirect(
-                url_for("ScannerPage", scan_num_str=scan_num_str, output=message)
+                url_for(
+                    "ScannerPage",
+                    scan_num_str=scan_num_str,
+                    output=sanitize_output(message),
+                )
             )
 
     return redirect(url_for("ScannerPage", scan_num_str=scan_num_str))
@@ -336,8 +353,8 @@ def HubPage():
     # Get the pin array configuration
     pin_array = get_pin_array()
 
-    # Get output message from query parameters if it exists
-    output = request.args.get("output", None)
+    # Get output message from query parameters if it exists and sanitize it
+    output = sanitize_output(request.args.get("output", None))
 
     return render_template(
         "Hub.html",
@@ -359,25 +376,31 @@ def HubPage():
 def update_version():
 
     if not is_raspberry_pi():
-        return redirect(url_for("HubPage", output="No update, not on Raspberry Pi"))
+        return redirect(
+            url_for("HubPage", output=sanitize_output("No update, not on Raspberry Pi"))
+        )
 
     try:
         cmd_update = "s3cmd --no-preserve sync s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
         getLogger().warning("Update version: %s", cmd_update)
         result = run(
             cmd_update,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             check=False,
         )
 
         return redirect(
-            url_for("HubPage", output=f"Update version OK: {result.stdout}")
+            url_for(
+                "HubPage", output=sanitize_output(f"Update version OK: {result.stdout}")
+            )
         )
 
     except CalledProcessError as e:
-        return redirect(url_for("HubPage", output=f"Command failed: {e.stderr}"))
+        return redirect(
+            url_for("HubPage", output=sanitize_output(f"Command failed: {e.stderr}"))
+        )
 
 
 @app.route("/App", methods=["GET"])
@@ -451,7 +474,9 @@ def update_app_config():
             return render_template(
                 "App.html",
                 app_config=ConfigApp().__dict__,
-                output="Invalid log level value. Must be WARNING, INFO, or DEBUG.",
+                output=sanitize_output(
+                    "Invalid log level value. Must be WARNING, INFO, or DEBUG."
+                ),
                 **get_common_template_vars(),
             )
 
@@ -488,7 +513,7 @@ def update_app_config():
         return render_template(
             "App.html",
             app_config=app_config,
-            output=output,
+            output=sanitize_output(output),
             **get_common_template_vars(),
         )
 
@@ -496,7 +521,7 @@ def update_app_config():
         return render_template(
             "App.html",
             app_config=ConfigApp().__dict__,
-            output=f"Error updating configuration: {str(e)}",
+            output=sanitize_output(f"Error updating configuration: {str(e)}"),
             **get_common_template_vars(),
         )
 
@@ -535,7 +560,10 @@ def write_config():
         success, message = process_hub_form_data(request.form)
         return redirect(
             url_for(
-                "HubPage", output=f"{'Success: ' if success else 'Error: '}{message}"
+                "HubPage",
+                output=sanitize_output(
+                    f"{'Success: ' if success else 'Error: '}{message}"
+                ),
             )
         )
     return redirect(url_for("HubPage"))
@@ -547,23 +575,32 @@ def send_hub_config():
         # First process the form data and save locally
         success, message = process_hub_form_data(request.form)
         if not success:
-            return redirect(url_for("HubPage", output=message))
+            return redirect(url_for("HubPage", output=sanitize_output(message)))
 
         # Then send to server
         result = SendHubConfigToServer()
         if result == 0:
             return redirect(
-                url_for("HubPage", output="Configuration successfully sent to server")
+                url_for(
+                    "HubPage",
+                    output=sanitize_output("Configuration successfully sent to server"),
+                )
             )
 
         return redirect(
-            url_for("HubPage", output="Error sending configuration to server")
+            url_for(
+                "HubPage",
+                output=sanitize_output("Error sending configuration to server"),
+            )
         )
 
     except Exception as e:
         return redirect(
             url_for(
-                "HubPage", output=f"Error sending configuration to server: {str(e)}"
+                "HubPage",
+                output=sanitize_output(
+                    f"Error sending configuration to server: {str(e)}"
+                ),
             )
         )
 
@@ -581,13 +618,18 @@ def get_hub_config():
             return redirect(
                 url_for(
                     "HubPage",
-                    output="Configuration successfully downloaded from server",
+                    output=sanitize_output(
+                        "Configuration successfully downloaded from server"
+                    ),
                 )
             )
 
         # Redirect to /Hub with error message
         return redirect(
-            url_for("HubPage", output="Error downloading configuration from server")
+            url_for(
+                "HubPage",
+                output=sanitize_output("Error downloading configuration from server"),
+            )
         )
 
     except Exception as e:
@@ -595,7 +637,9 @@ def get_hub_config():
         return redirect(
             url_for(
                 "HubPage",
-                output=f"Error downloading configuration from server: {str(e)}",
+                output=sanitize_output(
+                    f"Error downloading configuration from server: {str(e)}"
+                ),
             )
         )
 
@@ -621,13 +665,17 @@ def init_hub():
         getLogger().warning("Start init-hub")
         tokens_result = getTokens()
         if tokens_result != 0:
-            return redirect(url_for("HubPage", output="Failed to get tokens"))
+            return redirect(
+                url_for("HubPage", output=sanitize_output("Failed to get tokens"))
+            )
 
         getLogger().warning("End init-hub")
-        return redirect(url_for("HubPage", output="Hub initialized successfully"))
+        return redirect(
+            url_for("HubPage", output=sanitize_output("Hub initialized successfully"))
+        )
 
     except (OSError, ValueError) as e:
-        return redirect(url_for("HubPage", output=f"Error: {str(e)}"))
+        return redirect(url_for("HubPage", output=sanitize_output(f"Error: {str(e)}")))
 
 
 @app.route("/scan_acq", methods=["GET", "POST"])
@@ -636,20 +684,26 @@ def scan_acq():
     try:
         cmd_acq = "python3 ScanorhizeProcess.py -f"
         getLogger().warning("Scan Acq: %s", cmd_acq)
-        result = run(cmd_acq, shell=True, capture_output=True, text=True, check=False)
+        result = run(cmd_acq, shell=False, capture_output=True, text=True, check=False)
         if result.returncode == 0:
             getLogger().warning("Scan Acq: OK")
-            return redirect(url_for("HubPage", output="Scanners acquisition OK"))
+            return redirect(
+                url_for("HubPage", output=sanitize_output("Scanners acquisition OK"))
+            )
 
         getLogger().warning(
             "Scan Acq: failed (return code: %d, stderr: %s)",
             result.returncode,
             result.stderr,
         )
-        return redirect(url_for("HubPage", output="Scanners acquisition failed"))
+        return redirect(
+            url_for("HubPage", output=sanitize_output("Scanners acquisition failed"))
+        )
 
     except CalledProcessError as e:
-        return redirect(url_for("HubPage", output=f"Command failed: {e.stderr}"))
+        return redirect(
+            url_for("HubPage", output=sanitize_output(f"Command failed: {e.stderr}"))
+        )
 
 
 @app.route("/poweroff", methods=["POST"])
@@ -658,14 +712,14 @@ def stop_server():
     if not is_raspberry_pi():
         return render_template(
             "Hub.html",
-            output="Not on Raspberry Pi",
+            output=sanitize_output("Not on Raspberry Pi"),
             **get_common_template_vars(),
         )
 
     # Before remove the USB key, we need to stop the server
     cmdeject = "sudo eject /dev/sda"
     result = run(
-        cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdeject, capture_output=True, universal_newlines=True, shell=False, check=False
     )
     getLogger().warning("Eject command: %s", cmdeject)
     if result.returncode == 0:
@@ -694,7 +748,7 @@ def stop_server():
         "sudo poweroff",
         capture_output=True,
         universal_newlines=True,
-        shell=True,
+        shell=False,
         check=False,
     )
     return "OK"

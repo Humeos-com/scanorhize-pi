@@ -123,7 +123,7 @@ if config:
         syncLogFiles()
         # On crée un tunnel SSH inverse pour la maintenance à distance
         cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
-        run(cmd, shell=True, capture_output=True, text=True, check=False)
+        run(cmd, shell=False, capture_output=True, text=True, check=False)
         getLogger().warning(
             "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
             getSSHPort(),
@@ -143,7 +143,7 @@ if config:
     cmd = "nohup python3 Scanorhize.py >> Log/Scanorhize.log 2>&1 &"
     getLogger().warning(cmd)
     result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmd, capture_output=True, universal_newlines=True, shell=False, check=False
     )
     if result.returncode == 0:
         getLogger().warning("Scanorhize.py started successfully")
@@ -154,7 +154,7 @@ if config:
     cmd = "nohup sudo ./Shut_connection.sh > /tmp/Shut_connection.log 2>&1 &"
     getLogger().warning(cmd)
     result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmd, capture_output=True, universal_newlines=True, shell=False, check=False
     )
     if result.returncode == 0:
         getLogger().warning("Shut_connection.sh started successfully")
@@ -172,7 +172,7 @@ cmd = "python3 ScanorhizeProcess.py"
 getLogger().warning(cmd)
 try:
     result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+        cmd, capture_output=True, universal_newlines=True, shell=False, check=True
     )
 except CalledProcessError as exc:
     getLogger().error(exc.stderr)
@@ -209,7 +209,7 @@ if not getOffline():
                 cmd,
                 capture_output=True,
                 universal_newlines=True,
-                shell=True,
+                shell=False,
                 check=False,
             )
         except CalledProcessError as exc:
@@ -273,7 +273,7 @@ if is_debug():  # Debug mode
 
 cmdeject = "sudo eject /dev/sda"
 result = run(
-    cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
+    cmdeject, capture_output=True, universal_newlines=True, shell=False, check=False
 )
 getLogger().warning(cmdeject)
 
@@ -298,5 +298,7 @@ if not is_raspberry_pi():
 doShutdown()
 cmd = "sudo poweroff"
 getLogger().warning(cmd)
-result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+result = run(
+    cmd, capture_output=True, universal_newlines=True, shell=False, check=False
+)
 sys.exit(0)
