@@ -94,7 +94,7 @@ def turn_usb_on(i_scan: int, time: int):
                 cmd,
                 capture_output=True,
                 universal_newlines=True,
-                shell=False,
+                shell=True,
                 check=True,
             )
             sleep(time)
@@ -126,7 +126,7 @@ def turn_usb_off(i_scan: int, delay: int = 0):
                 cmd,
                 capture_output=True,
                 universal_newlines=True,
-                shell=False,
+                shell=True,
                 check=True,
             )
             return 0

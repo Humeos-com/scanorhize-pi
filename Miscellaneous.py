@@ -171,7 +171,7 @@ def sync_time():
     """On synchronise l'horloge de la carte WittyPi avec le serveur"""
     try:
         cmd = "sudo ./TimeSynchronisation.sh"
-        run(cmd, capture_output=True, universal_newlines=True, shell=False, check=False)
+        run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
         getLogger().warning("TimeSynchronisation.sh: OK")
         return 1
     except (SubprocessError, CalledProcessError) as e:

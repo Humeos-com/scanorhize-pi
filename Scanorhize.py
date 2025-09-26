@@ -123,7 +123,7 @@ def add_header(response):
 def index():
     if request.method == "POST":
         cmd_pkill = "sudo pkill -f ScanorhizeProcess.py"
-        run(cmd_pkill, shell=False, capture_output=False, text=True, check=False)
+        run(cmd_pkill, shell=True, capture_output=False, text=True, check=False)
 
     return render_template(
         "index.html",
@@ -207,16 +207,23 @@ def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
     """
     try:
         # Update Scanner object with form data
-        Scanner.resolution = (
-            ResolutionList[int(form["resolution"]) - 1]
-            if int(form["resolution"]) <= 3
-            else ResolutionList[0]
-        )
-        Scanner.mode = (
-            ColorList[int(form["mode"]) - 1]
-            if form["mode"] != Scanner.mode
-            else Scanner.mode
-        )
+        try:
+            resolution_index = int(form.get("resolution", "1"))
+            if 1 <= resolution_index <= len(ResolutionList):
+                Scanner.resolution = ResolutionList[resolution_index - 1]
+            else:
+                getLogger().warning("Invalid resolution index: %d, keeping current: %s", resolution_index, Scanner.resolution)
+        except (ValueError, TypeError) as e:
+            getLogger().warning("Error parsing resolution: %s, keeping current: %s", e, Scanner.resolution)
+        
+        try:
+            mode_index = int(form.get("mode", "1"))
+            if 1 <= mode_index <= len(ColorList):
+                Scanner.mode = ColorList[mode_index - 1]
+            else:
+                getLogger().warning("Invalid mode index: %d, keeping current: %s", mode_index, Scanner.mode)
+        except (ValueError, TypeError) as e:
+            getLogger().warning("Error parsing mode: %s, keeping current: %s", e, Scanner.mode)
 
         # Update numeric fields with validation, using empty string as default
         Scanner.l = chaineIntwitherror(form.get("l", ""), Scanner.l, 0, Scanner.x_max)
@@ -385,7 +392,7 @@ def update_version():
         getLogger().warning("Update version: %s", cmd_update)
         result = run(
             cmd_update,
-            shell=False,
+            shell=True,
             capture_output=True,
             text=True,
             check=False,
@@ -684,7 +691,7 @@ def scan_acq():
     try:
         cmd_acq = "python3 ScanorhizeProcess.py -f"
         getLogger().warning("Scan Acq: %s", cmd_acq)
-        result = run(cmd_acq, shell=False, capture_output=True, text=True, check=False)
+        result = run(cmd_acq, shell=True, capture_output=True, text=True, check=False)
         if result.returncode == 0:
             getLogger().warning("Scan Acq: OK")
             return redirect(
@@ -719,7 +726,7 @@ def stop_server():
     # Before remove the USB key, we need to stop the server
     cmdeject = "sudo eject /dev/sda"
     result = run(
-        cmdeject, capture_output=True, universal_newlines=True, shell=False, check=False
+        cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     getLogger().warning("Eject command: %s", cmdeject)
     if result.returncode == 0:
@@ -748,7 +755,7 @@ def stop_server():
         "sudo poweroff",
         capture_output=True,
         universal_newlines=True,
-        shell=False,
+        shell=True,
         check=False,
     )
     return "OK"

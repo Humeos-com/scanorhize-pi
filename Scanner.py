@@ -201,7 +201,7 @@ class ScannerData:
                 command,
                 capture_output=True,
                 universal_newlines=True,
-                shell=False,
+                shell=True,
                 check=False,
             )
             res = result.returncode
@@ -361,7 +361,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
                 command,
                 capture_output=True,
                 universal_newlines=True,
-                shell=False,
+                shell=True,
                 check=False,
             )
             getLogger().warning("scanAcq: result %s", result)
@@ -395,7 +395,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         commandconv,
         capture_output=True,
         universal_newlines=True,
-        shell=False,
+        shell=True,
         check=False,
     )
     print(result.returncode, result.stdout, result.stderr)
@@ -436,7 +436,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
             command,
             capture_output=True,
             universal_newlines=True,
-            shell=False,
+            shell=True,
             check=False,
         )
         print(result.returncode, result.stdout, result.stderr)
