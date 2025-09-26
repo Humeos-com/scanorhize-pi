@@ -170,7 +170,7 @@ def getTodo():
         cmd = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/todo.sh ../todo.sh"
         getLogger().warning(cmd)
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+            cmd, capture_output=True, universal_newlines=True, shell=False, check=False
         )
         if result.returncode != 0:
             getLogger().error(
@@ -216,7 +216,7 @@ def syncImageFiles(hub_: HubData):
     getLogger().warning(cmd)
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            cmd, capture_output=True, universal_newlines=True, shell=False, check=True
         )
         getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
         remove_image_files(src)
@@ -235,7 +235,7 @@ def syncLogFiles():
 
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            cmd, capture_output=True, universal_newlines=True, shell=False, check=True
         )
         getLogger().warning("SyncLogFiles: %s", result.stdout)
         return 0
@@ -268,7 +268,9 @@ def runTodo():
 
     getLogger().warning("Run todo.sh")
     try:
-        result = run(todo_path, shell=True, capture_output=True, text=True, check=False)
+        result = run(
+            todo_path, shell=False, capture_output=True, text=True, check=False
+        )
         if result.returncode == 0:
             getLogger().warning("../todo.sh executed successfully")
             getLogger().warning("../todo.sh: %s", result.stdout)
@@ -313,7 +315,7 @@ def getTokens():
         cmdPost,
         capture_output=True,
         universal_newlines=True,
-        shell=True,
+        shell=False,
         check=False,
     )
     if result.returncode != 0:
@@ -368,7 +370,7 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdRead)
     result = run(
-        cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdRead, capture_output=True, universal_newlines=True, shell=False, check=False
     )
 
     if result.returncode != 0:
@@ -388,7 +390,7 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
     cmdWrite = f"s3cmd --no-preserve sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().warning(cmdWrite)
     result = run(
-        cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdWrite, capture_output=True, universal_newlines=True, shell=False, check=False
     )
 
     if result.returncode != 0:
@@ -408,7 +410,7 @@ def ReadHubConfigFromServer():
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().warning(cmdRead)
     result = run(
-        cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdRead, capture_output=True, universal_newlines=True, shell=False, check=False
     )
 
     if result.returncode != 0:
@@ -428,7 +430,7 @@ def SendHubConfigToServer():
     cmdWrite = f"s3cmd --no-preserve sync {getConfigHubFile()} s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().warning(cmdWrite)
     result = run(
-        cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdWrite, capture_output=True, universal_newlines=True, shell=False, check=False
     )
 
     if result.returncode != 0:
@@ -463,7 +465,7 @@ def SendParameters(Hub_: HubData):
 
     getLogger().warning(cmdPUT)
     result = run(
-        cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
+        cmdPUT, capture_output=True, universal_newlines=True, shell=False, check=False
     )
     if result.returncode != 0:
         getLogger().error(
@@ -507,7 +509,7 @@ def GetWifiSSID():
     cmd = "sudo iwgetid -r"
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            cmd, capture_output=True, universal_newlines=True, shell=False, check=True
         )
         if result.returncode != 0:
             getLogger().error(
@@ -531,7 +533,7 @@ def GetIP():
     cmd = "hostname -I"
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            cmd, capture_output=True, universal_newlines=True, shell=False, check=True
         )
         if result.returncode != 0:
             getLogger().error(

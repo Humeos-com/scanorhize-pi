@@ -18,19 +18,19 @@ Pin Array: {{ pin_array }}</pre>
 						<div class="form-check mb-3">
 							<input type="checkbox" class="form-check-input" id="use_server" name="use_server" value="true" {% if use_server %}checked{% endif %}>
 							<label class="form-check-label" for="use_server">Use Server</label>
-							<small class="form-text text-muted">Download configuration from server</small>
+							<small class="form-text text-muted">Download Hubconfiguration from server</small>
 						</div>
 						
 						<div class="form-check mb-3">
 							<input type="checkbox" class="form-check-input" id="sync_images" name="sync_images" {% if sync_images %}checked{% endif %}>
 							<label class="form-check-label" for="sync_images">Synchronize Images</label>
-							<small class="form-text text-muted">Sync images with server</small>
+							<small class="form-text text-muted">Send images to the server</small>
 						</div>
 						
 						<div class="form-check mb-3">
 							<input type="checkbox" class="form-check-input" id="todo" name="todo" {% if todo %}checked{% endif %}>
-							<label class="form-check-label" for="todo">Run Todo Script</label>
-							<small class="form-text text-muted">Execute todo.sh on next wake-up</small>
+							<label class="form-check-label" for="todo">Get Todo Script</label>
+							<small class="form-text text-muted">In order to run todo.sh on next wake-up</small>
 						</div>
 						
 						<div class="form-check mb-3">
@@ -76,7 +76,7 @@ Pin Array: {{ pin_array }}</pre>
 	{% if output %}
 	<div class="mt-3">
 		<h4>Output:</h4>
-		<pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ output }}</pre>
+		<pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ output|e }}</pre>
 	</div>
 	{% endif %}
 	
