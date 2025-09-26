@@ -66,6 +66,8 @@ Campaign: {{Campaign}}
                                 <option value="1">{{resolution1}}</option>
                                 <option value="2">{{resolution2}}</option>
                                 <option value="3">{{resolution3}}</option>
+                                <option value="4">{{resolution4}}</option>
+                                <option value="5">{{resolution5}}</option>
                             </select>
                         </div>  
                         
@@ -131,7 +133,7 @@ Campaign: {{Campaign}}
 
     {% if output %}
     <div class="alert alert-info mt-3">
-        <strong>Action Result:</strong> {{ output }}
+        <strong>Action Result:</strong> {{ output|e }}
     </div>
     {% endif %}
 

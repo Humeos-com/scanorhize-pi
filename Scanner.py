@@ -31,7 +31,7 @@ TIME_BEFORE_SCAN_EPSON = 2
 TIME_AFTER_SCAN_EPSON = 2
 
 DISPLAY_FILE = getDisplayFile()
-ResolutionList = ["300", "600", "1200"]
+ResolutionList = ["300", "600", "1200", "2400", "4800"]
 ColorList = ["Color", "Gray", "Lineart"]
 
 imagepathtiff = path.join(getImageDir(), "imagescan.tiff")
@@ -201,7 +201,7 @@ class ScannerData:
                 command,
                 capture_output=True,
                 universal_newlines=True,
-                shell=True,
+                shell=False,
                 check=False,
             )
             res = result.returncode
@@ -287,6 +287,8 @@ def updateScanParameters(scanner: ScannerData):
         "resolution1": ResolutionList[0],
         "resolution2": ResolutionList[1],
         "resolution3": ResolutionList[2],
+        "resolution4": ResolutionList[3],
+        "resolution5": ResolutionList[4],
         "LastImgTime": scanner.LastImgTime,
         "LastImgFile": scanner.LastImgFile,
         "l": scanner.l,
@@ -359,7 +361,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
                 command,
                 capture_output=True,
                 universal_newlines=True,
-                shell=True,
+                shell=False,
                 check=False,
             )
             getLogger().warning("scanAcq: result %s", result)
@@ -393,7 +395,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         commandconv,
         capture_output=True,
         universal_newlines=True,
-        shell=True,
+        shell=False,
         check=False,
     )
     print(result.returncode, result.stdout, result.stderr)
@@ -434,7 +436,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
             command,
             capture_output=True,
             universal_newlines=True,
-            shell=True,
+            shell=False,
             check=False,
         )
         print(result.returncode, result.stdout, result.stderr)

@@ -412,6 +412,7 @@ def has_internet() -> bool:
         getLogger().error("Error checking internet connection: %s", e)
         return False
 
+
 # pylint: disable=too-many-nested-blocks
 def get_network_timestamp() -> int:
     """Get network timestamp from internet server."""
@@ -851,6 +852,7 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
         WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date))
     except (OSError, IOError) as e:
         getLogger().error("Error setting shutdown time: %s", e)
+
 
 # pylint: disable=duplicate-code
 def setNextShutdownDate(date: str):
