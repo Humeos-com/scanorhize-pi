@@ -10,5 +10,5 @@
     "s3_bucket": "s3://scanorhize-images-prod",
     "scanorhize_server": "backend-prod.humeos.com",
     "uhubctl": "/usr/sbin/uhubctl",
-    "usb_dir": "/media/pi/Image"
+    "usb_dir": "/media/pi/Image",
 }

@@ -298,7 +298,5 @@ if not is_raspberry_pi():
 doShutdown()
 cmd = "sudo poweroff"
 getLogger().warning(cmd)
-result = run(
-    cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-)
+result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
 sys.exit(0)

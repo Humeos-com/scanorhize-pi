@@ -71,6 +71,10 @@ class HubData:
         # Point de température à partir duquel on dépasse la température
         self.over_temperature_point: int = 68
         # Reverse tunnel SSH port pour la maintenance à distance
+        # cette valeur est sauvegardee dans Hub.json.
+        # Mais à l'usage, si on relance le Hub, le port n'est plus
+        # utilisable. Donc on le met à jour après la lecture de la configuration.
+        random.seed()
         self.ssh_port: int = random.randint(2223, 2299)  # Random port between 2223-2299
         # todo.sh to run ?
         # si self.todo = True, alors on va chercher le fichier todo.sh
@@ -105,9 +109,11 @@ class HubData:
             getLogger().error("No file: %s", fullpath)
         else:
             self.__dict__.update(data)
-        # On ecrase toujours ces 2 valeurs
+        # On ecrase toujours ces 3 valeurs
         self.macAddress = getHwAddr()
         self.model = get_model()
+        self.ssh_port: int = random.randint(2223, 2299)  # Random port between 2223-2299
+
         set_over_temperature_action(
             self.over_temperature_action, self.over_temperature_point
         )
@@ -268,9 +274,7 @@ def runTodo():
 
     getLogger().warning("Run todo.sh")
     try:
-        result = run(
-            todo_path, shell=True, capture_output=True, text=True, check=False
-        )
+        result = run(todo_path, shell=True, capture_output=True, text=True, check=False)
         if result.returncode == 0:
             getLogger().warning("../todo.sh executed successfully")
             getLogger().warning("../todo.sh: %s", result.stdout)

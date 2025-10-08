@@ -60,7 +60,7 @@ class ScannerData:
         self.token = "token_bidon"
         self.projectId = ""
         self.sampleId = ""
-        self.UseServer = 0
+        self.UseServer = 1
         self.TimeBeforeScan = 0
         self.TimeAfterScan = 0
         self.error = 0

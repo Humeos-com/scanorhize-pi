@@ -212,18 +212,32 @@ def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
             if 1 <= resolution_index <= len(ResolutionList):
                 Scanner.resolution = ResolutionList[resolution_index - 1]
             else:
-                getLogger().warning("Invalid resolution index: %d, keeping current: %s", resolution_index, Scanner.resolution)
+                getLogger().warning(
+                    "Invalid resolution index: %d, keeping current: %s",
+                    resolution_index,
+                    Scanner.resolution,
+                )
         except (ValueError, TypeError) as e:
-            getLogger().warning("Error parsing resolution: %s, keeping current: %s", e, Scanner.resolution)
-        
+            getLogger().warning(
+                "Error parsing resolution: %s, keeping current: %s",
+                e,
+                Scanner.resolution,
+            )
+
         try:
             mode_index = int(form.get("mode", "1"))
             if 1 <= mode_index <= len(ColorList):
                 Scanner.mode = ColorList[mode_index - 1]
             else:
-                getLogger().warning("Invalid mode index: %d, keeping current: %s", mode_index, Scanner.mode)
+                getLogger().warning(
+                    "Invalid mode index: %d, keeping current: %s",
+                    mode_index,
+                    Scanner.mode,
+                )
         except (ValueError, TypeError) as e:
-            getLogger().warning("Error parsing mode: %s, keeping current: %s", e, Scanner.mode)
+            getLogger().warning(
+                "Error parsing mode: %s, keeping current: %s", e, Scanner.mode
+            )
 
         # Update numeric fields with validation, using empty string as default
         Scanner.l = chaineIntwitherror(form.get("l", ""), Scanner.l, 0, Scanner.x_max)

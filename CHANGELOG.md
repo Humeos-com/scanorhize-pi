@@ -1,8 +1,19 @@
 # Changelog
 
 ## TODO
-
 Créer un RAMDisk et modifier l'écriture des images.
+Ajouter des vignettes pour les images.
+Avoir plusieurs séquenceurs pour envoyer les vignettes, les infos du Hub, les images.
+
+## 2025-10-08 / v0.9.38
+Le port SSH utilisé pour le tunnel créé par le Hub sur backend-prod.humeos.com devient aléatoire entre 2223 et 2299 à chaque fois qu'on redémarre le mode configuration. Ceci afin d'éviter que si on lance le mode configuration 2 fois de suite on se trouve avec un tunnel bloqué par la première connexion. A noter qu'avant, ce port était aléatoire au premier lancement, puis stocké dans le fichier Hub.json. On savait ainsi quel Hub était connecté.
+
+## 2025-10-03 / v0.9.36
+Modification du calcul de la capacité de la batterie en fonction du voltage. On Affiche 0% à 3,2V et 100% à 4,2V. C'est une fonction linéaire, donc qui n'est pas réaliste, mais qui permet de savoir quand la batterie est faible. Car à 3,1V, le WittyPi coupe l'alimentation pour préserver la batterie, ce qui peut arriver pendant le fonctionnement lorsqu'on démarre le Hub avec 3,2V.
+
+## 2025-09-26 / v0.9.33
+On passe à 4800dpi. Les choix de résolution sont:
+300 / 600 / 1200 / 2400 /4800
 
 ## 2025-08-21
 Passage en Python de l'interface WittyPy avec le programme WittyPy_utilities.py
