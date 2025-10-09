@@ -46,8 +46,6 @@ from Hub import (
     runTodo,
     GetWifiSSID,
     GetIP,
-    getScanorhizeServer,
-    getSSHPort,
 )
 from version import __version__
 
@@ -121,14 +119,6 @@ if config:
         SendParameters(Hub)
         SendHubConfigToServer()
         syncLogFiles()
-        # On crée un tunnel SSH inverse pour la maintenance à distance
-        cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
-        run(cmd, shell=True, capture_output=True, text=True, check=False)
-        getLogger().warning(
-            "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
-            getSSHPort(),
-            getScanorhizeServer(),
-        )
         getLogger().warning("getTokens")
         getTokens()
 

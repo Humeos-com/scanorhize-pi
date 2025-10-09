@@ -15,9 +15,9 @@ from Scanner import (
     updateScanParameters,
     listConfigScanner,
     initScanners,
+    calculate_and_set_next_date,
     ResolutionList,
     ColorList,
-    calculate_and_set_next_date,
 )
 from Hub import (
     ReadScannerConfigFromServer,
@@ -25,6 +25,7 @@ from Hub import (
     GetWifiSSID,
     GetIP,
     getSSHPort,
+    getScanorhizeServer,
     getTokens,
     HubData,
     ReadHubConfigFromServer,
@@ -41,6 +42,7 @@ from ConfigApp import (
 )
 from Miscellaneous import (
     chaineIntwitherror,
+    check_connectivity,
     InitGPIO,
     initDisplayFile,
 )
@@ -69,10 +71,25 @@ if args.version:
 initDisplayFile()
 getLogger().warning("Start Scanorhize.py version: %s", __version__)
 Hub = HubData()
+
+try:
+    # On lance le tunnel SSH inverse pour la maintenance à distance si on a de la connectivité internet
+    # Lancer le tunnel SSH dans l'application Web permet de d'afficher le port SSH à utiliserdans l'application Web.
+    # On ne fait que 3 tenttatives, car on a déjà essayé 25 fois dans ScanorhizeStart.py
+    check_connectivity(3)
+    cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
+    run(cmd, shell=True, capture_output=True, text=True, check=False)
+    getLogger().warning(
+        "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
+        getSSHPort(),
+        getScanorhizeServer(),
+    )
+except RuntimeError as e:
+    has_internet = False
+    getLogger().error("Error pas de connectivité internet: %s", e)
+
 getLogger().warning("Launch Web app")
 app = Flask(__name__)
-
-has_internet = False
 
 
 def get_common_template_vars():
