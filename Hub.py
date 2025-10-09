@@ -44,7 +44,7 @@ class HubData:
 
     def __init__(self):
         """Initialize the instance if not already initialized."""
-        if hasattr(self, "initialized"):  # Skip if already initialized
+        if hasattr(self, "_initialized"):  # Skip if already initialized
             return
 
         self.projectId: str = ""
@@ -75,7 +75,9 @@ class HubData:
         # Mais à l'usage, si on relance le Hub, le port n'est plus
         # utilisable. Donc on le met à jour après la lecture de la configuration.
         random.seed()
-        self.ssh_port: int = random.randint(2223, 2299)  # Random port between 2223-2299
+        self.ssh_port: int = 0  # Random port between 2223-2299
+        # Modèle du Raspberry Pi
+        self.model: str = ""
         # todo.sh to run ?
         # si self.todo = True, alors on va chercher le fichier todo.sh
         # et on va l'exécuter au réveil suivant
@@ -83,7 +85,7 @@ class HubData:
         # version du hub
         self.version: str = __version__
 
-        self.initialized = True  # Mark as initialized
+        self._initialized = True  # Mark as initialized
         self.read_config()
 
     def json(self):
@@ -91,7 +93,9 @@ class HubData:
         data = {
             key: value
             for key, value in self.__dict__.items()
-            if not key.startswith("_") and key != "initialized"
+            # On ecrit toutes les valeurs dans le fichier de configuration Hub.json, par contre,
+            # on en ignore lors de la lecture dans read_config()
+            if not key.startswith("_")
         }
         return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=4)
 
@@ -108,11 +112,21 @@ class HubData:
         except (FileNotFoundError, ValueError):
             getLogger().error("No file: %s", fullpath)
         else:
-            self.__dict__.update(data)
-        # On ecrase toujours ces 3 valeurs
-        self.macAddress = getHwAddr()
-        self.model = get_model()
-        self.ssh_port = random.randint(2223, 2299)  # Random port between 2223-2299
+            # On ne lit pas macAddress, model et ssh_port depuis le fichier
+            filtered_data = {
+                key: value
+                for key, value in data.items()
+                if key not in ("macAddress", "model", "ssh_port")
+            }
+            self.__dict__.update(filtered_data)
+
+        # On initialise ces valeurs seulement si elles n'ont pas encore de valeur valide
+        if self.macAddress == "00:00:00:00:00:00":
+            self.macAddress = getHwAddr()
+        if self.model == "":
+            self.model = get_model()
+        if self.ssh_port == 0:
+            self.ssh_port = random.randint(2223, 2299)  # Random port between 2223-2299
 
         set_over_temperature_action(
             self.over_temperature_action, self.over_temperature_point
@@ -124,7 +138,7 @@ class HubData:
         """Prints the current configuration."""
         print("Current Configuration:")
         for key, value in self.__dict__.items():
-            if key != "initialized":
+            if key != "_initialized":
                 print(f"{key}: {value}")
 
 
@@ -595,6 +609,7 @@ if __name__ == "__main__":
     getTokens()
     # syncImageFiles()
     Hub = HubData()
+    print(f"macAddress: {Hub.macAddress}, model: {Hub.model}, ssh_port: {Hub.ssh_port}")
     Hub.read_config()
     hub_info_ = get_hub_info()
     getLogger().warning(
@@ -606,8 +621,10 @@ if __name__ == "__main__":
         hub_info_[4],
     )
 
+    print(f"macAddress: {Hub.macAddress}, model: {Hub.model}, ssh_port: {Hub.ssh_port}")
     SendHubConfigToServer()
     ReadHubConfigFromServer()
+    print(f"macAddress: {Hub.macAddress}, model: {Hub.model}, ssh_port: {Hub.ssh_port}")
 
     Scanner = ScannerData()
     listScannerconfigs = listConfigScanner()
