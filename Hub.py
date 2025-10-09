@@ -112,7 +112,7 @@ class HubData:
         # On ecrase toujours ces 3 valeurs
         self.macAddress = getHwAddr()
         self.model = get_model()
-        self.ssh_port: int = random.randint(2223, 2299)  # Random port between 2223-2299
+        self.ssh_port = random.randint(2223, 2299)  # Random port between 2223-2299
 
         set_over_temperature_action(
             self.over_temperature_action, self.over_temperature_point
