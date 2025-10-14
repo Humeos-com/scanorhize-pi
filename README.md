@@ -42,7 +42,7 @@ On utilise donc un bouton qui agit sur GPIO-7 (pin physique 7) avec mise à la t
 
 
 ## Installation du logiciel
-L'installation d'un Hub se fait par Ansible. Les sources se trouvent sur: https://github.com/arditial/ansible-arditi <br/>
+L'installation d'un Hub se fait par Ansible.<br/>
 Cette méthode permet de faire évoluer les composants, les configurations et assure la répétabilité du processus.<br/>
 Ansible permet également la mise à jour d'un Hub sans recopier toute la carte SD. On conserve ainsi la configuration des scanners et les logs tout en faisant évoluer le système.
 A la base, on part d'une image Debian Bookworm (raspios-bookworm-armhf-lite) sur la SD Card du Raspberry, en 32 bits pour les drivers Epson.
@@ -158,7 +158,7 @@ Pour se connecter au Raspberry, on peut lancer un SSH de la forme:
 ```
 debian@d2-2-gra11:~$ ssh pi@localhost -p 2269
 ```
-Les clés d'accès sont configurées sur le compte de l'utilisateur debian sur le serveur backend-prod.humeos.com et permettent d'accèder au Hub sans mot de passe.
+Les clés d'accès sont configurées sur le compte de l'utilisateur debian sur le serveur backend-prod.humeos.com et permettent d’accéder au Hub sans mot de passe.
 
 #### Modification des configurations sur le bucket S3
 Selon le mode `Use Server`, les Hubs et les scanners vont chercher leur configuration sur le bucket S3. On peut ainsi modifier les configurations sans passer en mode configuration, donc sans toucher les boîtiers.
@@ -175,6 +175,32 @@ $
 
 ### Mode nominal
 En mode nominal, le Hub se réveille, lance les acquisitions une par une, allume sa clé 4G, envoie son état, envoie ses images, supprime ses images localement, met à jour son prochain réveil et s'endort.<br/>
+
+### A propos des clés USB 4G/Wifi
+Ces clés permettent au Hub de communiquer avec la plateforme Web.
+Il y a plusieurs modes de fonctionnement.
+
+1. Fonctionnement historique.  
+La clé 4G/Wifi est connectée sur un USB qui ne fait que l'alimentation 5V (pas de data). La clé sert de point d'accès (AP) pour le hub, comme pour les utilisateurs qui veulent aller sur l'application Web de configuration du Hub.  
+En mode nominal, le Hub se connecte au Wifi de la clé, et obtient ainsi la connectivité Internet.
+Le mode historique permet de n'avoir qu'un seul mode réseau sur le Hub, l'utilisation de l'interface wlan0 qui passe par le Wifi Scanorhize.
+
+1. Fonctionnement actuel.  
+On utilise un câble USB avec les fils data pour connecter la clé. La clé crée 2 connexions: usb0 et wlan0  
+usb0 contient une IP fournie par la clé dans le même subnet que wlan0 pour la Wifi. Néanmoins les métriques des 2 interfaces sont différentes et la priorité est donnée à usb0. Dans ce mode, le Hub utilise le port USB pour communiquer avec l'Internet, ce qui est beaucoup plus efficace que de passer par le Wifi de la clé.  
+Comme les 2 interfaces du hub sont dans le même subnet, on ne voit pas le hub à travers le Wifi. On ne peut donc pas configurer le Hub à travers son interface Web par le Wifi.  
+Afin de contourner ce problème, en mode configuration on désactive l'interface USB. Le Hub communique ainsi à travers le Wifi. C'est bien l'objectif souhaité.  
+Sauf ce certaines clés Wifi/4G, et en particulier la clé Zunate LTE 4G (à base de Qualcomm), ne font pas "switch" entre les équipements qui y sont connectés !  
+Donc il n'y a pas de communication entre le Hub et un téléphone mobile qui seraient sur le même Wifi Scanorhize !  
+On ne peut donc pas configurer le Hub dans l'état à partir d'un téléphone.  
+La solution mise en place est que le Hub fasse un "nmap" pour découvrir les équipements connectés et en particulier les téléphones et les ordinateur, puis qu'il lance un ping sur ces IP afin de fournir ses informations ARP. Le téléphone connaît ainsi l'adresse ARP et l'IP du Hub et peut donc communiquer avec lui !  
+Le programme `/usr/local/bin/scanorhize-watch.sh` est chargé de balayer la plage `192.168.1.0/24` et de faire les ping sur les IP alive.
+
+1. Fonctionnement futur.  
+On pourrait très bien n'utiliser que des clé 4G sans Wifi, c'est typiquement le fonctionnement des cartes LTE avec antennes pour Raspberry, comme la carte Clipper HAT Mini (LTE 4G pour Raspberry Pi PIM717), qui ne fait que de la 4G.  
+Dans ce cas, on activerait l'AP du Raspberry en mode configuration uniquement.  
+Ca permet de limiter la consommation et d'autre part, on élimine le passage du Hub par le Wifi de la clé et enfin, on peut supposer que ces cartes ont de meilleurs performances sur la 4G.
+
 
 
 ## Problèmes et Diagnostics
@@ -196,9 +222,30 @@ Les causes les plus courantes sont :
 - Lorsque le Hub est réveillé, on voit des led rouges sur les cartes Relais, Raspberry et Big 7. La led verte sur le Raspberry indique les lectures/écritures sur le stockage.
 - La led de la clé 4G est verte lorsqu'elle est connectée à l'Internet
 - Si les voyants du Hub restent rouges mais qu'il ne se passe rien ou que le Hub s'éteint quelques secondes après l'allumage, c'est qu'il n'a plus assez de batterie. Pour forcer l'extinction du Hub, appuyer sur le bouton plus de 10 secondes.
+- Si on ne voit que les 3 leds rouges d'alimentation, c'est que le Hub est sous tension mais que le Raspberry ne fonctionne pas ou qu'il est planté par un arrêt du programme. S'il ne répond pas sur le réseau, il faut forcer l'arrêt en appuyant plus de 10 s sur le bouton.  
+Si le Hub répond sur le réseau, il faut regarder la log Log/ScanorhizeStart.log qui doit détailler l'incident.
+- Si on voit les leds rouges et la led verte fixes dans les 10 secondes suivant le démarrage, c'est probablement un kernel panic.
 
 #### La connectivité
 - Les clés 4G sont moins performantes qu'un téléphone mobile. Ce n'est pas parce qu'on capte bien dans une zone que le Hub va bien fonctionner. Il faut tester ou mieux aller sur l'interface de la clé 4G. On peut se connecter sur le Wifi Scanorhize et voir la configuration de la clé 4G sur l'URL: http://192.168.1.1/ On voit l'état de la 4G en haut de la page à droite, une fois authentifié.
+- On peut retrouver les matériels connectés et le Hub en particulier, avec des outils réseau une fois qu'on est connecté au Wifi Scanorhize. Si on a un terminal (Linux/Mac) on peut lancer:  
+`$ nmap -sn 192.168.1.0/24`  
+ou mieux, si on a un accès sudo:  
+`$ sudo nmap -sP 192.168.1.0/24`  
+qui affiche des informations supplémentaires comme le propriétaire de la MAC Address. A noter que pour le Raspberry ci dessous, la MAC Address Wifi (wlan0) est égale à la MAC Address eth0 + 1. Dans le cas ce dessous, le nom du Hub serait: `hub-2ccf676a4d5f`
+```
+Nmap scan report for 192.168.1.42
+Host is up (3.31s latency).
+MAC Address: 2C:CF:67:6A:4D:60 (Raspberry Pi (Trading))
+```
+- Un autre outil, sur les mobiles Android permet d'avoir les matériels connectés: Network Scanner
+
+#### La synchronisation d'un Hub
+Si on débranche la batterie et l'alimentation d'un Hub, il perd l'heure. Lorsque la désynchronisation est importante l'utilitaire s3cmd refuse de fonctionner. On ne peut donc par recevoir les images.  
+Il faut absolument avoir un Hub synchronisé pour que les programmes fonctionnent.  
+La seule manière pour qu'un Hub se synchronise est qu'il puisse se connecter à Internet. Lorsqu'on met le Hub en mode configuration et qu'il y a de la connectivité, il va se synchroniser avec la commande `Scanorhize/TimeSynchronisation.sh`
+
+
 
 ## Contribuer
 
