@@ -86,7 +86,9 @@ try:
     )
 except RuntimeError as e:
     has_internet = False
-    getLogger().error("Error pas de connectivité internet: %s", e)
+    getLogger().error(
+        "Error pas de connectivité internet: %s, on ne lance pas le tunnel SSH", e
+    )
 
 getLogger().warning("Launch Web app")
 app = Flask(__name__)
