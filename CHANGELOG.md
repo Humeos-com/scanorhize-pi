@@ -5,6 +5,12 @@ Créer un RAMDisk et modifier l'écriture des images.
 Ajouter des vignettes pour les images.
 Avoir plusieurs séquenceurs pour envoyer les vignettes, les infos du Hub, les images.
 
+
+## 2025-10-14 / v0.9.43
+Correctifs mineurs:
+On abandonne le nom duckdns.org dans l'initialisation du Hub.
+Le tunnel SSH est encadré par un try/catch pour la connectivité 4G.
+
 ## 2025-10-08 / v0.9.38
 Le port SSH utilisé pour le tunnel créé par le Hub sur backend-prod.humeos.com devient aléatoire entre 2223 et 2299 à chaque fois qu'on redémarre le mode configuration. Ceci afin d'éviter que si on lance le mode configuration 2 fois de suite on se trouve avec un tunnel bloqué par la première connexion. A noter qu'avant, ce port était aléatoire au premier lancement, puis stocké dans le fichier Hub.json. On savait ainsi quel Hub était connecté.
 
