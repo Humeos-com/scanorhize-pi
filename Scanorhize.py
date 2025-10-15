@@ -6,7 +6,15 @@ import sys
 from subprocess import run, CalledProcessError
 from time import sleep  # Add this import
 import argparse
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    send_from_directory,
+)
 
 from version import __version__
 from Scanner import (
@@ -35,6 +43,7 @@ from Hub import (
 from ConfigApp import (
     getLogger,
     getDisplayFile,
+    getImageDir,
     is_debug,
     is_prod,
     ConfigApp,
@@ -136,6 +145,12 @@ def add_header(response):
     # print("add_header", response)
     response.headers["Cache-Control"] = "public, max-age=0"
     return response
+
+
+@app.route("/images/<path:filename>")
+def serve_image(filename):
+    """Sert les images d'acquisition depuis getImageDir()"""
+    return send_from_directory(getImageDir(), filename)
 
 
 @app.route("/", methods=["POST", "GET"])

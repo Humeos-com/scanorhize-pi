@@ -3,7 +3,7 @@
     "config_dir": "ConfigFile",
     "config_hub_file": "Hub.json",
     "display_file": "Display.txt",
-    "image_dir": "static",
+    "image_dir": "images",
     "log_dir": "Log",
     "log_level": "INFO",
     "max_time": "300",

@@ -9,6 +9,7 @@ pyvenv.cfg
 .vscode
 DEBUG
 cspell.json
+images/
 
 
 # Byte-compiled / optimized / DLL files

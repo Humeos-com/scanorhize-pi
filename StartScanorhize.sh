@@ -3,6 +3,9 @@
 cd /home/pi/Scanorhize
 DATE=$(date '+%Y-%m-%d_%H%M%S')
 
+# On met les donnees dans le ramdisk
+rsync -av static/*.jpg images/
+
 if [ -e DEBUG ]
 then
     echo "DEBUG mode: on mesure le courant."
