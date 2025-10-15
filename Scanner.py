@@ -344,17 +344,9 @@ def generateThumbnail(
         th_y = getThumbHeight()
 
         # Calculate new dimensions preserving aspect ratio
-        ratio_image = original_width / original_height
-        ratio_box = th_x / th_y
-
-        if ratio_image > ratio_box:
-            # Image is wider than box, limited by width
-            new_width = th_x
-            new_height = int(original_height * th_x / original_width)
-        else:
-            # Image is taller than box, limited by height
-            new_height = th_y
-            new_width = int(original_width * th_y / original_height)
+        ratio = min(th_x / original_width, th_y / original_height)
+        new_width = int(original_width * ratio)
+        new_height = int(original_height * ratio)
 
         # Convert JP2 to JPEG with calculated dimensions
         command = (

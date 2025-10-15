@@ -25,17 +25,9 @@ Générer automatiquement des vignettes JPEG lors de chaque acquisition et perme
 Créer une nouvelle fonction `generateThumbnail(jp2_path: str, thumb_path: str, original_width: float, original_height: float, th_x: int, th_y: int) -> int`
 - Calculer les nouvelles dimensions en préservant le ratio d'aspect pour rentrer dans la boîte th_x × th_y:
   ```python
-  ratio_image = original_width / original_height
-  ratio_box = th_x / th_y
-  
-  if ratio_image > ratio_box:
-      # Image plus large que la boîte, limitée par la largeur
-      new_width = th_x
-      new_height = int(original_height * th_x / original_width)
-  else:
-      # Image plus haute que la boîte, limitée par la hauteur
-      new_height = th_y
-      new_width = int(original_width * th_y / original_height)
+  ratio = min(th_x / original_width, th_y / original_height)
+  new_width = int(original_width * ratio)
+  new_height = int(original_height * ratio)
   ```
 - Utiliser `gdal_translate` pour convertir JP2 en JPEG avec les dimensions calculées
 - Commande: `gdal_translate -of JPEG -outsize {new_width} {new_height} -co QUALITY=85 {jp2_path} {thumb_path}`
