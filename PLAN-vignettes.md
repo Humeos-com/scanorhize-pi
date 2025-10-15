@@ -69,6 +69,13 @@ Modifier `syncImageFiles()` pour gérer le mode vignettes uniquement:
 - Note: L'ordre des options est important dans s3cmd, les includes doivent venir avant les excludes
 - Raison du filtre par nom plutôt que par extension: permet de distinguer les vignettes même si le format des images principales change de JP2 à JPEG à l'avenir
 
+Modifier `remove_image_files()` pour la suppression sélective:
+- Ajouter un paramètre `thumbnails_only: bool = False`
+- Si `thumbnails_only=True`: supprimer uniquement les fichiers avec `thumb` dans le nom et extension `.jpg`
+- Si `thumbnails_only=False`: supprimer tous les fichiers (JP2, JSON, vignettes)
+- Appeler avec `remove_image_files(src, thumbnails_only=hub_.send_thumbnails_only)`
+- **Important**: Ne supprimer que ce qui a été effectivement envoyé pour préserver les fichiers non envoyés
+
 ### 6. Interface Web - Logique automatique
 
 **Fichier: `Scanorhize.py`**

@@ -222,13 +222,32 @@ def getHubId():
     return hub_id
 
 
-def remove_image_files(folder: str):
-    """Remove .jp2 and .json files from directory"""
+def remove_image_files(folder: str, thumbnails_only: bool = False):
+    """Remove image files from directory
+
+    Args:
+        folder: Directory to clean
+        thumbnails_only: If True, remove only thumbnails.
+                        If False, remove all (JP2, JSON, thumbnails)
+    """
     if not os.path.exists(folder):
         return
     for root, _, files in os.walk(folder, topdown=False):
         for name in files:
-            if name.endswith((".jp2", ".json")):
+            should_remove = False
+
+            if thumbnails_only:
+                # Only remove thumbnails (files with 'thumb' in name)
+                if "thumb" in name and name.endswith(".jpg"):
+                    should_remove = True
+            else:
+                # Remove all: JP2, JSON, and thumbnails
+                if name.endswith((".jp2", ".json")) or (
+                    "thumb" in name and name.endswith(".jpg")
+                ):
+                    should_remove = True
+
+            if should_remove:
                 file_path = os.path.join(root, name)
                 try:
                     os.remove(file_path)
@@ -261,7 +280,8 @@ def syncImageFiles(hub_: HubData):
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
         getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
-        remove_image_files(src)
+        # Remove only what was sent: thumbnails only or all files
+        remove_image_files(src, thumbnails_only=hub_.send_thumbnails_only)
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncImageFiles from %s: %s", src, e)
 
