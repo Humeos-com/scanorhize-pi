@@ -21,17 +21,28 @@ Pin Array: {{ pin_array }}</pre>
 							<small class="form-text text-muted">Download Hubconfiguration from server</small>
 						</div>
 						
-						<div class="form-check mb-3">
-							<input type="checkbox" class="form-check-input" id="sync_images" name="sync_images" {% if sync_images %}checked{% endif %}>
-							<label class="form-check-label" for="sync_images">Synchronize Images</label>
-							<small class="form-text text-muted">Send images to the server</small>
-						</div>
-						
-						<div class="form-check mb-3">
-							<input type="checkbox" class="form-check-input" id="todo" name="todo" {% if todo %}checked{% endif %}>
-							<label class="form-check-label" for="todo">Get Todo Script</label>
-							<small class="form-text text-muted">In order to run todo.sh on next wake-up</small>
-						</div>
+					<div class="form-check mb-3">
+						<input type="checkbox" class="form-check-input" id="sync_images" name="sync_images" {% if sync_images %}checked{% endif %}>
+						<label class="form-check-label" for="sync_images">Synchronize Images</label>
+						<small class="form-text text-muted">Send images to the server</small>
+					</div>
+					
+					<div class="form-check mb-3">
+						<input type="checkbox" class="form-check-input" id="send_thumbnails_only" name="send_thumbnails_only" {% if send_thumbnails_only or auto_check_thumbnails_only %}checked{% endif %}>
+						<label class="form-check-label" for="send_thumbnails_only">
+							Send thumbnails only
+							{% if auto_check_thumbnails_only %}
+							<span class="badge bg-info text-dark">Auto-enabled (resolution >= 600 dpi)</span>
+							{% endif %}
+						</label>
+						<small class="form-text text-muted">Send only thumbnails to server, JP2 and JSON remain on USB (recommended for resolutions >= 600dpi)</small>
+					</div>
+					
+					<div class="form-check mb-3">
+						<input type="checkbox" class="form-check-input" id="todo" name="todo" {% if todo %}checked{% endif %}>
+						<label class="form-check-label" for="todo">Get Todo Script</label>
+						<small class="form-text text-muted">In order to run todo.sh on next wake-up</small>
+					</div>
 						
 						<div class="form-check mb-3">
 							<input type="checkbox" class="form-check-input" id="offline" name="offline" {% if offline %}checked{% endif %} onchange="warnOffline(this)">

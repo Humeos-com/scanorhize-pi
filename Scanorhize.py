@@ -411,6 +411,21 @@ def HubPage():
     # Get output message from query parameters if it exists and sanitize it
     output = sanitize_output(request.args.get("output", None))
 
+    # Check if any active scanner has resolution >= 600 dpi for auto-check
+    auto_check_thumbnails_only = False
+    listScannerconfigs = listConfigScanner()
+    for scanner_config in listScannerconfigs:
+        scanner = ScannerData()
+        scanner.ReadScannerConfig(scanner_config)
+        if scanner.enable:
+            try:
+                resolution = int(scanner.resolution)
+                if resolution >= 600:
+                    auto_check_thumbnails_only = True
+                    break
+            except (ValueError, TypeError):
+                pass  # Skip invalid resolution values
+
     return render_template(
         "Hub.html",
         hub_config=hub_config,
@@ -421,6 +436,8 @@ def HubPage():
         delta_time=Hub.delta_time,
         offline=Hub.offline,
         sync_images=Hub.sync_images,
+        send_thumbnails_only=Hub.send_thumbnails_only,
+        auto_check_thumbnails_only=auto_check_thumbnails_only,
         todo=Hub.todo,
         output=output,
         **get_common_template_vars(),
@@ -476,6 +493,8 @@ def AppPage():
         "image_dir": config.image_dir,
         "s3_bucket": config.s3_bucket,
         "scanorhize_server": config.scanorhize_server,
+        "th_x": config.th_x,
+        "th_y": config.th_y,
     }
 
     return render_template(
@@ -524,6 +543,8 @@ def update_app_config():
         # Get the new values from the form
         new_log_level = request.form.get("log_level")
         new_usb_dir = request.form.get("usb_dir")
+        new_th_x = request.form.get("th_x")
+        new_th_y = request.form.get("th_y")
 
         if new_log_level not in ["WARNING", "INFO", "DEBUG"]:
             return render_template(
@@ -535,10 +556,28 @@ def update_app_config():
                 **get_common_template_vars(),
             )
 
+        # Validate thumbnail dimensions
+        try:
+            th_x_val = int(new_th_x)
+            th_y_val = int(new_th_y)
+            if th_x_val <= 0 or th_y_val <= 0:
+                raise ValueError("Thumbnail dimensions must be positive integers")
+        except (ValueError, TypeError):
+            return render_template(
+                "App.html",
+                app_config=ConfigApp().__dict__,
+                output=sanitize_output(
+                    "Invalid thumbnail dimensions. Must be positive integers."
+                ),
+                **get_common_template_vars(),
+            )
+
         # Get ConfigApp instance
         config = ConfigApp()
         config.log_level = new_log_level
         config.usb_dir = new_usb_dir
+        config.th_x = th_x_val
+        config.th_y = th_y_val
 
         # Save the configuration
         if config.save_config() == 0:
@@ -563,6 +602,8 @@ def update_app_config():
             "image_dir": config.image_dir,
             "s3_bucket": config.s3_bucket,
             "scanorhize_server": config.scanorhize_server,
+            "th_x": config.th_x,
+            "th_y": config.th_y,
         }
 
         return render_template(
@@ -600,6 +641,7 @@ def process_hub_form_data(form):
         # Handle checkboxes
         Hub.offline = "offline" in form
         Hub.sync_images = "sync_images" in form
+        Hub.send_thumbnails_only = "send_thumbnails_only" in form
         Hub.todo = "todo" in form
 
         # Save the Hub configuration locally

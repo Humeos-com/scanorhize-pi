@@ -56,6 +56,8 @@ class ConfigApp:
         self.s3_bucket: str = "s3://scanorhize-images-prod"
         self.scanorhize_server: str = "backend-prod.humeos.com"
         self.offline: bool = False
+        self.th_x: int = 512
+        self.th_y: int = 704
         # Initialize logger
         self.logger = logging.getLogger("ConfigApp")
 
@@ -249,6 +251,14 @@ def getConfigFile():
 
 def getLogDir():
     return ConfigApp().log_dir
+
+
+def getThumbWidth():
+    return ConfigApp().th_x
+
+
+def getThumbHeight():
+    return ConfigApp().th_y
 
 
 if __name__ == "__main__":
