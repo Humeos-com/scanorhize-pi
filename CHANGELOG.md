@@ -2,9 +2,15 @@
 
 ## TODO
 Créer un RAMDisk et modifier l'écriture des images.
-Ajouter des vignettes pour les images.
 Avoir plusieurs séquenceurs pour envoyer les vignettes, les infos du Hub, les images.
 
+## 2025-10-15 / v0.9.48
+Ajout de la génération automatique de vignettes lors des acquisitions:
+- Configuration des dimensions des vignettes (th_x, th_y) dans l'interface App (défaut: 512x704 pixels)
+- Mode "Send thumbnails only" pour n'envoyer que les vignettes (pas les JP2 ni JSON)
+- Auto-activation du mode vignettes uniquement si résolution >= 600 dpi
+- Séparation des répertoires: static/ pour Flask, images/ pour les acquisitions
+- Modification des résolutions disponibles: 75 / 300 / 600 / 1200 / 2400 dpi (suppression de 4800 dpi)
 
 ## 2025-10-14 / v0.9.43
 Correctifs mineurs:
@@ -69,7 +75,7 @@ Création des 2 scripts powerinfo.py et powerdown.py pour tester les scanners et
 
 ## 2024-11-19
 
-Récupération des sources d'origine depuis un des boitiers
+Récupération des sources d'origine depuis un des boîtiers
 Tous les fichiers sont datés de 24-08-2020 à 02-03-2021
 Commit initial
 
