@@ -54,6 +54,8 @@ def CopyImageToUSB(Scanner, FolderImage_):
         fileName = date.replace(":", "-")
         jp2Path = path.join(FolderImage_, f"image_{fileName}.jp2")
         jp2JSONPath = path.join(FolderImage_, f"image_{fileName}.json")
+        thumbPath = path.join(FolderImage_, f"image_{fileName}_thumb.jpg")
+
         # Check if source file exists
         if not os.path.exists(Scanner.LastImgFile):
             getLogger().error("Source file not found: %s", Scanner.LastImgFile)
@@ -64,6 +66,14 @@ def CopyImageToUSB(Scanner, FolderImage_):
             return 1
         getLogger().warning("Copy %s to %s", Scanner.LastImgFile, jp2Path)
         shutil.copy2(Scanner.LastImgFile, jp2Path)
+
+        # Copy thumbnail if it exists
+        if Scanner.LastThumbFile and os.path.exists(Scanner.LastThumbFile):
+            getLogger().warning("Copy %s to %s", Scanner.LastThumbFile, thumbPath)
+            shutil.copy2(Scanner.LastThumbFile, thumbPath)
+        else:
+            getLogger().warning("No thumbnail to copy")
+
         return 0
 
     except (IOError, OSError) as err:

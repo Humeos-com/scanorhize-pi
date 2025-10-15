@@ -65,6 +65,10 @@ class HubData:
         # On synchronise les images ou non
         # si self.offline = True, alors on ne synchronise pas les images
         self.sync_images: bool = True
+        # Envoyer uniquement les vignettes (pas les images JP2 ni les JSON)
+        # Recommandé pour les hautes résolutions >= 600 dpi
+        # Les JP2 et leurs JSON restent ensemble sur USB pour maintenir la cohérence
+        self.send_thumbnails_only: bool = False
         # Action à faire si on dépasse la température
         # 0: None, 1: Shutdown, 2: Startup
         self.over_temperature_action: int = 1
@@ -162,6 +166,10 @@ def getSyncImages():
     return HubData().sync_images
 
 
+def getSendThumbnailsOnly():
+    return HubData().send_thumbnails_only
+
+
 def getOverTemperatureAction():
     return HubData().over_temperature_action
 
@@ -232,7 +240,21 @@ def remove_image_files(folder: str):
 def syncImageFiles(hub_: HubData):
     """Synchronise les fichiers images et JSON sur le serveur"""
     src = path.join(getUsbDir(), hub_.projectId)
-    cmd = f"s3cmd --no-preserve --no-progress sync {src} {getS3Bucket()}"
+
+    # Build s3cmd command with optional filters for thumbnails only mode
+    if hub_.send_thumbnails_only:
+        # Only sync thumbnails (no JP2, no JSON)
+        # JSON files stay with their JP2 on USB to maintain data consistency
+        cmd = (
+            f"s3cmd --include '*thumb*' --exclude '*' "
+            f"--no-preserve --no-progress sync {src} {getS3Bucket()}"
+        )
+        getLogger().warning("Syncing thumbnails only (send_thumbnails_only=True)")
+    else:
+        # Sync all files (default behavior)
+        cmd = f"s3cmd --no-preserve --no-progress sync {src} {getS3Bucket()}"
+        getLogger().warning("Syncing all files (send_thumbnails_only=False)")
+
     getLogger().warning(cmd)
     try:
         result = run(

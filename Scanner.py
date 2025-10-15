@@ -19,7 +19,14 @@ from Miscellaneous import (
     ReadBatVoltCap,
 )
 from OSUtils import is_raspberry_pi
-from ConfigApp import getDisplayFile, getConfigDir, getLogger, getImageDir
+from ConfigApp import (
+    getDisplayFile,
+    getConfigDir,
+    getLogger,
+    getImageDir,
+    getThumbWidth,
+    getThumbHeight,
+)
 
 X_MAX = 216
 Y_MAX = 297
@@ -31,7 +38,7 @@ TIME_BEFORE_SCAN_EPSON = 2
 TIME_AFTER_SCAN_EPSON = 2
 
 DISPLAY_FILE = getDisplayFile()
-ResolutionList = ["300", "600", "1200", "2400", "4800"]
+ResolutionList = ["75", "300", "600", "1200", "2400"]
 ColorList = ["Color", "Gray", "Lineart"]
 
 imagepathtiff = path.join(getImageDir(), "imagescan.tiff")
@@ -49,6 +56,7 @@ class ScannerData:
         self.resolution = ResolutionList[0]
         self.LastImgTime = ""
         self.LastImgFile = ""
+        self.LastThumbFile = ""
         self.l = 0
         self.t = 0
         self.x = X_MAX
@@ -316,6 +324,65 @@ def updateScanParameters(scanner: ScannerData):
     return Scannerparam
 
 
+def generateThumbnail(
+    jp2_path: str, thumb_path: str, original_width: float, original_height: float
+) -> int:
+    """Generate a thumbnail from JP2 image preserving aspect ratio
+
+    Args:
+        jp2_path: Path to the source JP2 image
+        thumb_path: Path where the thumbnail will be saved
+        original_width: Original image width (from scanner.x)
+        original_height: Original image height (from scanner.y)
+
+    Returns:
+        int: 0 if success, error code otherwise
+    """
+    try:
+        # Get thumbnail box dimensions from config
+        th_x = getThumbWidth()
+        th_y = getThumbHeight()
+
+        # Calculate new dimensions preserving aspect ratio
+        ratio = min(th_x / original_width, th_y / original_height)
+        new_width = int(original_width * ratio)
+        new_height = int(original_height * ratio)
+
+        # Convert JP2 to JPEG with calculated dimensions
+        command = (
+            f"gdal_translate -of JPEG -outsize {new_width} {new_height} "
+            f'-co "QUALITY=85" {jp2_path} {thumb_path}'
+        )
+        getLogger().warning("generateThumbnail: %s", command)
+
+        result = run(
+            command,
+            capture_output=True,
+            universal_newlines=True,
+            shell=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            getLogger().error(
+                "generateThumbnail failed: %s %s", result.stdout, result.stderr
+            )
+            return result.returncode
+
+        getLogger().warning(
+            "Thumbnail generated: %sx%s -> %sx%s",
+            original_width,
+            original_height,
+            new_width,
+            new_height,
+        )
+        return 0
+
+    except (OSError, ValueError, ZeroDivisionError) as e:
+        getLogger().error("generateThumbnail error: %s", e)
+        return 1
+
+
 def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     """Lance le scanimage et convertit l'image en jp2000
     cree également le fichier JSON avec les attributs de l'image
@@ -408,6 +475,20 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     getLogger().warning("scanAcq: End conversion jp2")
     scanner.LastImgTime = date
     scanner.LastImgFile = imagepathjp2000
+
+    # Generate thumbnail from JP2
+    fileName = date.replace(":", "-")
+    thumbPath = path.join(getImageDir(), f"image_{fileName}_thumb.jpg")
+    thumb_error = generateThumbnail(imagepathjp2000, thumbPath, scanner.x, scanner.y)
+    if thumb_error == 0:
+        scanner.LastThumbFile = thumbPath
+        getLogger().warning("scanAcq: Thumbnail generated: %s", thumbPath)
+    else:
+        getLogger().warning(
+            "scanAcq: Thumbnail generation failed, continuing without thumbnail"
+        )
+        scanner.LastThumbFile = ""
+
     getLogger().warning("scanAcq: end")
 
     return scanner
