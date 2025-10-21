@@ -140,16 +140,6 @@ if config:
     else:
         getLogger().error("Failed to start Scanorhize.py: %s", result.stderr)
 
-    # En mode config on désactive la connexion réseau qui passe par le port USB
-    cmd = "nohup sudo ./Shut_connection.sh > /tmp/Shut_connection.log 2>&1 &"
-    getLogger().warning(cmd)
-    result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
-    if result.returncode == 0:
-        getLogger().warning("Shut_connection.sh started successfully")
-    else:
-        getLogger().error("Failed to start Shut_connection.sh: %s", result.stderr)
     sys.exit(0)
 
 # Etape 2 #############################################

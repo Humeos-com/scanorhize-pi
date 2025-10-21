@@ -15,15 +15,15 @@ do
     sleep 10
     # usb0 sur les Raspberry Pi 4
     # eth1 sur les Raspberry Pi 5
-    WIRED_CONNECTION=$(nmcli -t --field UUID,DEVICE  connection show --active | grep "eth1\|usb0")
+    WIRED_CONNECTION=$(/usr/bin/nmcli -t --field UUID,DEVICE  connection show --active | grep "eth1\|usb0")
     if [ "bidon" = "bidon$WIRED_CONNECTION" ]
     then
-        echo "Wired connection not found."
+        echo "$(date '+%F %T') - Wired connection not found."
         continue;
     fi
     UUID=$(echo $WIRED_CONNECTION | cut -d':' -f 1)
-    nmcli connection down "$UUID"
-    echo "Connection $WIRED_CONNECTION shut down"
+    /usr/bin/nmcli connection down "$UUID"
+    echo "$(date '+%F %T') - Connection $WIRED_CONNECTION shut down"
     continue;
 done
 

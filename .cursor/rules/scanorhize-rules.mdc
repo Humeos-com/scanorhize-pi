@@ -4,6 +4,7 @@ globs: ["*.py"]
 alwaysApply: true
 ---
 
+
 ## Error logging
 use getLogger without f strings to log errors and warnings
 
@@ -26,4 +27,9 @@ on except always explicit the kind of exception and use getLogger to log the exc
 
 ### Try to follow the DRY (Don't Repeat Yourself) principle to avoid code duplication
 ### The coding style should comply with Black formatter https://black.readthedocs.io/en/stable/
+### Run Black (inside the .venv directory) to check the style
+### Delete trailing whitespaces
+### Imports must be at the beginning of the source file
+### System imports must be declared before project imports
+
 
