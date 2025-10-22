@@ -88,6 +88,16 @@ nextStartDateValue = calculate_and_set_next_date()
 
 if config:
     getLogger().warning("On passe en mode config")
+    # On cree un fichier /run/config pour indiquer aux shells qu'on est en mode config
+    cmd = "sudo touch /run/config >> Log/Scanorhize.log 2>&1"
+    getLogger().warning(cmd)
+    result = run(
+        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
+    )
+    if result.returncode == 0:
+        getLogger().warning("creation /run/config OK")
+    else:
+        getLogger().error("Failed to create /run/config: %s", result.stderr)
 
     # Run initScanners() to initialize scanners
     # Init Scanners before getting tokens, because this operation
