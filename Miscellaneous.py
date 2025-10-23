@@ -173,6 +173,7 @@ def check_connectivity(max_attempts=25):
 
 
 def sync_time():
+    return 0
     """On synchronise l'horloge de la carte WittyPi avec le serveur"""
     try:
         cmd = "sudo ./TimeSynchronisation.sh"

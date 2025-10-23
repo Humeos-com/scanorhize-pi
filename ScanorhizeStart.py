@@ -190,20 +190,9 @@ if not getOffline():
         enable4G()
         # Teste la connectivité
         check_connectivity()
-
-        # On synchronise l'horloge de la carte WittyPi avec le serveur
-        try:
-            cmd = "sudo ./TimeSynchronisation.sh"
-            getLogger().warning(cmd)
-            result = run(
-                cmd,
-                capture_output=True,
-                universal_newlines=True,
-                shell=True,
-                check=False,
-            )
-        except CalledProcessError as exc:
-            getLogger().error(exc.stderr)
+        has_internet = True
+        getLogger().warning("Internet OK !")
+        sync_time()
 
         # Etape 4 #############################################
         # On lance un sous programme qui met à jour toutes les données sur la plateforme
