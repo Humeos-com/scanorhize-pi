@@ -172,19 +172,6 @@ def check_connectivity(max_attempts=25):
         raise RuntimeError("Pas de connectivité !")
 
 
-def sync_time():
-    return 0
-    """On synchronise l'horloge de la carte WittyPi avec le serveur"""
-    try:
-        cmd = "sudo ./TimeSynchronisation.sh"
-        run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-        getLogger().warning("TimeSynchronisation.sh: OK")
-        return 1
-    except (SubprocessError, CalledProcessError) as e:
-        getLogger().error("TimeSynchronisation.sh error: %s", e)
-    return 0
-
-
 def InitGPIO():
     """Fonction historique pour les port USB"""
     return init_gpio()

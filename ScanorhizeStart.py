@@ -18,7 +18,6 @@ from Miscellaneous import (
     disable4G,
     check_connectivity,
     ReadGPIOConfig,
-    sync_time,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 from ConfigApp import is_debug, getLogger
@@ -116,7 +115,6 @@ if config:
         check_connectivity()
         has_internet = True
         getLogger().warning("Internet OK !")
-        sync_time()
         runTodo()
 
         # On recupère eventuellement le todo.sh
@@ -192,7 +190,6 @@ if not getOffline():
         check_connectivity()
         has_internet = True
         getLogger().warning("Internet OK !")
-        sync_time()
 
         # Etape 4 #############################################
         # On lance un sous programme qui met à jour toutes les données sur la plateforme
