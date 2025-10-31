@@ -40,6 +40,7 @@ from Hub import (
     SendHubConfigToServer,
     get_hub_info,
 )
+from DateUtils import ValidateDate
 from ConfigApp import (
     getLogger,
     getDisplayFile,
@@ -289,7 +290,15 @@ def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
             form.get("UseServer", "0"), Scanner.UseServer, 0, 1
         )
         if form.get("StartDate", "") != "":
-            Scanner.StartDate = form["StartDate"]
+            start_date = form["StartDate"]
+            if ValidateDate(start_date):
+                Scanner.StartDate = start_date
+            else:
+                getLogger().warning(
+                    "Invalid date format for StartDate: %s, keeping current: %s",
+                    start_date,
+                    Scanner.StartDate,
+                )
         Scanner.PeriodeS = parse_period(form.get("PeriodeS", "3600s"))
         Scanner.TimeBeforeScan = chaineIntwitherror(
             form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60

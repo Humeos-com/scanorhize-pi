@@ -12,7 +12,7 @@ from ConfigApp import getLogger
 
 # Java Zoned Timestamp, with TZ=UTC
 JAVA_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-DEFAULT_DATE_TIME = "2024-11-01T00:00:00Z"
+DEFAULT_DATE_TIME = "2025-11-30T00:00:00Z"
 DEFAULT_SECONDS = 1742310000  # 2025-03-18T15:00:00Z
 
 
@@ -36,9 +36,11 @@ def DateToSeconds(date: str):
 
 def SecondsToDate(seconds: int):
     try:
-        date_obj = datetime.fromtimestamp(seconds, tz=timezone.utc)
+        # Ensure integer seconds and guard against platform range issues
+        date_obj = datetime.fromtimestamp(int(seconds), tz=timezone.utc)
         date = date_obj.strftime(JAVA_FORMAT)
-    except ValueError:
+    except (OverflowError, OSError, ValueError, TypeError) as e:
+        getLogger().warning("SecondsToDate overflow/invalid seconds=%s: %s", seconds, e)
         date = DEFAULT_DATE_TIME
     return date
 
@@ -73,6 +75,23 @@ def ConvertDateToWitty(date: str):
     except ValueError:
         date = "01 06 25 00"
     return date
+
+
+def ValidateDate(date: str):
+    """
+    Validate if a date string matches the JAVA_FORMAT format
+
+    Args:
+        date (str): date string to validate in JAVA_FORMAT format
+
+    Returns:
+        bool: True if date is valid, False otherwise
+    """
+    try:
+        datetime.strptime(date, JAVA_FORMAT)
+        return True
+    except ValueError:
+        return False
 
 
 def CalculNextStartDate(DateOrigin: str, PeriodeS: int, DateStart: str):
