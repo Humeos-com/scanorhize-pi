@@ -847,7 +847,7 @@ def stop_server():
     try:
         os.remove("DEBUG")
         getLogger().warning("remove_image_files: removed DEBUG")
-    except (FileNotFoundError, PermissionError) as e:
+    except (PermissionError) as e:
         getLogger().error("Error removing file DEBUG: %s", e)
 
     run(

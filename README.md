@@ -148,7 +148,7 @@ http://192.168.1.42:8080
 #### Accès SSH
 On peut aussi accéder au Raspberry depuis le serveur `backend-prod.humeos.com` si on connaît le port utilisé par le Raspberry. Le port est affiché sur l'interface Web en haut à droite dans toutes les pages. Si on n'a pas accès à l'interface Web, on peut découvrir le port avec la commande suivante sur le serveur `backend-prod.humeos.com`:
 ```
-debian@d2-2-gra11:~$ sudo netstat -tanpl | grep ":22" | grep -v 2222
+debian@d2-2-gra11:~$ sudo netstat -tanpl | grep -E ':22(2[3-9]|[3-9][0-9])'
 tcp        0      0 127.0.0.1:2269          0.0.0.0:*               LISTEN      1040576/sshd: debian 
 tcp6       0      0 ::1:2269                :::*                    LISTEN      1040576/sshd: debian
 debian@d2-2-gra11:~$ 
@@ -159,6 +159,16 @@ Pour se connecter au Raspberry, on peut lancer un SSH de la forme:
 debian@d2-2-gra11:~$ ssh pi@localhost -p 2269
 ```
 Les clés d'accès sont configurées sur le compte de l'utilisateur debian sur le serveur backend-prod.humeos.com et permettent d’accéder au Hub sans mot de passe.
+Par ailleurs, comme les clés des Raspberry Pi sont différentes, afin d'éviter le message d'alerte du "Man in the middle", on ignore volontairement leurs clés avec le fichier de configuration du client SSH:
+```
+debian@d2-2-gra11:~$ cat .ssh/config 
+# Pour accéder aux Hubs
+Host localhost
+    StrictHostKeyChecking No
+    user pi
+debian@d2-2-gra11:~$ 
+```
+
 
 #### Modification des configurations sur le bucket S3
 Selon le mode `Use Server`, les Hubs et les scanners vont chercher leur configuration sur le bucket S3. On peut ainsi modifier les configurations sans passer en mode configuration, donc sans toucher les boîtiers.
@@ -176,6 +186,27 @@ $
 ### Mode nominal
 En mode nominal, le Hub se réveille, lance les acquisitions une par une, allume sa clé 4G, envoie son état, envoie ses images, supprime ses images localement, met à jour son prochain réveil et s'endort.<br/>
 
+### A propos des résolutions et des tailles d'images
+Les résolutions possible avec le Hub, sont 300, 600, 1200, 2400.  
+La résolution 4800 n'a pas été retenue car produisant des images trop lourdes.  
+En 2400 dpi, une image au format TIFF pèse 1,6Go, l'image au format JP2 avec une compression de facteur 10 pèse 160Mo.  
+Il n'est pas possible en pratique de transférer de tels fichiers avec une clé 4G.  
+Au delà de 600 dpi,le mode de fonctionnement recommandé et de stocker les JP2 sur la SD Card USB et d'envoyer les vignettes pour avoir un retour sur le fonctionnement du système.  
+A noter que l'image TIFF est stockée dans un RAM disque de 2Go, d'où l'impossibilité d'utiliser la résolution 4800 dpi qui ne pourrait pas y être stockée. La conversion TIFF vers JP2 est effectuée dans le RAM disque par gdal_translate. La vignette est créé à partir du JP2.  
+Une fois le fichier JP2 obtenu, il est copié avec sa vignette dans la SD Card USB.
+
+Tableau indiquant le nombre d'images qu'on peut stocker selon la résolution et l'espace de stockage disponible.  
+10Go correspondent à l'espace de stockage d'un Hub qui n'a pas de stockage externe sur le port USB.
+
+| Résolution  | TIFF    | JP2    | Nb images 10Go | Nb images SD 64Go | Nb images SD 128Go |
+|   ---------:| -------:|-------:|-------------:|---------:|------:|
+| 300         | 26 Mo   | 2,6 Mo |    3900      |   25000  | 50000 |
+| 600         | 100 Mo  | 10 Mo  |    1000      |    6500  | 13000 |
+| 1200        | 400 Mo  | 40 Mo  |     250      |    1600  |  3200 |
+| 2400        | 1,6 Go  | 160 Mo |      64      |     400  |   800 |
+
+
+
 ### A propos des clés USB 4G/Wifi
 Ces clés permettent au Hub de communiquer avec la plateforme Web.
 Il y a plusieurs modes de fonctionnement.
@@ -185,8 +216,9 @@ La clé 4G/Wifi est connectée sur un USB qui ne fait que l'alimentation 5V (pas
 En mode nominal, le Hub se connecte au Wifi de la clé, et obtient ainsi la connectivité Internet.
 Le mode historique permet de n'avoir qu'un seul mode réseau sur le Hub, l'utilisation de l'interface wlan0 qui passe par le Wifi Scanorhize.
 
+
 1. Fonctionnement actuel.  
-On utilise un câble USB avec les fils data pour connecter la clé. La clé crée 2 connexions: usb0 et wlan0  
+On utilise un câble USB avec les fils data pour connecter la clé. La clé crée 2 connexions: usb0 (eth1 sur Pi 4) et wlan0  
 usb0 contient une IP fournie par la clé dans le même subnet que wlan0 pour la Wifi. Néanmoins les métriques des 2 interfaces sont différentes et la priorité est donnée à usb0. Dans ce mode, le Hub utilise le port USB pour communiquer avec l'Internet, ce qui est beaucoup plus efficace que de passer par le Wifi de la clé.  
 Comme les 2 interfaces du hub sont dans le même subnet, on ne voit pas le hub à travers le Wifi. On ne peut donc pas configurer le Hub à travers son interface Web par le Wifi.  
 Afin de contourner ce problème, en mode configuration on désactive l'interface USB. Le Hub communique ainsi à travers le Wifi. C'est bien l'objectif souhaité.  
@@ -200,6 +232,18 @@ Le programme `/usr/local/bin/scanorhize-watch.sh` est chargé de balayer la plag
 On pourrait très bien n'utiliser que des clé 4G sans Wifi, c'est typiquement le fonctionnement des cartes LTE avec antennes pour Raspberry, comme la carte Clipper HAT Mini (LTE 4G pour Raspberry Pi PIM717), qui ne fait que de la 4G.  
 Dans ce cas, on activerait l'AP du Raspberry en mode configuration uniquement.  
 Ca permet de limiter la consommation et d'autre part, on élimine le passage du Hub par le Wifi de la clé et enfin, on peut supposer que ces cartes ont de meilleurs performances sur la 4G.
+
+1. Les différentes clés testées
+
+| Modèle      | idVendor | idProduct | usb0           | wlan0        | Libellé   | Remarques |
+|:--------    |:-------- |:--------  |:----           |:-----        |:--------  |:----      |
+| ZTE         | 19d2     | 1225      |                | 192.168.1.XX | ZTE WCDMA Technologies MSM ZTE Mobile Broadband  |       |
+| Zunate      | 05c6     | 90b3      | 192.168.1.XXX  | 192.168.1.42 |   |  Puce Qualcomm. Comme les 2 interfaces ont une IP dans le subnet 192.168.1.0/24 on éteint la liaison usb0 en mode configuration |
+| Zunate      | 05c6     | 9092      | 192.168.1.XXX  | 192.168.1.42 | Qualcomm, Inc. Nokia 8110 4G |   |
+| KuWfi       | 0e8d     | 2008      | 192.168.42.XXX | 192.168.1.42 | Puce ZTE. On laisse usb0 dont la métrique est prioritaire pour l'accès Internet |   |
+| KuWfi       | 19d2     | 1557      | 192.168.42.XXX | 192.168.1.42 | ZTE WCDMA Technologies MSM ZXIC Mobile Boardband |   |
+| KuWfi       | 19d2     | 1225      | 192.168.42.XXX | 192.168.1.42 | ZTE WCDMA Technologies MSM ZXIC Mobile Boardband |   |
+| KuWfi 2020  | 0e8d     | 2002      |                | 192.168.1.XX | MediaTek Inc. uf906_35_lowram_20200827 | Clé obsolète dont les débits ne dépassent pas 10Mbps    |
 
 
 
@@ -243,7 +287,7 @@ MAC Address: 2C:CF:67:6A:4D:60 (Raspberry Pi (Trading))
 #### La synchronisation d'un Hub
 Si on débranche la batterie et l'alimentation d'un Hub, il perd l'heure. Lorsque la désynchronisation est importante l'utilitaire s3cmd refuse de fonctionner. On ne peut donc par recevoir les images.  
 Il faut absolument avoir un Hub synchronisé pour que les programmes fonctionnent.  
-La seule manière pour qu'un Hub se synchronise est qu'il puisse se connecter à Internet. Lorsqu'on met le Hub en mode configuration et qu'il y a de la connectivité, il va se synchroniser avec la commande `Scanorhize/TimeSynchronisation.sh`
+La seule manière pour qu'un Hub se synchronise est qu'il puisse se connecter à Internet. Lorsqu'on met le Hub en mode configuration et qu'il y a de la connectivité, il va se synchroniser avec la commande `/usr/local/bin/network-timesync.sh`. En fait cette commande est lancée par NetworkManager lorsqu'une interface réseau se met à l'état "up".
 
 
 
