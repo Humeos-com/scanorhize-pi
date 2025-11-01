@@ -847,8 +847,8 @@ def stop_server():
     try:
         os.remove("DEBUG")
         getLogger().warning("remove_image_files: removed DEBUG")
-    except (PermissionError) as e:
-        getLogger().error("Error removing file DEBUG: %s", e)
+    except (FileNotFoundError, PermissionError) as e:
+        getLogger().warning("Error removing file DEBUG: %s", e)
 
     run(
         "sudo poweroff",
