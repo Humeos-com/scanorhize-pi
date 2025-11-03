@@ -88,6 +88,10 @@ class HubData:
         self.todo: bool = False
         # version du hub
         self.version: str = __version__
+        # Période d'acquisition commune à tous les scanners (format crontab)
+        # Format: minute heure jour_mois mois jour_semaine
+        # Exemple: "0 8 * * *" pour tous les jours à 8h
+        self.acquisition_schedule: str = "0 8 * * *"
 
         self._initialized = True  # Mark as initialized
         self.read_config()
@@ -209,6 +213,10 @@ def getTodo():
             return 1
         getLogger().warning("todo.sh downloaded successfully")
     return 0
+
+
+def getAcquisitionSchedule():
+    return HubData().acquisition_schedule
 
 
 def getUseServer():
@@ -627,6 +635,62 @@ def get_hub_info():
         usb_space_info[1],  # USB space percent
         get_temperature(),  # temperature
     ]
+
+
+def calculate_next_wakeup_from_crontab():
+    """Calcule et configure le prochain réveil WittyPi selon le crontab Hub
+
+    Returns:
+        str: Date du prochain réveil (ISO8601)
+    """
+    from DateUtils import (
+        calculate_next_cron_time,
+        GetCurrentDate,
+        DateToSeconds,
+        SecondsToDate,
+    )
+    from WittyPy_utilities import SetNextStartDate, setNextShutdownDate
+
+    # Obtenir la date actuelle
+    current_date = GetCurrentDate()
+    current_date_s = DateToSeconds(current_date)
+
+    # Lire le schedule crontab du Hub
+    hub = HubData()
+    hub.read_config()
+    schedule = hub.acquisition_schedule
+
+    # Calculer la prochaine exécution selon le crontab
+    try:
+        next_date, next_date_s = calculate_next_cron_time(schedule, current_date)
+    except ValueError as e:
+        getLogger().error("Invalid crontab schedule, using default 1h: %s", e)
+        # Fallback: 1 heure plus tard
+        next_date_s = current_date_s + 3600
+        next_date = SecondsToDate(next_date_s)
+
+    # Minimum 10 minutes à partir de maintenant
+    next_date_s = max(next_date_s, current_date_s + 600)
+
+    # Gérer batterie faible (< 7% -> +30 jours)
+    battery = ReadBatVoltCap()
+    if battery[1] < 7:
+        next_date_s = current_date_s + (3600 * 24 * 30)
+        getLogger().warning("Low battery, delaying wakeup by 30 days")
+
+    # Configurer le WittyPi
+    next_date = SecondsToDate(next_date_s)
+    SetNextStartDate(next_date)
+
+    # Configurer shutdown 20 minutes après le démarrage actuel
+    shutdown_time = SecondsToDate(current_date_s + (60 * 20))
+    setNextShutdownDate(shutdown_time)
+
+    getLogger().warning(
+        "Next wakeup scheduled at: %s (from crontab: %s)", next_date, schedule
+    )
+
+    return next_date
 
 
 if __name__ == "__main__":

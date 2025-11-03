@@ -21,7 +21,12 @@ import argparse
 from version import __version__
 
 from ConfigApp import getLogger
-from Hub import getDeltaTime, getSyncImages, syncImageFiles, HubData
+from Hub import (
+    getSyncImages,
+    syncImageFiles,
+    HubData,
+    calculate_next_wakeup_from_crontab,
+)
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Miscellaneous import (
@@ -29,7 +34,7 @@ from Miscellaneous import (
     initDisplayFile,
 )
 from Campaign import CopyImageToUSB, CreateFolderOnUSB
-from DateUtils import CalculNextStartDate, DateToSeconds, GetCurrentDate
+from DateUtils import GetCurrentDate
 
 parser = argparse.ArgumentParser(
     prog="ScanorhizeProcess.py",
@@ -58,7 +63,6 @@ if args.version:
 force = bool(args.force)
 
 CurrentDate = GetCurrentDate()
-CurrentDateinS = DateToSeconds(CurrentDate)
 initDisplayFile()
 getLogger().warning("StartProcess")
 res = InitGPIO()
@@ -81,16 +85,9 @@ for CurrentScanner in listScannerconfigs:
     data = "Scanner file: " + CurrentScanner
     getLogger().warning(data)
 
-    DateOriginS = DateToSeconds(Scanner.StartDate)
-    NextStartDate, NextStartseconds = CalculNextStartDate(
-        Scanner.StartDate, Scanner.PeriodeS, CurrentDate
-    )
-    NextStartseconds = NextStartseconds - Scanner.PeriodeS
-    # On déclenche l'acquisition si la date courante voisine à "DeltaTime près" de la date de déclenchement
-    if force or (
-        CurrentDateinS > DateOriginS
-        and NextStartseconds <= CurrentDateinS <= NextStartseconds + getDeltaTime()
-    ):
+    # Plus besoin de vérifier NextStartDate pour chaque scanner
+    # Si on est réveillé, c'est qu'il faut acquérir (selon crontab Hub)
+    if force or True:  # Tous les scanners actifs acquièrent
         if force:
             getLogger().warning("Force acquisition")
         # get image from scanner
@@ -112,15 +109,9 @@ for CurrentScanner in listScannerconfigs:
         else:
             getLogger().error("Image acquisition Error")
             scanning_error = 1
-    else:
-        getLogger().warning(
-            "Scanner %s: no acquisition. DateStart %s too far from NextStartDate %s",
-            str(i_scan + 1),
-            CurrentDateinS,
-            NextStartseconds,
-        )
     i_scan = i_scan + 1
 # fin for
+
 if force:
     # On peut travailler sans synchroniser les images si le réseau est mauvais
     # ou si les images sont trop grosses pour le réseau
@@ -128,5 +119,9 @@ if force:
     Hub.read_config()
     if getSyncImages():
         syncImageFiles(Hub)
+
+# Calculer et configurer le prochain réveil
+next_wakeup = calculate_next_wakeup_from_crontab()
+getLogger().warning("Next scheduled wakeup: %s", next_wakeup)
 
 sys.exit(scanning_error)

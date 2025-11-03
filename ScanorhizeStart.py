@@ -25,7 +25,6 @@ from Scanner import (
     initScanners,
     listConfigScanner,
     ScannerData,
-    calculate_and_set_next_date,
 )
 from Hub import (
     HubData,
@@ -45,6 +44,7 @@ from Hub import (
     runTodo,
     GetWifiSSID,
     GetIP,
+    calculate_next_wakeup_from_crontab,
 )
 from version import __version__
 
@@ -82,7 +82,7 @@ EndGPIO()
 # Si la batterie est morte, l'heure sera aléatoire, il faut
 # refaire l'initialisation par le mode config, qui mettra
 # le boitier à l'heure correcte.
-nextStartDateValue = calculate_and_set_next_date()
+nextStartDateValue = calculate_next_wakeup_from_crontab()
 
 
 if config:

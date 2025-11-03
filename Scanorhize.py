@@ -23,7 +23,6 @@ from Scanner import (
     updateScanParameters,
     listConfigScanner,
     initScanners,
-    calculate_and_set_next_date,
     ResolutionList,
     ColorList,
 )
@@ -214,7 +213,6 @@ def ScannerPage(scan_num_str: str):
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
-    Scannerparam["PeriodeS"] = format_period(Scanner.PeriodeS)
     getLogger().warning("Scanner n° : %s", str(i_scan + 1))
     # Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
@@ -289,17 +287,6 @@ def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
         Scanner.UseServer = chaineIntwitherror(
             form.get("UseServer", "0"), Scanner.UseServer, 0, 1
         )
-        if form.get("StartDate", "") != "":
-            start_date = form["StartDate"]
-            if ValidateDate(start_date):
-                Scanner.StartDate = start_date
-            else:
-                getLogger().warning(
-                    "Invalid date format for StartDate: %s, keeping current: %s",
-                    start_date,
-                    Scanner.StartDate,
-                )
-        Scanner.PeriodeS = parse_period(form.get("PeriodeS", "3600s"))
         Scanner.TimeBeforeScan = chaineIntwitherror(
             form.get("TimeBeforeScan", "0"), Scanner.TimeBeforeScan, 0, 60
         )
@@ -311,10 +298,6 @@ def process_scanner_form_data(form, Scanner, listScannerconfigs, i_scan):
         # Save the updated Scanner object
         Scanner.WriteScannerConfig(listScannerconfigs[i_scan])
         getLogger().warning("Updated Scanner object: %s", Scanner.__dict__)
-
-        # Recalculate next start date
-        nextStartDateValue = calculate_and_set_next_date()
-        getLogger().warning("Recalculated next start date: %s", nextStartDateValue)
 
         return True, "Configuration saved successfully"
 
@@ -448,6 +431,7 @@ def HubPage():
         send_thumbnails_only=Hub.send_thumbnails_only,
         auto_check_thumbnails_only=auto_check_thumbnails_only,
         todo=Hub.todo,
+        acquisition_schedule=Hub.acquisition_schedule,
         output=output,
         **get_common_template_vars(),
     )
@@ -631,6 +615,26 @@ def update_app_config():
         )
 
 
+def validate_crontab_syntax(schedule: str) -> bool:
+    """Valide la syntaxe d'une expression crontab
+
+    Args:
+        schedule: Expression crontab à valider
+
+    Returns:
+        bool: True si valide, False sinon
+    """
+    try:
+        from croniter import croniter
+        from datetime import datetime
+
+        # Tester si croniter peut parser l'expression
+        croniter(schedule, datetime.now())
+        return True
+    except (ValueError, KeyError):
+        return False
+
+
 def process_hub_form_data(form):
     """Process form data for Hub configuration and update Hub object.
 
@@ -653,8 +657,41 @@ def process_hub_form_data(form):
         Hub.send_thumbnails_only = "send_thumbnails_only" in form
         Hub.todo = "todo" in form
 
+        # Valider et sauvegarder le schedule crontab
+        new_schedule = form.get("acquisition_schedule", "0 8 * * *")
+        old_schedule = Hub.acquisition_schedule
+
+        # Validation basique de la syntaxe crontab
+        schedule_changed = False
+        if validate_crontab_syntax(new_schedule):
+            if new_schedule != old_schedule:
+                Hub.acquisition_schedule = new_schedule
+                schedule_changed = True
+                getLogger().warning(
+                    "Acquisition schedule updated: %s -> %s", old_schedule, new_schedule
+                )
+        else:
+            getLogger().warning(
+                "Invalid crontab syntax: %s, keeping current", new_schedule
+            )
+
         # Save the Hub configuration locally
         Hub.write_config()
+
+        # Si le schedule a changé, recalculer et mettre à jour le réveil WittyPi
+        if schedule_changed:
+            try:
+                from Hub import calculate_next_wakeup_from_crontab
+
+                next_wakeup = calculate_next_wakeup_from_crontab()
+                getLogger().warning(
+                    "WittyPi wakeup updated after schedule change: %s", next_wakeup
+                )
+            except Exception as e:
+                getLogger().error(
+                    "Error updating WittyPi wakeup after schedule change: %s", e
+                )
+
         return True, "Configuration saved successfully"
     except Exception as e:
         return False, f"Error processing form data: {str(e)}"

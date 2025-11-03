@@ -25,7 +25,6 @@ Last Image File: {{LastImgFile}}
 Token: {{token[:24]}}
 Project ID: {{projectId}}
 Sample ID: {{sampleId}}
-Campaign: {{Campaign}}
 </pre>
 
     <!-- Configuration Form Section -->
@@ -96,17 +95,6 @@ Campaign: {{Campaign}}
                     </div>
                     
                     <div class="col-md-6">
-                        <div class="form-group mb-3">
-                            <label for="StartDate">Start Date (YYYY-MM-DDTHH:mm:ssZ)</label>
-                            <input type="text" class="form-control" id="StartDate" name="StartDate" value={{StartDate}} placeholder={{StartDate}}>
-                        </div>
-                        
-                        <div class="form-group mb-3">
-                            <label for="PeriodeS">Period</label>
-                            <input type="text" class="form-control" id="PeriodeS" name="PeriodeS" value={{PeriodeS}} placeholder={{PeriodeS}}>
-                            <small class="form-text text-muted">Period between each scan. Can be in seconds or days. For example : 3600s or 0.5d</small>
-                        </div>
-                        
                         <div class="form-group mb-3">
                             <label for="TimeBeforeScan">Time Before Scan (s)</label>
                             <input type="text" class="form-control" id="TimeBeforeScan" name="TimeBeforeScan" value={{TimeBeforeScan}} placeholder={{TimeBeforeScan}}>

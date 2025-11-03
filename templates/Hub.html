@@ -12,7 +12,7 @@ Pin Array: {{ pin_array }}</pre>
 			<h4>Hub Settings</h4>
 		</div>
 		<div class="card-body">
-			<form action="/update-hub-settings" method="POST">
+			<form action="{{url_for('write_config')}}" method="POST" id="hub-form">
 				<div class="row">
 					<div class="col-md-6">
 						<div class="form-check mb-3">
@@ -68,6 +68,31 @@ Pin Array: {{ pin_array }}</pre>
 							<label for="delta_time">Delta Time (seconds)</label>
 							<input type="text" class="form-control" id="delta_time" name="delta_time" value="{{ delta_time }}" onblur="validateTimeout(this, 180, 3600)">
 							<small class="form-text text-muted">Maximum time between operations (180-3600 seconds)</small>
+						</div>
+						
+						<div class="form-group mb-3">
+							<label for="acquisition_schedule">Acquisition Schedule (crontab format)</label>
+							<input type="text" class="form-control" id="acquisition_schedule" 
+								   name="acquisition_schedule" value="{{ acquisition_schedule }}" 
+								   placeholder="0 8 * * *" required>
+							<div id="crontab-feedback" class="small"></div>
+							<small class="form-text text-muted">
+								Format: minute hour day month weekday<br>
+								Examples: "0 */1 * * *" (every hour), "15 */2 * * *" (every 2 hours at :15), "0 8 * * *" (daily at 8am)
+							</small>
+						</div>
+					</div>
+				</div>
+				
+				<div class="row">
+					<div class="col-md-12">
+						<div class="alert alert-info">
+							<strong>Common patterns:</strong><br>
+							• Every hour: <code>0 */1 * * *</code><br>
+							• Every 2 hours: <code>0 */2 * * *</code><br>
+							• Every 6 hours: <code>0 */6 * * *</code><br>
+							• Daily at 8am: <code>0 8 * * *</code><br>
+							• Twice daily (8am, 8pm): <code>0 8,20 * * *</code>
 						</div>
 					</div>
 				</div>
@@ -134,11 +159,123 @@ Pin Array: {{ pin_array }}</pre>
 		input.value = value;
 	}
 
+	function validateCrontabSyntax(schedule) {
+		/**
+		 * Valide une expression crontab (5 champs)
+		 * Format: minute heure jour_mois mois jour_semaine
+		 * Retourne true si valide, false sinon
+		 */
+		if (!schedule || schedule.trim() === '') {
+			return false;
+		}
+		
+		const parts = schedule.trim().split(/\s+/);
+		
+		// Doit avoir exactement 5 champs
+		if (parts.length !== 5) {
+			return false;
+		}
+		
+		// Validation de base pour chaque champ
+		const fieldValidations = [
+			{ min: 0, max: 59, name: 'minute' },      // minute: 0-59
+			{ min: 0, max: 23, name: 'hour' },        // heure: 0-23
+			{ min: 1, max: 31, name: 'day' },         // jour: 1-31
+			{ min: 1, max: 12, name: 'month' },       // mois: 1-12
+			{ min: 0, max: 6, name: 'weekday' }       // jour semaine: 0-6
+		];
+		
+		for (let i = 0; i < 5; i++) {
+			const field = parts[i];
+			const validation = fieldValidations[i];
+			
+			if (!validateCrontabField(field, validation.min, validation.max)) {
+				console.error(`Invalid crontab field ${validation.name}: ${field}`);
+				return false;
+			}
+		}
+		
+		return true;
+	}
+
+	function validateCrontabField(field, min, max) {
+		/**
+		 * Valide un champ crontab individuel
+		 * Supporte: *, */n, n, n-m, n,m,p
+		 */
+		// Cas 1: *
+		if (field === '*') {
+			return true;
+		}
+		
+		// Cas 2: */n (tous les n)
+		if (field.startsWith('*/')) {
+			const n = parseInt(field.substring(2));
+			return !isNaN(n) && n > 0 && n <= max;
+		}
+		
+		// Cas 3: n,m,p (liste)
+		if (field.includes(',')) {
+			const values = field.split(',');
+			return values.every(v => {
+				const num = parseInt(v);
+				return !isNaN(num) && num >= min && num <= max;
+			});
+		}
+		
+		// Cas 4: n-m (plage)
+		if (field.includes('-')) {
+			const range = field.split('-');
+			if (range.length !== 2) return false;
+			const start = parseInt(range[0]);
+			const end = parseInt(range[1]);
+			return !isNaN(start) && !isNaN(end) && 
+				   start >= min && end <= max && start <= end;
+		}
+		
+		// Cas 5: n (valeur simple)
+		const num = parseInt(field);
+		return !isNaN(num) && num >= min && num <= max;
+	}
+
+	// Validation lors de la saisie (temps réel)
+	const acquisitionScheduleInput = document.getElementById('acquisition_schedule');
+	if (acquisitionScheduleInput) {
+		acquisitionScheduleInput.addEventListener('blur', function() {
+			const schedule = this.value;
+			const feedback = document.getElementById('crontab-feedback');
+			
+			if (validateCrontabSyntax(schedule)) {
+				this.classList.remove('is-invalid');
+				this.classList.add('is-valid');
+				if (feedback) {
+					feedback.textContent = '✓ Valid crontab syntax';
+					feedback.className = 'text-success small';
+				}
+			} else {
+				this.classList.remove('is-valid');
+				this.classList.add('is-invalid');
+				if (feedback) {
+					feedback.textContent = '✗ Invalid crontab syntax (format: minute hour day month weekday)';
+					feedback.className = 'text-danger small';
+				}
+			}
+		});
+	}
+
 	// Validate all timeouts before form submission
 	document.querySelector('form').addEventListener('submit', function(event) {
 		validateTimeout(document.getElementById('connect_timeout'), 10, 60);
 		validateTimeout(document.getElementById('max_time'), 60, 600);
 		validateTimeout(document.getElementById('delta_time'), 180, 3600);
+		
+		const schedule = document.getElementById('acquisition_schedule').value;
+		
+		if (!validateCrontabSyntax(schedule)) {
+			event.preventDefault();
+			alert('Invalid crontab syntax for acquisition schedule.\nFormat: minute hour day month weekday\nExample: "0 8 * * *"');
+			return false;
+		}
 	});
 
 	// Initialize form state when page loads

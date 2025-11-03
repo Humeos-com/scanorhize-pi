@@ -8,6 +8,8 @@ from datetime import datetime
 from datetime import timezone
 import time
 
+from croniter import croniter
+
 from ConfigApp import getLogger
 
 # Java Zoned Timestamp, with TZ=UTC
@@ -124,6 +126,56 @@ def CalculNextStartDate(DateOrigin: str, PeriodeS: int, DateStart: str):
     except (ValueError, TypeError) as e:
         getLogger().error("Error calculating next start date: %s", e)
         return DateStart, DateToSeconds(DateStart)
+
+
+def calculate_next_cron_time(schedule: str, current_date: str) -> tuple:
+    """Calcule la prochaine exécution selon un planning crontab
+
+    Args:
+        schedule: Expression crontab "minute heure jour mois jour_semaine"
+        current_date: Date actuelle ISO8601
+
+    Returns:
+        tuple: (next_date_iso8601, next_date_seconds)
+
+    Raises:
+        ValueError: Si la syntaxe crontab est invalide
+    """
+    try:
+        # Convertir ISO8601 en datetime
+        base_time = datetime.fromisoformat(current_date.replace("Z", "+00:00"))
+
+        # Créer l'itérateur crontab
+        cron = croniter(schedule, base_time)
+
+        # Obtenir la prochaine occurrence
+        next_time = cron.get_next(datetime)
+
+        # Convertir en ISO8601 et secondes
+        next_date_iso = next_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        next_date_seconds = int(next_time.timestamp())
+
+        return next_date_iso, next_date_seconds
+
+    except (ValueError, KeyError) as e:
+        getLogger().error("Invalid crontab expression: %s - %s", schedule, e)
+        raise
+
+
+def convert_datetime_to_wittypi_format(dt: datetime) -> str:
+    """Convertit un datetime Python en format WittyPi
+
+    Args:
+        dt: datetime Python
+
+    Returns:
+        str: Date au format WittyPi "DD HH:MM:SS"
+
+    Example:
+        datetime(2025, 10, 15, 8, 0, 0) -> "15 08:00:00"
+    """
+    # Format WittyPi: "DD HH:MM:SS" (jour du mois, heures:minutes:secondes)
+    return dt.strftime("%d %H:%M:%S")
 
 
 if __name__ == "__main__":
