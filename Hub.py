@@ -13,6 +13,12 @@ import random
 import argparse
 from version import __version__
 
+from DateUtils import (
+    calculate_next_cron_time,
+    GetCurrentDate,
+    DateToSeconds,
+    SecondsToDate,
+)
 from ConfigApp import (
     getConfigHubFile,
     getScanorhizeServer,
@@ -25,8 +31,12 @@ from Campaign import getUsbDir, USBSpace
 from OSUtils import get_model, is_raspberry_pi
 from Scanner import ScannerData, listConfigScanner, listScannerSerials
 from AuthUtils import getHwAddr
-from WittyPy_utilities import set_over_temperature_action, get_temperature
-
+from WittyPy_utilities import (
+    set_over_temperature_action,
+    get_temperature,
+    SetNextStartDate,
+    setNextShutdownDate,
+)
 from utils import write_json_to_file
 from pin_config import DEFAULT_PIN_ARRAY
 from Miscellaneous import ReadBatVoltCap
@@ -643,13 +653,6 @@ def calculate_next_wakeup_from_crontab():
     Returns:
         str: Date du prochain réveil (ISO8601)
     """
-    from DateUtils import (
-        calculate_next_cron_time,
-        GetCurrentDate,
-        DateToSeconds,
-        SecondsToDate,
-    )
-    from WittyPy_utilities import SetNextStartDate, setNextShutdownDate
 
     # Obtenir la date actuelle
     current_date = GetCurrentDate()
