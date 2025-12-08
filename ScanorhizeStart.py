@@ -6,6 +6,7 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 """
 
 import sys
+import time
 from subprocess import run, CalledProcessError
 import argparse
 
@@ -170,6 +171,8 @@ except CalledProcessError as exc:
 # Mise à jour des paramètres
 Hub = HubData()
 Hub.read_config()
+# Wait 15 seconds for battery voltage to stabilize before reading
+time.sleep(15)
 hub_info = get_hub_info()
 
 getLogger().warning(
