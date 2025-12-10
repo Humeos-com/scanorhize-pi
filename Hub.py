@@ -590,7 +590,7 @@ def GetWifiSSID():
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
         if result.returncode != 0:
-            getLogger().error(
+            getLogger().info(
                 "Error GetWifiSSID: return: %s error: %s",
                 result.returncode,
                 result.stderr,
