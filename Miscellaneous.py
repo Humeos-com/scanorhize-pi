@@ -111,10 +111,11 @@ def ReadBatVoltCap():
         Volt = get_input_voltage()
         # Calcul historique, à 3,3V on est encore à 30%
         # Cap = round((Volt - 2.7) / 1.49 * 100, 2)
-        # A 3,2V on est à 0% et à 4,2 on est à 100%
+
+        # A 3,2V on est à 0% et à 3,9 on est à 100%
         # ce qui est plus proche de la réalité
         # A 3.1V le Witty coupe l'alimentation
-        Cap = round((Volt - 3.2) * 100, 2)
+        Cap = round((Volt - 3.2)/0.7 * 100, 2)
         return (Volt, Cap)
 
     # On est dans le cas d'une alimentation USB (Power Bank ou alimentation)

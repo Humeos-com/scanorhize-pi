@@ -594,10 +594,71 @@ def initScanners():
         getLogger().warning("initScanners: Aucun scanner trouvé")
 
 
-# DEPRECATED: This function has been replaced by calculate_next_wakeup_from_crontab() in Hub.py
-# It is kept here for reference but should not be used anymore.
-# The new function uses Hub.acquisition_schedule (crontab format) instead of individual
-# scanner StartDate and PeriodeS.
+def calculate_and_set_next_date():
+    """Calculate and set the next wake-up and shutdown date for the WittyPi.
+    This function:
+    1. Gets current date and calculates next start date for each enabled scanner
+    2. Determines the earliest next start date
+    3. Handles battery level considerations
+    4. Sets the next wake-up and shutdown date
+    """
+
+    # Get current date and convert to seconds
+    DateStart = GetCurrentDate()
+    CurrentDateinS = DateToSeconds(DateStart)
+
+    # Get list of scanner configs and initialize arrays dynamically
+    listScannerconfigs_ = listConfigScanner()
+    NextStartseconds = []
+    NextStartDates = []
+
+    # Calculate next start dates only for enabled scanners
+    ScannerObj = ScannerData()
+    for i_scan_, CurrentScanner_ in enumerate(listScannerconfigs_):
+        ScannerObj.ReadScannerConfig(CurrentScanner_)
+        nextDate, nextDateS = CalculNextStartDate(
+            ScannerObj.StartDate, ScannerObj.PeriodeS, DateStart
+        )
+        # NextStartDates toujours présent dans la config
+        NextStartDates.append(nextDate)
+        getLogger().warning("Scanner-%s: Next start date: %s", i_scan_ + 1, nextDate)
+
+        # On utilise NextStartseconds pour calcuer le prochain réveil
+        if ScannerObj.enable:
+            NextStartseconds.append(nextDateS)
+        else:
+            getLogger().warning(
+                "Scanner-%s: Disabled, skipping for next wake up calculation",
+                i_scan_ + 1,
+            )
+
+    # If no scanners are enabled, set a default wake-up time
+    if not NextStartseconds:
+        getLogger().warning("No enabled scanners found, setting default wake-up time")
+        nextStartSecs = CurrentDateinS + (24 * 3600)  # 1 day from now
+    else:
+        # Calculate the next wake-up time
+        # Ensure it's at least 600 seconds (10 minutes) from now
+        nextStartSecs = max(int(min(NextStartseconds)), (CurrentDateinS + 600))
+
+    nextStartDateValue_ = SecondsToDate(nextStartSecs)
+    getLogger().warning("Next wake up at: %s", nextStartDateValue_)
+
+    # Check battery level and adjust wake-up time if needed
+    Bat = ReadBatVoltCap()
+    if Bat[0] < 3.5:  # if battery is low, under 3.5V, delay wake-up by 3 days
+        nextStartDateValue_ = SecondsToDate(nextStartSecs + (3600 * 24 * 3))
+        getLogger().warning(
+            "No more battery: wake up in 30 days: %s", nextStartDateValue_
+        )
+
+    # Set the next wake-up time
+    SetNextStartDate(nextStartDateValue_)
+
+    # Set shutdown time to 20 minutes from now as a safety measure
+    StopTime = SecondsToDate(CurrentDateinS + (60 * 20))
+    setNextShutdownDate(StopTime)
+    return nextStartDateValue_
 
 
 if __name__ == "__main__":
