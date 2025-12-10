@@ -678,8 +678,9 @@ def calculate_next_wakeup_from_crontab():
     # Gérer batterie faible (< 7% -> +30 jours)
     battery = ReadBatVoltCap()
     if battery[1] < 7:
-        next_date_s = current_date_s + (3600 * 24 * 30)
-        getLogger().warning("Low battery, delaying wakeup by 30 days")
+        # Stops the hub until battery is charged through the solar panel
+        next_date_s = current_date_s + (3600 * 24 * 3)
+        getLogger().warning("Low battery, delaying wakeup by 3 days")
 
     # Configurer le WittyPi
     next_date = SecondsToDate(next_date_s)
