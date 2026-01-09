@@ -86,7 +86,7 @@ try:
     # Lancer le tunnel SSH dans l'application Web permet de d'afficher le port SSH à utiliserdans l'application Web.
     # On ne fait que 3 tenttatives, car on a déjà essayé 25 fois dans ScanorhizeStart.py
     check_connectivity(3)
-    cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 debian@{getScanorhizeServer()}  -p 2222 -E Log/ssh.log"
+    cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 pi@{getScanorhizeServer()} -E Log/ssh.log"
     run(cmd, shell=True, capture_output=True, text=True, check=False)
     getLogger().warning(
         "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
