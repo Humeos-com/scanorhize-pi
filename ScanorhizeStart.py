@@ -33,6 +33,7 @@ from Hub import (
     SendParameters,
     syncImageFiles,
     ReadScannerConfigFromServer,
+    SendScannerConfigToServer,
     getOffline,
     getSyncImages,
     SendHubConfigToServer,
@@ -128,6 +129,10 @@ if config:
         SendParameters(Hub)
         SendHubConfigToServer()
         syncLogFiles()
+        Scanner = ScannerData()
+        for CurrentScanner in listConfigScanner():
+            Scanner.ReadScannerConfig(CurrentScanner)
+            SendScannerConfigToServer(Scanner)
         getLogger().warning("getTokens")
         getTokens()
 

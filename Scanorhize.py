@@ -803,7 +803,10 @@ def init_hub():
         # can be completed without network
         initScanners()
         getLogger().warning("End InitScanners")
-
+        Scanner = ScannerData()
+        for CurrentScanner in listConfigScanner():
+            Scanner.ReadScannerConfig(CurrentScanner)
+            SendScannerConfigToServer(Scanner)
         # Run getTokens() to get authentication tokens
         getLogger().warning("Start init-hub")
         tokens_result = getTokens()
