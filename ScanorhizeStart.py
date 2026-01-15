@@ -249,6 +249,7 @@ if not getOffline():
 
 # Etape 4 #############################################
 # On éteint le Raspberry Pi et le WittyPi
+nextStartDateValue = calculate_next_wakeup_from_crontab()
 if is_debug():  # Debug mode
     getLogger().warning(
         "Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé"
