@@ -231,6 +231,7 @@ class ScannerData:
             self.error = 0
             self.device = scanimage_message.strip()
             self.enable = 1
+            self.UseServer = 1
             getLogger().warning(
                 "scanSearch: Scanner detected successfully - device: %s, enable: %d, error: %d",
                 self.device,
