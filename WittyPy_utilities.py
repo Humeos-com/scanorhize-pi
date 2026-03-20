@@ -149,14 +149,23 @@ class WittyPi:
 
     def __init__(self):
         """Initialize the instance if not already initialized."""
+        # Ensure the attribute exists even if the singleton instance was
+        # previously created in a partially-initialized state.
+        try:
+            _ = self.i2c_address
+        except AttributeError:
+            self.i2c_address = None
+
         if not hasattr(self, "initialized"):  # Prevent re-initialization
+            # Define before any I2C attempt so is_WittyPi_* never crashes.
+            self.i2c_address = None
             try:
                 self.i2c_bus = SMBus(1)
-            except FileNotFoundError:
-                getLogger().error("ERROR: I2C bus not available")
+            except (FileNotFoundError, OSError, IOError) as e:
+                getLogger().error("ERROR: I2C bus not available: %s", e)
                 self.i2c_bus = None
                 self.initialized = True
-                return
+                raise Exception("Witty Pi non détectée / I2C bus indisponible") from None
 
             self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_3
             self.firmware_id = 0
@@ -168,7 +177,7 @@ class WittyPi:
             self.get_firmware_id()
             if self.firmware_id is None:
                 self.initialized = True
-                return
+                raise Exception("Witty Pi non détectée / I2C bus indisponible") from None
 
             self.get_reason_click()
             self.initialized = True
