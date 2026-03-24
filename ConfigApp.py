@@ -53,7 +53,7 @@ class ConfigApp:
         self.uhubctl: str = "/usr/sbin/uhubctl"
         self.usb_dir: str = "/media/pi/Image"
         self.image_dir: str = "images"
-        self.s3_bucket: str = "s3://humeos-images-prod"
+        self.s3_bucket: str = "s3://humeos-images-landing"
         self.scanorhize_server: str = "backend-prod.humeos.com"
         self.offline: bool = False
         self.th_x: int = 512
