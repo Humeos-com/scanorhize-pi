@@ -446,7 +446,7 @@ def update_version():
         )
 
     try:
-        cmd_update = "s3cmd --no-preserve sync s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
+        cmd_update = "s3cmd --no-preserve sync --delete-removed --exclude-from Scanorhize/s3exclude.txt s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
         getLogger().warning("Update version: %s", cmd_update)
         result = run(
             cmd_update,
