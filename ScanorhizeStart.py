@@ -100,6 +100,14 @@ if config:
     else:
         getLogger().error("Failed to create /run/config: %s", result.stderr)
 
+    #Activation de l'AP
+    getLogger().warning("Lancement du point d'accès (192.168.4.1)")
+    try:
+        run("sudo nmcli con up hub_AP", shell=True, check=True)
+        getLogger().warning("AP activé")
+    except Exception as e:
+        getLogger().error("Echec activation AP : %s", e)
+        
     # Run initScanners() to initialize scanners
     # Init Scanners before getting tokens, because this operation
     # can be completed without network
