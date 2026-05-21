@@ -68,6 +68,8 @@ if args.version:
     sys.exit(0)
 
 # Etape 0 #############################################
+time.sleep(10) # Clock sync
+
 getLogger().warning("ScanorhizeStart.py version: %s", __version__)
 
 # On regarde si on est en mode configuration
