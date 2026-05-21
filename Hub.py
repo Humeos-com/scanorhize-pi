@@ -81,7 +81,8 @@ class HubData:
         self.send_thumbnails_only: bool = False
         # Action à faire si on dépasse la température
         # 0: None, 1: Shutdown, 2: Startup
-        self.over_temperature_action: int = 1
+        # sur wp5, 0 : none, 1:startup, 2: shutdown
+        self.over_temperature_action: int = 2
         # Point de température à partir duquel on dépasse la température
         self.over_temperature_point: int = 68
         # Reverse tunnel SSH port pour la maintenance à distance
@@ -693,6 +694,8 @@ def calculate_next_wakeup_from_crontab():
     getLogger().warning(
         "Next wakeup scheduled at: %s (from crontab: %s)", next_date, schedule
     )
+    getLogger().warning(
+        "Next shutdown scheduled at: %s", shutdown_time)
 
     return next_date
 

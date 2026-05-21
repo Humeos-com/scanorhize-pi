@@ -106,6 +106,9 @@ class ScannerData:
         fullpath = os.path.join(getConfigDir(), file)
         json_data = self.json()
         try:
+            if not os.path.exists(getConfigDir()):
+                getLogger().warning("Creating directory: %s", getConfigDir())
+                os.makedirs(getConfigDir(), exist_ok=True)
             with open(fullpath, "w", encoding="utf-8") as outfile:
                 outfile.write(json_data)
         except OSError as e:
@@ -161,100 +164,6 @@ class ScannerData:
             return 1
 
         return 0
-
-    def scanSearch(self, i_scan: int):
-        """Recherche le scanner et enregistre le numéro de série
-        on regarde le port USB pour enregistrer le #serie du scanner
-
-        "scanimage" renvoie toujour 0
-        On utilise scanimage -f '%d' pour avoir uniquement le device !!!
-
-        Soit il n'y a pas de scanner et on ne reçoit rien:
-        ~/Scanorhize $ scanimage -f '%d'
-        ~/Scanorhize $ echo $?
-        0
-        ~/Scanorhize $
-
-        Soit il y a un scanner et on reçoit le message:
-        ~/Scanorhize $ scanimage -f '%d'
-        Pour les scanners Canon LIDE 400 ou LIDE 300, on reçoit:
-        pixma:04A91912_43C7A6
-        Pour les scanners Epson, on reçoit:
-        epsonscan2:Epson Perfection V39II:XBZZ029435:esci2:usb:ES0283:319
-        ~/Scanorhize $
-        """
-
-        getLogger().warning(
-            "scanSearch: Starting scanner detection for port %d", i_scan + 1
-        )
-        error = TurnUsbOn(i_scan, 5)
-        if error != 0:
-            self.error = 1
-            getLogger().warning("scanSearch: TurnUsbOn failed with error %d", error)
-            return self
-
-        res = 1
-        # attribut par défaut si on ne trouve rien
-        scanimage_message = "No scanners were identified"
-        if is_raspberry_pi():
-            command = f"scanimage -f '%d' " f"| tee -a {DISPLAY_FILE}"
-            getLogger().warning("scanSearch: Executing command: %s", command)
-            result = run(
-                command,
-                capture_output=True,
-                universal_newlines=True,
-                shell=True,
-                check=False,
-            )
-            res = result.returncode
-            scanimage_message = result.stdout
-            getLogger().warning(
-                "scanSearch: Command result - returncode: %d, stdout: '%s', stderr: '%s'",
-                res,
-                scanimage_message,
-                result.stderr,
-            )
-            if len(scanimage_message) == 0:
-                res = 1
-                getLogger().warning(
-                    "scanSearch: Empty scanimage output, setting res to 1"
-                )
-        else:
-            # fake scanimage message
-            res = 0
-            scanimage_message = """pixma:00000_ABABAB"""
-            getLogger().warning(
-                "scanSearch: Using fake scanimage message: %s", scanimage_message
-            )
-
-        if res == 0 and len(scanimage_message.strip()) > 0:
-            self.error = 0
-            self.device = scanimage_message.strip()
-            self.enable = 1
-            self.UseServer = 1
-            getLogger().warning(
-                "scanSearch: Scanner detected successfully - device: %s, enable: %d, error: %d",
-                self.device,
-                self.enable,
-                self.error,
-            )
-        else:
-            self.error = 1
-            self.device = "NoScannerDetected"
-            self.enable = 0
-            self.UseServer = 0
-            # On ne reinitalise pas tous les attributs car on peut être offline
-            # self.projectId = ""
-            # self.sampleId = ""
-            # self.token = "token"
-            getLogger().warning("scanSearch: No scanner detected")
-
-        getLogger().warning("scanSearch: device %s", self.device)
-        TurnUsbOff(i_scan, 0)
-        if self.error > 0:
-            getLogger().error("scanSearch: error: %s, %s", result.stdout, result.stderr)
-
-        return self
 
     def scanSearchAll(self):
         """Renvoie une liste des ID de tous les scanners branchés (tous ports simultanément)."""
@@ -396,18 +305,10 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         getLogger().warning("Scanner %s is disabled", str(i_scan + 1))
         return scanner
 
-    getLogger().warning("scanAcq: on allume le port USB: %s", i_scan + 1)
-    error = TurnUsbOn(i_scan, scanner.TimeBeforeScan)
-    if error != 0:
-        scanner.error = 1
-        return scanner
-
     if scanner.device == "NoScannerDetected":
         option_device = ""
     else:
-        option_device = f" --device={scanner.device}"
-    # On n'utilise pas le device pour l'instant, car sinon, il faut respecter le cablage...
-    option_device = ""
+        option_device = f' --device="{scanner.device}"'
     command = (
         f"scanimage {option_device} "
         f"--mode={scanner.mode} "
@@ -422,7 +323,6 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     res = 1
     i = 0
     while res != 0 and i < 2:
-        # print("i=",i)
         getLogger().warning("scanAcq: try %s", i + 1)
         if is_raspberry_pi():
             result = run(
@@ -444,9 +344,6 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
                 res = 12
             scanner.error = res
         i += 1
-    # On a un timer de manière à ce que le charriot des Canon LIDE 400
-    # revienne à la position de départ
-    TurnUsbOff(i_scan, scanner.TimeAfterScan)
     if scanner.error > 0:
         getLogger().error("error acquisition: " + result.stdout + result.stderr)
         return scanner

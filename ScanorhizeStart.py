@@ -89,6 +89,7 @@ nextStartDateValue = calculate_next_wakeup_from_crontab()
 
 if config:
     getLogger().warning("On passe en mode config")
+    calculate_next_wakeup_from_crontab()
     # On cree un fichier /run/config pour indiquer aux shells qu'on est en mode config
     cmd = "sudo touch /run/config >> Log/Scanorhize.log 2>&1"
     getLogger().warning(cmd)
