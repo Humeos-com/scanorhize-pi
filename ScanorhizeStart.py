@@ -107,7 +107,7 @@ if config:
         getLogger().warning("AP activé")
     except Exception as e:
         getLogger().error("Echec activation AP : %s", e)
-        
+
     # Run initScanners() to initialize scanners
     # Init Scanners before getting tokens, because this operation
     # can be completed without network
@@ -152,7 +152,7 @@ if config:
     getLogger().warning("IP: %s", GetIP())
 
     # En principe, on éteint le Raspberry Pi depuis l'application Web Scanorhize.py
-    cmd = "nohup python3 Scanorhize.py >> Log/Scanorhize.log 2>&1 &"
+    cmd = "nohup python3 Scanorhize.py >> Log/Scanorhize.log 2>&1"
     getLogger().warning(cmd)
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
