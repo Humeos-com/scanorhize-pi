@@ -28,14 +28,11 @@ Pin Array: {{ pin_array }}</pre>
 					</div>
 					
 					<div class="form-check mb-3">
-						<input type="checkbox" class="form-check-input" id="send_thumbnails_only" name="send_thumbnails_only" {% if send_thumbnails_only or auto_check_thumbnails_only %}checked{% endif %}>
+						<input type="checkbox" class="form-check-input" id="send_thumbnails_only" name="send_thumbnails_only" {% if send_thumbnails_only %}checked{% endif %}>
 						<label class="form-check-label" for="send_thumbnails_only">
 							Send thumbnails only
-							{% if auto_check_thumbnails_only %}
-							<span class="badge bg-info text-dark">Auto-enabled (resolution >= 600 dpi)</span>
-							{% endif %}
 						</label>
-						<small class="form-text text-muted">Send only thumbnails to server, JP2 and JSON remain on USB (recommended for resolutions >= 600dpi)</small>
+						<small class="form-text text-muted">Send only thumbnails to server, JP2 and JSON remain on USB</small>
 					</div>
 					
 					<div class="form-check mb-3">

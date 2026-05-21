@@ -403,21 +403,6 @@ def HubPage():
     # Get output message from query parameters if it exists and sanitize it
     output = sanitize_output(request.args.get("output", None))
 
-    # Check if any active scanner has resolution >= 600 dpi for auto-check
-    auto_check_thumbnails_only = False
-    listScannerconfigs = listConfigScanner()
-    for scanner_config in listScannerconfigs:
-        scanner = ScannerData()
-        scanner.ReadScannerConfig(scanner_config)
-        if scanner.enable:
-            try:
-                resolution = int(scanner.resolution)
-                if resolution >= 600:
-                    auto_check_thumbnails_only = True
-                    break
-            except (ValueError, TypeError):
-                pass  # Skip invalid resolution values
-
     return render_template(
         "Hub.html",
         hub_config=hub_config,
@@ -429,7 +414,6 @@ def HubPage():
         offline=Hub.offline,
         sync_images=Hub.sync_images,
         send_thumbnails_only=Hub.send_thumbnails_only,
-        auto_check_thumbnails_only=auto_check_thumbnails_only,
         todo=Hub.todo,
         acquisition_schedule=Hub.acquisition_schedule,
         output=output,
