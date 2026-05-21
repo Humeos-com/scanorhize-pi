@@ -256,6 +256,15 @@ class ScannerData:
 
         return self
 
+    def scanSearchAll(self):
+        """Renvoie une liste des ID de tous les scanners branchés (tous ports simultanément)."""
+        if is_raspberry_pi():
+            command = "scanimage -f '%d%n'"
+            result = run(command, capture_output=True, universal_newlines=True, shell=True)
+            if result.returncode == 0 and result.stdout.strip():
+                return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return []
+
 
 def extract_serial(device_string: str) -> str:
     """Extract serial number from device string
@@ -549,50 +558,39 @@ def listScannerSerials():
 
 
 def listConfigScanner():
-
-    # Pour l'instant, on prend les 3 fichiers de configuration
-    # try:
-    #    # de la forme Scanner-[1-9].json
-    #    listfile = [
-    #        f for f in os.listdir(getConfigDir()) if re.match(r"^Scanner-[1-9].json$", f)
-    #    ]
-    #    listfile.sort(reverse=False)
-    #    getLogger().warning(str(listfile))
-    # except OSError:
-    listfile = ["Scanner-1.json", "Scanner-2.json", "Scanner-3.json"]
-    return listfile
+    return [f"Scanner-{i}.json" for i in range(1, 6)]
 
 
 def initScanners():
-    """Operation à l'initialisation du Hub.
-    Lorsqu'il n'y a aucun fichier de configuration.
-    Brancher les scanners sur les ports USB et lancer
-    l'initScanner. On va chercher les scanners sur les 3 ports
-    et on va écrire leur configuration."""
-    scanner = ScannerData()
-    listScannerconfigs_ = ["Scanner-1.json", "Scanner-2.json", "Scanner-3.json"]
-    i_scan = 0
-    for CurrentScanner in listScannerconfigs_:
-        scanner.ReadScannerConfig(CurrentScanner)
-        scanner.scanSearch(i_scan)
-        # Only set timing parameters if scanner was detected successfully
-        if scanner.error == 0:
-            scanner.TimeBeforeScan = (
-                TIME_BEFORE_SCAN_PIXMA if scanner.is_pixma() else TIME_BEFORE_SCAN_EPSON
-            )
-            scanner.TimeAfterScan = (
-                TIME_AFTER_SCAN_PIXMA if scanner.is_pixma() else TIME_AFTER_SCAN_EPSON
-            )
-            getLogger().warning("Scanner-%d: Scanner detected and enabled", i_scan + 1)
-        else:
-            getLogger().warning("Scanner-%d: No scanner detected, disabled", i_scan + 1)
+    """Répertorie tous les scanners branchés simultanément et crée leurs fichiers de config."""
+    listfile = listConfigScanner()
 
-        # Always write the configuration
-        scanner.WriteScannerConfig(CurrentScanner)
-        getLogger().warning("Scanner-%d: Configuration written", i_scan + 1)
-        i_scan += 1
-    if i_scan == 0:
-        getLogger().warning("initScanners: Aucun scanner trouvé")
+    # Récupère tous les devices connectés en une seule passe
+    devices_found = ScannerData().scanSearchAll()
+    getLogger().warning("initScanners: %d scanner(s) détecté(s)", len(devices_found))
+
+    for i, current_file in enumerate(listfile):
+        scanner = ScannerData()  # objet neuf à chaque itération — pas de fuite entre scanners
+        scanner.ReadScannerConfig(current_file)
+
+        if i < len(devices_found):
+            scanner.device = devices_found[i]
+            scanner.enable = 1
+            scanner.error = 0
+            if scanner.is_pixma():
+                scanner.TimeBeforeScan = TIME_BEFORE_SCAN_PIXMA
+                scanner.TimeAfterScan = TIME_AFTER_SCAN_PIXMA
+            else:
+                scanner.TimeBeforeScan = TIME_BEFORE_SCAN_EPSON
+                scanner.TimeAfterScan = TIME_AFTER_SCAN_EPSON
+            getLogger().warning("initScanners: %s associé à %s", current_file, scanner.device)
+        else:
+            scanner.device = "NoScannerDetected"
+            scanner.enable = 0
+            scanner.error = 0
+            getLogger().warning("initScanners: %s — aucun scanner physique", current_file)
+
+        scanner.WriteScannerConfig(current_file)
 
 
 if __name__ == "__main__":
