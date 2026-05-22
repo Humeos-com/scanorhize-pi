@@ -4,6 +4,8 @@
 import sys
 from subprocess import run, SubprocessError, CalledProcessError
 from time import sleep
+import socket
+import requests
 
 from DateUtils import GetCurrentDate
 from WittyPy_utilities import (
@@ -146,6 +148,7 @@ def pingAPI(address):
     try:
         run(["ping", "-c 1", address], capture_output=True, text=True, check=True)
         getLogger().warning("Ping OK: %s", address)
+        print(f"    → Humeos Ping OK")
         return 1
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("Ping Error: %s", e)
@@ -162,19 +165,91 @@ def disable4G():
     return disable_4g()
 
 
-def check_connectivity(max_attempts=25):
-    """Check connectivity to the server with retries
-    25 retries = 2 minutes"""
-    res = 0
-    iteration = 0
-    while res == 0 and iteration < max_attempts:
-        res = pingAPI(getScanorhizeServer())
-        if is_raspberry_pi():
+def check_network_route(timeout=3):
+    """
+    Check whether the device has a basic network route available.
+
+    Attempts to open a TCP connection to a reliable external server
+    (Cloudflare DNS: 1.1.1.1 on port 53).
+
+    This verifies:
+    - the network interface is up,
+    - routing is available,
+    - outbound traffic is possible.
+
+    It does NOT guarantee that full Internet access or DNS resolution works.
+    """
+    
+    try:
+        socket.create_connection(("1.1.1.1", 53), timeout=timeout)
+        print(f"    → Network route OK")
+        return True
+    except OSError:
+        return False
+
+
+def check_http_connection(url="https://clients3.google.com/generate_204", timeout=5):
+    """
+    Check whether full Internet access is available.
+
+    Sends an HTTP GET request to a lightweight endpoint expected
+    to return HTTP status code 204 (No Content).
+
+    This verifies:
+    - DNS resolution,
+    - TCP connectivity,
+    - HTTPS communication,
+    - real Internet access.
+    """
+    
+    try:
+        response = requests.get(url, timeout=timeout)
+        print(f"    → Google 204 OK")
+        return response.status_code == 204
+
+    except requests.RequestException:
+        return False
+
+
+def check_connectivity(max_attempts=25, min_number_of_successes=5):
+    print("checking connectivity....")
+        
+    for attempt in range(1, max_attempts + 1):
+
+        # Step 1: Check network route
+        if not check_network_route():
+            print(f"    → [{attempt}/{max_attempts}] No network route")
             sleep(5)
-        iteration += 1
-    if iteration == max_attempts:
-        getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
-        raise RuntimeError("Pas de connectivité !")
+            continue
+
+        # Step 2: Check Internet access
+        if not check_http_connection():
+            print(f"    → [{attempt}/{max_attempts}] HTTP connection failed")
+            sleep(5)
+            continue
+            
+        # Step 3: Ping Humeos server
+        if not pingAPI(getScanorhizeServer()):
+            print(f"    → [{attempt}/{max_attempts}] Humeos Ping failed")
+            sleep(5)
+            continue
+
+        min_number_of_successes -= 1
+        if min_number_of_successes > 0:
+            print(f"    → [{attempt}/{max_attempts}] Internet OK... but let's try it again {min_number_of_successes} more time"
+                f"{'s' if min_number_of_successes > 1 else ''}..."
+            )
+            sleep(5)
+            continue
+        
+        print(f"    → [{attempt}/{max_attempts}] Internet OK")
+        return True
+        
+
+
+    # Failes to get Internet connection
+    getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
+    raise RuntimeError("Pas de connectivité !")
 
 
 def InitGPIO():
