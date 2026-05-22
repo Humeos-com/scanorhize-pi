@@ -100,6 +100,11 @@ class ConfigApp:
             os.path.expanduser(self.log_dir),
             f"Scanorhize_{datetime.now():%Y-%m-%d}.log",
         )
+
+        # Create log folder if does not exist        
+        log_dir = os.path.dirname(log_file)
+        os.makedirs(log_dir, exist_ok=True)
+
         fh = logging.FileHandler(log_file)
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
