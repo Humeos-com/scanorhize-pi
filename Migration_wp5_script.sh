@@ -10,7 +10,7 @@ set -e  # Exit on error
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+BLUE='\e[94m'
 NC='\033[0m'
 
 log()     { echo -e "${GREEN}[OK]${NC} $1"; }
@@ -283,10 +283,51 @@ SVCEOF
     log "scanorhize-startup service created and enabled"
 fi
 
+
 # =============================================================================
-# 5. PYTHON FILES TRANSFER NOTE
+# 5. CREATE UPLOAD-PICTURES SERVICE
 # =============================================================================
-section "5 - Python files transfer (manual step)"
+section "5 - upload-pictures service"
+
+SERVICE_FILE="/etc/systemd/system/upload-pictures.service"
+
+if [ -f "$SERVICE_FILE" ]; then
+    warn "upload-pictures service already exists, overwriting..."
+fi
+info "Creating $SERVICE_FILE..."
+if true; then
+
+read -p "  AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
+read -p "  AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
+
+    cat > "$SERVICE_FILE" << SVCEOF
+[Unit]
+Description=Upload pictures
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Scanorhize
+ExecStart=/bin/bash -c '/home/pi/Scanorhize/upload_pictures_s3.sh >> /home/pi/Scanorhize/Log/upload-pictures.log 2>&1'
+Restart=always
+RestartSec=10
+Environment=AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+Environment=AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+Environment=AWS_DEFAULT_REGION=eu-west-3
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+    systemctl enable upload-pictures.service
+    log "upload-pictures service created and enabled"
+fi
+
+
+# =============================================================================
+# 6. PYTHON FILES TRANSFER NOTE
+# =============================================================================
+section "6 - Python files transfer (manual step)"
 
 echo ""
 info "Python file changes are NOT applied automatically by this script."
@@ -311,8 +352,9 @@ echo "  [OK] wittypi (WP4) service stopped and disabled"
 echo "  [OK] WP4 files removed"
 echo "  [OK] WittyPi 5 installed (wp5d.service running)"
 echo "  [OK] scanorhize-startup service created"
+echo "  [OK] upload-pictures service created"
 echo ""
-warn "Remember to transfer the modified Python files (see section 5)"
+warn "Remember to transfer the modified Python files (see section 6)"
 warn "A reboot is recommended to validate all changes"
 echo ""
 read -p "Reboot now? [y/N] " REBOOT
