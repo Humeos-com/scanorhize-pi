@@ -6,6 +6,9 @@ import sys
 from subprocess import run, CalledProcessError
 from time import sleep  # Add this import
 import argparse
+import shutil
+from pathlib import Path
+
 from flask import (
     Flask,
     render_template,
@@ -477,6 +480,190 @@ def AppPage():
     return render_template(
         "App.html", app_config=app_config, **get_common_template_vars()
     )
+
+
+@app.route("/Tests", methods=["GET"])
+def TestsPage():
+    return render_template("Tests.html", **get_common_template_vars())
+
+
+@app.route("/tests/run/<test_name>", methods=["GET"])
+def run_test(test_name: str):
+    try:
+        if test_name == "internet":
+            try:
+                check_connectivity(1)
+                return jsonify(ok=True, message="Internet connection is available.")
+            except RuntimeError as e:
+                return jsonify(ok=False, message=str(e))
+
+        if test_name == "s3":
+            config = ConfigApp()
+            result = run(
+                f"s3cmd ls {config.s3_bucket}",
+                shell=True, capture_output=True, text=True, check=False,
+            )
+            if result.returncode == 0:
+                return jsonify(ok=True, message=f"S3 bucket {config.s3_bucket} is accessible using `s3cmd`.", next_test="s3-test")
+                
+            return jsonify(ok=False, message=result.stderr or "Could not reach {config.s3_bucket} bucket.")
+            
+        if test_name == "s3-test":
+            config = ConfigApp()
+            result = run(
+                f"s3cmd ls s3://humeos-test",
+                shell=True, capture_output=True, text=True, check=False,
+            )
+            if result.returncode == 0:
+                return jsonify(ok=True, message=f"S3 bucket s3://humeos-test is accessible using `s3cmd`.")
+                
+            return jsonify(ok=False, message=result.stderr or "Could not reach s3://humeos-test bucket.")
+
+        if test_name == "ssh":
+            result = run(
+                "pgrep -a ssh", shell=True, capture_output=True, text=True, check=False
+            )
+            if result.returncode == 0:
+                return jsonify(ok=True, message=f"Active SSH processes:\n{result.stdout}")
+            return jsonify(ok=False, message="No active SSH tunnel found.")
+
+        if test_name == "scanners":
+            configs = listConfigScanner()
+            if not configs:
+                return jsonify(ok=False, message="No scanner config files found.")
+            lines = []
+            for cfg in configs:
+                scanner = ScannerData()
+                scanner.ReadScannerConfig(cfg)
+                lines.append(f"  {cfg}: projectId={scanner.projectId}, sampleId={scanner.sampleId}")
+            return jsonify(ok=True, message="Scanner configs found:\n" + "\n".join(lines), summary=f"{len(lines)} scanner config file(s) found")
+            
+        if test_name == "upload-pictures-service":
+            try:
+                result = run(
+                    ["systemctl", "is-active", "upload-pictures"],
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.stdout.strip() == "active":
+                    return jsonify(ok=True, message="Upload Pictures service is active.", next_test="copy-test-picture")
+                    
+                else:
+                    return jsonify(ok=False, message=f"Upload Pictures service status: {result.stdout.strip()}")
+
+            except Exception as e:
+                return jsonify(ok=False, message="Upload Pictures service status is not 'active'")
+                
+        if test_name == "copy-test-picture":
+            configs = listConfigScanner()
+            if not configs:
+                return jsonify(ok=False, message="No scanner config files found.")
+            for cfg in configs:
+                scanner = ScannerData()
+                scanner.ReadScannerConfig(cfg)
+                if scanner.projectId and scanner.sampleId:
+                    from datetime import datetime
+                    now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    testFile = "/home/pi/Scanorhize/static/1.jpg"
+                    destFile = f"/media/pi/Image/{scanner.projectId}/{scanner.sampleId}/test_{now}.jpg"
+                    source = Path(testFile)
+                    destination = Path(destFile)
+
+                    try:
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy(source, destination)
+                        now = datetime.now().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+                        return jsonify(ok=True, message=f"Test file {testFile} copied to {destFile}\n[{now}] <b style='color:orange;'>⌛ IN PROGRESS</b>: Test picture is waiting to be uploaded to server", next_test="wait-for-pictures-upload")
+
+                    except FileNotFoundError:
+                        return jsonify(ok=False, message=f"Test file {testFile} not found.")
+                        
+                    except Exception as e:
+                        return jsonify(ok=False, message=str(e))
+                        
+                    break
+            
+            return jsonify(ok=False, message="No scanner config files found.")
+            
+        if test_name == "wait-for-pictures-upload":
+            configs = listConfigScanner()
+            if not configs:
+                return jsonify(ok=False, message="No scanner config files found.")
+            for cfg in configs:
+                scanner = ScannerData()
+                scanner.ReadScannerConfig(cfg)
+                if scanner.projectId and scanner.sampleId:
+                    from datetime import datetime
+                    destFile = f"/media/pi/Image/{scanner.projectId}/{scanner.sampleId}"
+                    destination = Path(destFile)
+                    
+                    file_count = sum(1 for f in destination.iterdir() if f.is_file())
+
+                    if file_count == 0:
+                        return jsonify(ok=True, message=f"Test picture uploaded to server (no more pictures in folder)")
+                    else:
+                        sleep(3)
+                        return jsonify(processing=True, message=f"Uploading {file_count} picture(s) to server", next_test="wait-for-pictures-upload")
+
+        if test_name == "speed":
+            import time
+            from datetime import datetime
+            local_path = "/tmp/2MB.jpg"
+            s3_path = "s3://humeos-test/tests/2MB.jpg"
+
+            try:
+                # -------------------
+                # DOWNLOAD
+                # -------------------
+                t0 = time.time()
+
+                run(
+                    ["s3cmd", "--force", "get", s3_path, local_path],
+                    check=True
+                )
+
+                t1 = time.time()
+
+                download_time = t1 - t0
+                size_bytes = os.path.getsize(local_path)
+                download_speed = (size_bytes / (1024 * 1024)) / download_time
+
+                # -------------------
+                # UPLOAD
+                # -------------------
+                t2 = time.time()
+
+                run(
+                    ["s3cmd", "put", local_path, s3_path],
+                    check=True
+                )
+
+                t3 = time.time()
+
+                upload_time = t3 - t2
+                upload_speed = (size_bytes / (1024 * 1024)) / upload_time
+
+                return jsonify(
+                    ok=True,
+                    message=(
+                        f"Download: {download_time:.2f}s ({download_speed:.2f} MB/s) | "
+                        f"Upload: {upload_time:.2f}s ({upload_speed:.2f} MB/s)"
+                    ),
+                    summary=(
+                        f"Download: {download_time:.2f}s ({download_speed:.2f} MB/s) | "
+                        f"Upload: {upload_time:.2f}s ({upload_speed:.2f} MB/s)"
+                    )
+                )
+
+            except Exception as e:
+                return jsonify(ok=False, message=str(e))
+                       
+        
+        return jsonify(ok=False, message=f"Unknown test: {test_name}")
+
+    except Exception as e:
+        return jsonify(ok=False, message=str(e))
 
 
 @app.route("/get-app-config", methods=["GET"])

@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{%block content%}
+
+<div class="container">
+    <h1>Tests</h1>
+
+    <!-- =========================
+         MASTER TEST CONTROLS
+    ========================== -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Master</h4>
+        </div>
+
+        <div class="card-body">
+            <!-- Runs every test sequentially -->
+            <button class="btn btn-primary me-2 run-test-btn run-all-btn"
+                    onclick="runAll()">
+                Run all
+            </button>
+        </div>
+    </div>
+
+    <!-- =========================
+         CONNECTIVITY TESTS
+    ========================== -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Connectivity</h4>
+        </div>
+
+        <div class="card-body">
+
+            <!-- Internet connectivity test -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('internet', true)">
+                Internet
+            </button>
+
+            <!-- AWS S3 bucket accessibility test -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('s3', true)">
+                S3 Bucket
+            </button>
+
+            <!-- SSH tunnel availability test -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('ssh', true)">
+                SSH Tunnel
+            </button>
+
+            <!-- Upload pictures service test -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('upload-pictures-service', true)">
+                ↑ Upload pictures service
+            </button>
+
+            <!-- Download/upload speed test -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('speed', true)">
+                ↓↑ Speed test
+            </button>
+        </div>
+    </div>
+
+    <!-- =========================
+         HARDWARE TESTS
+    ========================== -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Hardware</h4>
+        </div>
+
+        <div class="card-body">
+
+            <!-- Scanner hardware test -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('scanners', true)">
+                Scanners
+            </button>
+
+        </div>
+    </div>
+
+    <!-- =========================
+         TEST RESULTS OUTPUT
+    ========================== -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Results</h4>
+        </div>
+
+        <div class="card-body">
+
+            <!-- Console-like output area -->
+            <pre id="test-output"
+                 class="bg-light p-3"
+                 style="min-height: 100px;
+                        max-height: 400px;
+                        overflow-y: auto;
+                        white-space: pre-wrap;">
+            </pre>
+
+        </div>
+    </div>
+</div>
+
+<script>
+
+document.getElementById('test-output').innerHTML = ""
+
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
+
+// True when "Run all" mode is active
+let runningAll = false
+
+// Currently running button element
+let runningTestBtn
+
+// Stores summary results for all tests
+let allTestResults = ""
+
+
+/* =========================================================
+   RUN ALL TESTS
+========================================================= */
+
+/**
+ * Starts sequential execution of all tests.
+ */
+function runAll() {
+
+    // Reset previous summary results
+    allTestResults = ""
+
+    // Enable "run all" mode
+    runningAll = true
+
+    // Find first test button (excluding Run All button)
+    runningTestBtn =
+        document.querySelector('.run-test-btn:not(.run-all-btn)');
+
+    // Trigger first test
+    runningTestBtn.click();
+}
+
+
+/* =========================================================
+   RESET BUTTON STATES
+========================================================= */
+
+/**
+ * Re-enables all test buttons and resets global state.
+ */
+function initTestButtonStates() {
+
+    // Select every test button
+    const testButtons =
+        document.querySelectorAll('.run-test-btn');
+
+    // Re-enable buttons
+    testButtons.forEach(button => {
+        button.disabled = false;
+    });
+
+    // Reset current running button
+    runningTestBtn = null
+
+    // Disable run-all mode
+    runningAll = false
+}
+
+
+/* =========================================================
+   RUN SINGLE TEST
+========================================================= */
+
+/**
+ * Runs a test by name.
+ *
+ * @param {string} testName
+ *      Name of backend test endpoint.
+ *
+ * @param {boolean} showTestName
+ *      Whether to display "Running..." message.
+ */
+function runTest(testName, showTestName) {
+
+    // Disable all buttons while a test runs
+    const testButtons = document.querySelectorAll('.run-test-btn');
+
+    testButtons.forEach(button => {
+        button.disabled = true;
+    });
+
+    // Output console element
+    const output = document.getElementById('test-output');
+
+    // Current timestamp
+    const now = new Date().toLocaleString();
+
+    /* -----------------------------------------------------
+       DISPLAY RUNNING MESSAGE
+    ----------------------------------------------------- */
+
+    if (showTestName) {
+        output.innerHTML += `[${now}] Running <b>${testName}</b> test...`
+        // Scroll page + output area to bottom
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    /* -----------------------------------------------------
+       CALL BACKEND TEST ENDPOINT
+    ----------------------------------------------------- */
+
+    fetch('/tests/run/' + testName)
+        // Parse JSON response
+        .then(response => response.json())
+        .then(data => {
+            /* ---------------------------------------------
+               DISPLAY TEST RESULT
+            --------------------------------------------- */
+            output.innerHTML +=`<br>[${now}] ${data.processing ? '<b style="color:orange;">⌛ IN PROGRESS</b>' : (data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>')}: ${data.message}`;
+
+            /* ---------------------------------------------
+               SAVE SUMMARY RESULTS
+            --------------------------------------------- */
+
+            if (runningAll == true) {
+                if (data.summary) {
+                    allTestResults += `<br>         → ${data.summary}`
+                }
+            }
+            else if (data.next_test == null) {
+                // Re-enable buttons if not in run-all mode
+                initTestButtonStates()
+            }
+
+            /* ---------------------------------------------
+               HANDLE MULTI-STEP TESTS
+            --------------------------------------------- */
+
+            if (data.next_test) {
+                // Automatically launch next backend test
+                runTest(data.next_test, false)
+            }
+
+            /* ---------------------------------------------
+               TEST FINISHED
+            --------------------------------------------- */
+
+            else {
+                // Separator line
+                output.innerHTML += `<hr>`
+
+                /* -----------------------------------------
+                   RUN NEXT TEST IN RUN-ALL MODE
+                ----------------------------------------- */
+
+                if (
+                    data.ok &&
+                    runningAll == true &&
+                    runningTestBtn
+                ) {
+
+                    // Get all test buttons except "Run all"
+                    const runTestButtons = [...document.querySelectorAll('.run-test-btn:not(.run-all-btn)')];
+
+                    // Move to next test button
+                    runningTestBtn = runTestButtons[runTestButtons.indexOf(runningTestBtn) + 1] || null;
+
+                    // Launch next test
+                    if (runningTestBtn) {
+                        setTimeout(() => {
+                            // Temporarily enable button
+                            runningTestBtn.disabled = false;
+                            // Trigger click
+                            runningTestBtn.click();
+                            // Disable again during processing
+                            runningTestBtn.disabled = true;
+                        }, 2000)
+                    }
+
+                    /* -------------------------------------
+                       ALL TESTS PASSED
+                    ------------------------------------- */
+
+                    else {
+                        initTestButtonStates()
+                        output.innerHTML +=`<br>[${now}] <b style="color:green;">✔ PASSED: </b>${allTestResults}`;
+                    }
+                }
+
+                /* -----------------------------------------
+                   TEST FAILED / NORMAL EXIT
+                ----------------------------------------- */
+                else {
+                    initTestButtonStates()
+                }
+            }
+
+            /* ---------------------------------------------
+               AUTO SCROLL OUTPUT
+            --------------------------------------------- */
+
+            document.documentElement.scrollTop = document.documentElement.scrollHeight;
+            output.scrollTop = output.scrollHeight;
+        })
+
+        /* -------------------------------------------------
+           FETCH ERROR
+        ------------------------------------------------- */
+
+        .catch(error => {
+            output.innerHTML +=`<br>[${now}]<b style="color:red;">✘ ERROR</b>: ${error}<hr>`;
+
+            // Scroll to bottom
+            document.documentElement.scrollTop = document.documentElement.scrollHeight;
+            output.scrollTop = output.scrollHeight;
+
+            // Reset buttons
+            initTestButtonStates()
+        });
+}
+
+</script>
+
+{%endblock%}
