@@ -211,7 +211,7 @@ def check_http_connection(url="https://clients3.google.com/generate_204", timeou
         return False
 
 
-def check_connectivity(max_attempts=25, min_number_of_successes=5):
+def check_connectivity(max_attempts=25, min_number_of_successes=1):
     print("checking connectivity....")
         
     for attempt in range(1, max_attempts + 1):

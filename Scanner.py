@@ -459,6 +459,8 @@ def listConfigScanner():
 
 
 def initScanners():
+    getLogger().warning("Start InitScanners")
+    
     """Répertorie tous les scanners branchés simultanément et crée leurs fichiers de config."""
     listfile = listConfigScanner()
 
@@ -488,6 +490,8 @@ def initScanners():
             getLogger().warning("initScanners: %s — aucun scanner physique", current_file)
 
         scanner.WriteScannerConfig(current_file)
+        
+    getLogger().warning("End InitScanners")
 
 
 if __name__ == "__main__":
