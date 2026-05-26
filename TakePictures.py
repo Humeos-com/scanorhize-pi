@@ -67,6 +67,8 @@ if res != 0:
 Scanner = ScannerData()
 listScannerconfigs = listConfigScanner()
 scanning_error = 0
+pictures_taken = 0
+scanner_ids = []
 
 i_scan = 0
 for CurrentScanner in listScannerconfigs:
@@ -75,6 +77,8 @@ for CurrentScanner in listScannerconfigs:
         getLogger().warning("Scanner %s is disabled", str(i_scan + 1))
         i_scan = i_scan + 1
         continue
+
+    scanner_ids.append(f"{Scanner.projectId}/{Scanner.sampleId}")
 
     data = "Scanner file: " + CurrentScanner
     getLogger().warning(data)
@@ -96,6 +100,7 @@ for CurrentScanner in listScannerconfigs:
             copyerror = CopyImageToUSB(Scanner, FolderImage)
             if copyerror == 0:
                 getLogger().warning("Image copied to USB")
+                pictures_taken += 1
             else:
                 getLogger().error("Error in copy to USB")
                 scanning_error = 1
@@ -106,4 +111,6 @@ for CurrentScanner in listScannerconfigs:
     i_scan = i_scan + 1
 # fin for
 
+print(f"PICTURES_TAKEN:{pictures_taken}")
+print(f"SCANNERS:{','.join(scanner_ids)}")
 sys.exit(scanning_error)

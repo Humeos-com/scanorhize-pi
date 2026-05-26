@@ -527,6 +527,22 @@ def run_test(test_name: str):
                 return jsonify(ok=True, message=f"Active SSH processes:\n{result.stdout}")
             return jsonify(ok=False, message="No active SSH tunnel found.")
 
+        if test_name == "take-pictures":
+            result = run(
+                "python3 TakePictures.py -f",
+                shell=True, capture_output=True, text=True, check=False,
+            )
+            stdout = {line.split(":")[0]: line.split(":", 1)[1]
+                      for line in result.stdout.splitlines() if ":" in line}
+            pictures_taken = int(stdout.get("PICTURES_TAKEN", 0))
+            scanners = stdout.get("SCANNERS", "")
+            scanner_list = scanners.replace(",", ", ") if scanners else "none"
+            total = len(scanners.split(",")) if scanners else 0
+
+            if result.returncode == 0:
+                return jsonify(ok=True, message=f"{pictures_taken}/{total} picture(s) taken — scanners: {scanner_list}", next_test="wait-for-pictures-upload")
+            return jsonify(ok=False, message=f"{pictures_taken}/{total} picture(s) taken — scanners: {scanner_list}\n{result.stderr or ''}")
+
         if test_name == "scanners":
             configs = listConfigScanner()
             if not configs:
