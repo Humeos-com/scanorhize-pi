@@ -7,9 +7,10 @@
 # 1. Discovers all scanners from JSON files in $CONFIG_DIR
 # 2. Reads projectId and sampleId from each scanner JSON files
 # 3. Source folders: $IMAGEFOLDER/<projectId>/<sampleId>
-# 4. Syncs files to S3 in order: JSON → JPG → JP2
-# 5. Sorts files by newest first
-# 6. Preserves folder hierarchy in S3
+# 4. Snapshots existing files at launch; new files are always uploaded first
+# 5. Re-scans after every upload: new files (JSON → JPG → JP2), then existing (JSON → JPG → JP2)
+# 6. Deletes local file on successful upload
+# 7. Preserves folder hierarchy in S3
 #
 # Notes:
 # - Requires Python3 (for JSON parsing)
@@ -20,7 +21,6 @@
 #           AWS Secret Access Key [None]: xxx
 #           Default region name [None]: eu-west-3
 #           Default output format [None]: json
-#
 #
 #
 # FREE TIP: simulate internet connection latency and packet loss (for test purposes)
@@ -35,6 +35,7 @@
 CONFIG_DIR="$HOME/Scanorhize/ConfigFile"
 IMAGEFOLDER="/media/pi/Image"
 S3_BUCKET="s3://humeos-test"   # S3 bucket
+EXISTING_FILES=""           # populated once at first launch
 
 while true; do
     echo ""
@@ -122,68 +123,76 @@ PYTHON
     done
 
     # -----------------------------
-    # 4. Function to sync files by type to S3
+    # 3b. Snapshot existing files once at launch (used to prioritize new files)
     # -----------------------------
-    sync_sorted_s3 () {
-        PATTERN="$1"
-        LABEL="$2"
+    if [ -z "$EXISTING_FILES" ]; then
+        EXISTING_FILES=$(mktemp)
+        find "${SOURCES[@]}" -type f \( -name "*.json" -o -name "*.jpg" -o -name "*.jp2" \) \
+            >> "$EXISTING_FILES" 2>/dev/null
+        echo "✔ Snapshot: $(wc -l < "$EXISTING_FILES") existing files recorded at launch"
+    fi
+
+    # -----------------------------
+    # 4. Function: upload all files one at a time, re-scanning after each upload.
+    #    Priority order on every scan: new files first, then existing (each group JSON → JPG → JP2, newest first).
+    # -----------------------------
+    sync_one_by_one () {
+        local PATTERNS=("*.json" "*.jpg" "*.jp2")
+        local LABELS=("JSON" "JPG" "JP2")
 
         echo ""
         echo "======================================"
-        echo "[SYNC] $LABEL files ($PATTERN)"
+        echo "[SYNC] Starting upload pipeline (new files first, then existing — JSON → JPG → JP2)"
         echo "======================================"
 
-        FILE_LIST=$(mktemp)
+        while true; do
+            # Re-scan after every upload: new files take priority over files present at launch
+            FILE=""
+            LABEL=""
+            for PHASE in new existing; do
+                for i in 0 1 2; do
+                    CANDIDATE=$(find "${SOURCES[@]}" -type f -name "${PATTERNS[$i]}" -printf '%T@ %p\n' 2>/dev/null \
+                        | sort -nr | cut -d' ' -f2- | while read -r path; do
+                            if [ "$PHASE" = "new" ] && ! grep -qxF "$path" "$EXISTING_FILES" 2>/dev/null; then
+                                echo "$path"; break
+                            elif [ "$PHASE" = "existing" ] && grep -qxF "$path" "$EXISTING_FILES" 2>/dev/null; then
+                                echo "$path"; break
+                            fi
+                        done | head -1)
+                    if [ -n "$CANDIDATE" ]; then
+                        FILE="$CANDIDATE"
+                        LABEL="${LABELS[$i]}"
+                        break 2
+                    fi
+                done
+            done
 
-        # Collect files from all sources
-        for SRC in "${SOURCES[@]}"; do
-            echo "Scanning: $SRC"
-            find "$SRC" -type f -name "$PATTERN" -printf '%T@ %p\n' >> "$FILE_LIST"
-        done
+            [ -z "$FILE" ] && { echo "✔ No more files to sync"; break; }
 
-        COUNT=$(wc -l < "$FILE_LIST")
-        echo "✔ Total $LABEL files found: $COUNT"
-
-        if [ "$COUNT" -eq 0 ]; then
-            echo "⚠ No $LABEL files to sync"
-            rm -f "$FILE_LIST"
-            return
-        fi
-
-        echo "Sorting newest first and uploading to S3..."
-
-        # Loop through files, newest first
-        sort -nr "$FILE_LIST" | cut -d' ' -f2- | while read -r FILE; do
-            # Preserve projectId/sampleId structure relative to IMAGEFOLDER
             REL_PATH="${FILE#$IMAGEFOLDER/}"
             S3_DEST="$S3_BUCKET/$REL_PATH"
             echo ""
-            echo "Uploading: $REL_PATH → $S3_DEST"
+            echo "[$LABEL] Uploading: $REL_PATH → $S3_DEST"
+
             if aws s3 cp "$FILE" "$S3_DEST" --only-show-errors; then
                 echo "    ✔  Upload successful"
                 echo "    → Deleting file"
-                rm "$FILE" #Remove file from USB drive
+                rm "$FILE"
             else
-                echo "    ❌ Upload failed!"
+                echo "    ❌ Upload failed! Stopping sync"
                 echo "    → Keeping file"
+                break
             fi
-            
         done
-
-        rm -f "$FILE_LIST"
-        echo "✔ Done syncing $LABEL"
     }
 
     # -----------------------------
-    # 5. Run sync pipeline in priority order
-    # .json first, then .jpg files, and .jp2 files
+    # 5. Run sync pipeline
     # -----------------------------
     echo ""
     echo "[3/5] Starting sync pipeline..."
 
-    sync_sorted_s3 "*.json" "JSON"
-    sync_sorted_s3 "*.jpg" "JPG"
-    sync_sorted_s3 "*.jp2" "JP2"
+    sync_one_by_one
 
     echo ""
     echo "======================================"
