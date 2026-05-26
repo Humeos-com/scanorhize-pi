@@ -156,7 +156,7 @@ def serve_image(filename):
 @app.route("/", methods=["POST", "GET"])
 def index():
     if request.method == "POST":
-        cmd_pkill = "sudo pkill -f ScanorhizeProcess.py"
+        cmd_pkill = "sudo pkill -f TakePictures.py"
         run(cmd_pkill, shell=True, capture_output=False, text=True, check=False)
 
     return render_template(
@@ -812,7 +812,7 @@ def init_hub():
 def scan_acq():
     getLogger().warning("Force scanners acquisition")
     try:
-        cmd_acq = "python3 ScanorhizeProcess.py -f"
+        cmd_acq = "python3 TakePictures.py -f"
         getLogger().warning("Scan Acq: %s", cmd_acq)
         result = run(cmd_acq, shell=True, capture_output=True, text=True, check=False)
         if result.returncode == 0:
