@@ -20,7 +20,7 @@ Par la suite, le Hub va se réveiller selon sa programmation, faire des acquisit
 ## Détail du fonctionnement
 Au démarrage du Raspberry, on lance la commande `/home/pi/Scanorhize/StartScanorhize.sh`<br/>
 Ce shell lance ScanorhizeStart.py qui gère les heures de réveil et d'endormissement du Hub et qui selon le mode de démarrage (appui sur le bouton ON/OFF ou réveil programmé) va lancer l'acquisition des images par le scanner ou le serveur Web en mode configuration.<br/>
-Le serveur Flask est lancé par la commande Scanorhize.py et l'acquisition par TakePictures.py
+Le serveur Flask est lancé par la commande WebServer.py et l'acquisition par TakePictures.py
 
 
 #### Mode Configuration

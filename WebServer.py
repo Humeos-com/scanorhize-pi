@@ -61,7 +61,7 @@ from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
 parser = argparse.ArgumentParser(
-    prog="Scanorhize.py",
+    prog="WebServer.py",
     usage="%(prog)s [--version]",
     epilog="""Lance l'application web de gestion des scanners""",
 )
@@ -74,11 +74,11 @@ parser.add_argument(
 )
 args = parser.parse_args()
 if args.version:
-    print(f"Scanorhize.py version: {__version__}")
+    print(f"WebServer.py version: {__version__}")
     sys.exit(0)
 
 initDisplayFile()
-getLogger().warning("Start Scanorhize.py version: %s", __version__)
+getLogger().warning("Start WebServer.py version: %s", __version__)
 Hub = HubData()
 
 try:

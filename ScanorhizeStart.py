@@ -128,7 +128,7 @@ def launchServer():
 
     #Launch server in the background
     try:
-        Popen(["python3", "Scanorhize.py"])
+        Popen(["python3", "WebServer.py"])
     except Exception as e:
         print(f"Error: {e}")
 
