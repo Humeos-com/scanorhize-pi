@@ -18,6 +18,13 @@
                     onclick="runAll()">
                 Run all
             </button>
+
+            <!-- Visible only while a test is running; aborts the in-flight request -->
+            <button class="btn btn-danger me-2" id="stop-btn"
+                    onclick="stopTests()"
+                    style="display:none;">
+                Stop
+            </button>
         </div>
     </div>
 
@@ -79,6 +86,12 @@
                 Scanners
             </button>
 
+            <!-- Trigger a forced acquisition on all scanners -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('take-pictures', true)">
+                Take pictures
+            </button>
+
         </div>
     </div>
 
@@ -121,6 +134,9 @@ let runningTestBtn
 
 // Stores summary results for all tests
 let allTestResults = ""
+
+// AbortController for cancelling the in-flight fetch request
+let abortController = null
 
 
 /* =========================================================
@@ -165,11 +181,28 @@ function initTestButtonStates() {
         button.disabled = false;
     });
 
+    // Hide stop button
+    document.getElementById('stop-btn').style.display = 'none';
+
     // Reset current running button
     runningTestBtn = null
 
     // Disable run-all mode
     runningAll = false
+}
+
+
+/* =========================================================
+   STOP RUNNING TEST
+========================================================= */
+
+/**
+ * Aborts the current in-flight fetch; the catch block handles cleanup.
+ */
+function stopTests() {
+    if (abortController) {
+        abortController.abort();
+    }
 }
 
 
@@ -195,6 +228,10 @@ function runTest(testName, showTestName) {
         button.disabled = true;
     });
 
+    // Show stop button and arm a fresh AbortController for this request
+    document.getElementById('stop-btn').style.display = 'inline-block';
+    abortController = new AbortController();
+
     // Output console element
     const output = document.getElementById('test-output');
 
@@ -216,7 +253,7 @@ function runTest(testName, showTestName) {
        CALL BACKEND TEST ENDPOINT
     ----------------------------------------------------- */
 
-    fetch('/tests/run/' + testName)
+    fetch('/tests/run/' + testName, { signal: abortController.signal })
         // Parse JSON response
         .then(response => response.json())
         .then(data => {
@@ -315,7 +352,11 @@ function runTest(testName, showTestName) {
         ------------------------------------------------- */
 
         .catch(error => {
-            output.innerHTML +=`<br>[${now}]<b style="color:red;">✘ ERROR</b>: ${error}<hr>`;
+            if (error.name === 'AbortError') {
+                output.innerHTML += `<br>[${now}] <b style="color:orange;">⏹ STOPPED</b><hr>`;
+            } else {
+                output.innerHTML += `<br>[${now}]<b style="color:red;">✘ ERROR</b>: ${error}<hr>`;
+            }
 
             // Scroll to bottom
             document.documentElement.scrollTop = document.documentElement.scrollHeight;
