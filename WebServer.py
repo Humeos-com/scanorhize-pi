@@ -628,11 +628,21 @@ def run_test(test_name: str):
             if not configs:
                 return jsonify(ok=False, message="No scanner config files found.")
             lines = []
+            configuredScanners = 0
             for cfg in configs:
                 scanner = ScannerData()
                 scanner.ReadScannerConfig(cfg)
-                lines.append(f"  {cfg}: projectId={scanner.projectId}, sampleId={scanner.sampleId}")
-            return jsonify(ok=True, message="Scanner configs found:\n" + "\n".join(lines), summary=f"{len(lines)} scanner config file(s) found")
+                if not scanner.device or scanner.device == "NoScannerDetected":
+                    device_str = "<span style='font-weight:bold; color:orange;'>⚠</span> device missing or not detected"
+                else:
+                    device_str = scanner.device
+                    configuredScanners += 1
+                lines.append(f"  {cfg}: projectId={scanner.projectId}, sampleId={scanner.sampleId}, device={device_str}")
+                
+            if configuredScanners == 0:
+                return jsonify(ok=False, message="Scanner configs found:\n" + "\n".join(lines) + "\n  → No scanner configured", summary=f"{len(lines)} scanner config file(s) found")
+            else:
+                return jsonify(ok=True, message="Scanner configs found:\n" + "\n".join(lines) + f"\n  → {configuredScanners} scanner(s) configured", summary=f"{len(lines)} scanner config file(s) found")
             
         if test_name == "upload-pictures-service":
             try:
