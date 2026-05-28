@@ -147,7 +147,7 @@ def pingAPI(address):
     """
     try:
         run(["ping", "-c 1", address], capture_output=True, text=True, check=True)
-        getLogger().warning("Ping OK: %s", address)
+        getLogger().log("Ping OK: %s", address)
         print(f"    → Humeos Ping OK")
         return 1
     except (SubprocessError, CalledProcessError) as e:
