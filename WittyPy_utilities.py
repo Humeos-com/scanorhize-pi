@@ -351,7 +351,7 @@ class WittyPi:
         return self.firmware_id == I2C_MC_ADDRESS_WP5
 
     def is_reason_click(self) -> bool:
-        getLogger().log(f"self.reason_click = {self.reason_click}")
+        getLogger().info(f"self.reason_click = {self.reason_click}")
         return self.reason_click == REASON_CLICK
 
     def i2c_read_byte(self, register: int, retry: int = 3) -> Optional[int]:
@@ -365,7 +365,7 @@ class WittyPi:
             if retry > 1:
                 time.sleep(1)
                 message = f"I2C read {self.i2c_address:02X}:{register:02X} failed, retrying {retry + 1}..."
-                getLogger().log(message)
+                getLogger().info(message)
                 return self.i2c_read_byte(register, retry - 1)
 
             message = f"I2C read {self.i2c_address:02X}:{register:02X} failed after {retry} retries: {e}"
@@ -384,7 +384,7 @@ class WittyPi:
             if retry > 1:
                 time.sleep(1)
                 message = f"I2C read word {self.i2c_address:02X}:{register:02X} failed, retrying {retry + 1}..."
-                getLogger().log(message)
+                getLogger().info(message)
                 return self.i2c_read_word(register, retry - 1)
 
             message = f"I2C read word {self.i2c_address:02X}:{register:02X} failed after {retry} retries: {e}"
@@ -407,7 +407,7 @@ class WittyPi:
             if retry < 3:
                 time.sleep(1)
                 message = f"I2C write {self.i2c_address:02X}:{register:02X} {value:02X} failed, retrying {retry + 1}..."
-                getLogger().log(message)
+                getLogger().info(message)
                 return self.i2c_write_byte(register, value, retry + 1)
 
             message = f"I2C write {self.i2c_address:02X}:{register:02X} {value:02X} failed after {retry} retries: {e}"
@@ -1107,7 +1107,7 @@ def net_to_system():
     """Apply network time to system."""
     net_ts = get_network_timestamp()
     if net_ts != -1:
-        getLogger().log("  Applying network time to system...")
+        getLogger().info("  Applying network time to system...")
         try:
             run_command(["sudo", "date", "-u", "-s", f"@{net_ts}"])
             getLogger().info("  Done :-)")

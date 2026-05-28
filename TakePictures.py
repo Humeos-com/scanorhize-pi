@@ -58,7 +58,7 @@ force = bool(args.force)
 
 CurrentDate = GetCurrentDate()
 initDisplayFile()
-getLogger().log("StartTakePictures")
+getLogger().info("StartTakePictures")
 res = InitGPIO()
 if res != 0:
     getLogger().error("InitGPIOError")
@@ -81,7 +81,7 @@ for CurrentScanner in listScannerconfigs:
     scanner_ids.append(f"{Scanner.projectId}/{Scanner.sampleId}")
 
     data = "Scanner file: " + CurrentScanner
-    getLogger().log(data)
+    getLogger().info(data)
 
     # Plus besoin de vérifier NextStartDate pour chaque scanner
     # Si on est réveillé, c'est qu'il faut acquérir (selon crontab Hub)
@@ -89,17 +89,17 @@ for CurrentScanner in listScannerconfigs:
         if force:
             getLogger().warning("Force acquisition")
         # get image from scanner
-        getLogger().log("Scanner %s: start image acquisition", str(i_scan + 1))
+        getLogger().info("Scanner %s: start image acquisition", str(i_scan + 1))
         Scanner = scanAcq(Scanner, i_scan, CurrentDate)
         Scanner.WriteScannerConfig(CurrentScanner)
         if Scanner.error == 0:
-            getLogger().log("Image acquisition Ok")
+            getLogger().info("Image acquisition Ok")
             sleep(5)  # Voir si on peut réduire ce timer
             FolderImage = CreateFolderOnUSB(Scanner.projectId)
             FolderImage = CreateFolderOnUSB(path.join(FolderImage, Scanner.sampleId))
             copyerror = CopyImageToUSB(Scanner, FolderImage)
             if copyerror == 0:
-                getLogger().log("Image copied to USB")
+                getLogger().info("Image copied to USB")
                 pictures_taken += 1
             else:
                 getLogger().error("Error in copy to USB")

@@ -43,7 +43,7 @@ def CreateFolderOnUSB(directory: str):
         getLogger().error("CreateFolder Error: %s set to backup", err)
         data = "Folder save: " + FOLDER_IMAGE
 
-    getLogger().log(data)
+    getLogger().info(data)
     return Folder
 
 
@@ -64,12 +64,12 @@ def CopyImageToUSB(Scanner, FolderImage_):
         if Scanner.scanDumpMeta(jp2JSONPath):
             getLogger().error("Error creating JSON file: %s", jp2JSONPath)
             return 1
-        getLogger().log("Copy %s to %s", Scanner.LastImgFile, jp2Path)
+        getLogger().info("Copy %s to %s", Scanner.LastImgFile, jp2Path)
         shutil.copy2(Scanner.LastImgFile, jp2Path)
 
         # Copy thumbnail if it exists
         if Scanner.LastThumbFile and os.path.exists(Scanner.LastThumbFile):
-            getLogger().log("Copy %s to %s", Scanner.LastThumbFile, thumbPath)
+            getLogger().info("Copy %s to %s", Scanner.LastThumbFile, thumbPath)
             shutil.copy2(Scanner.LastThumbFile, thumbPath)
         else:
             getLogger().warning("No thumbnail to copy")

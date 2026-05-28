@@ -107,7 +107,7 @@ class ScannerData:
         json_data = self.json()
         try:
             if not os.path.exists(getConfigDir()):
-                getLogger().log("Creating directory: %s", getConfigDir())
+                getLogger().info("Creating directory: %s", getConfigDir())
                 os.makedirs(getConfigDir(), exist_ok=True)
             with open(fullpath, "w", encoding="utf-8") as outfile:
                 outfile.write(json_data)
@@ -263,7 +263,7 @@ def generateThumbnail(
             f"gdal_translate -of JPEG -outsize {new_width} {new_height} "
             f'-co "QUALITY=85" {jp2_path} {thumb_path}'
         )
-        getLogger().log("generateThumbnail: %s", command)
+        getLogger().info("generateThumbnail: %s", command)
 
         result = run(
             command,
@@ -279,7 +279,7 @@ def generateThumbnail(
             )
             return result.returncode
 
-        getLogger().log(
+        getLogger().info(
             "Thumbnail generated: %sx%s -> %sx%s",
             original_width,
             original_height,
@@ -319,11 +319,11 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         f"-y {scanner.y} "
         f"--format=tiff > {imagepathtiff} | tee -a {DISPLAY_FILE}"
     )
-    getLogger().log("scanAcq: %s", command)
+    getLogger().info("scanAcq: %s", command)
     res = 1
     i = 0
     while res != 0 and i < 2:
-        getLogger().log("scanAcq: try %s", i + 1)
+        getLogger().info("scanAcq: try %s", i + 1)
         if is_raspberry_pi():
             result = run(
                 command,
@@ -332,7 +332,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
                 shell=True,
                 check=False,
             )
-            getLogger().log("scanAcq: result %s", result)
+            getLogger().info("scanAcq: result %s", result)
             res = result.returncode
             if len(result.stderr) > 2:
                 res = 12
@@ -355,7 +355,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         f"{imagepathtiff} "
         f"{imagepathjp2000} | tee -a {DISPLAY_FILE}"
     )
-    getLogger().log("scanAcq: Start conversion jp2: %s", commandconv)
+    getLogger().info("scanAcq: Start conversion jp2: %s", commandconv)
     result = run(
         commandconv,
         capture_output=True,
@@ -370,7 +370,7 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
         scanner.error = 20
         return scanner
 
-    getLogger().log("scanAcq: End conversion jp2")
+    getLogger().info("scanAcq: End conversion jp2")
     scanner.LastImgTime = date
     scanner.LastImgFile = imagepathjp2000
 
@@ -380,14 +380,14 @@ def scanAcq(scanner: ScannerData, i_scan: int, date: str):
     thumb_error = generateThumbnail(imagepathjp2000, thumbPath, scanner.x, scanner.y)
     if thumb_error == 0:
         scanner.LastThumbFile = thumbPath
-        getLogger().log("scanAcq: Thumbnail generated: %s", thumbPath)
+        getLogger().info("scanAcq: Thumbnail generated: %s", thumbPath)
     else:
         getLogger().warning(
             "scanAcq: Thumbnail generation failed, continuing without thumbnail"
         )
         scanner.LastThumbFile = ""
 
-    getLogger().log("scanAcq: end")
+    getLogger().info("scanAcq: end")
 
     return scanner
 
@@ -406,7 +406,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
         f"--resolution=75 "
         f"--format=jpeg > {imagepreview} | tee -a {DISPLAY_FILE}"
     )
-    getLogger().log("Command: %s", command)
+    getLogger().info("Command: %s", command)
     res = 1
     i = 0
     while res != 0 and i < 2:
@@ -427,7 +427,7 @@ def ScannerPreview(scanner: ScannerData, i_scan: int):
     if res > 0:
         getLogger().error("error acquisition: " + result.stdout + result.stderr)
     else:
-        getLogger().log("Preview OK")
+        getLogger().info("Preview OK")
 
     return imagepreview, res
 
@@ -450,7 +450,7 @@ def listScannerSerials():
         else:
             listserials.append("")
 
-    getLogger().log(str(listserials))
+    getLogger().info(str(listserials))
     return listserials
 
 
@@ -459,14 +459,14 @@ def listConfigScanner():
 
 
 def initScanners():
-    getLogger().log("Start InitScanners")
+    getLogger().info("Start InitScanners")
     
     """Répertorie tous les scanners branchés simultanément et crée leurs fichiers de config."""
     listfile = listConfigScanner()
 
     # Récupère tous les devices connectés en une seule passe
     devices_found = ScannerData().scanSearchAll()
-    getLogger().log("initScanners: %d scanner(s) détecté(s)", len(devices_found))
+    getLogger().info("initScanners: %d scanner(s) détecté(s)", len(devices_found))
 
     for i, current_file in enumerate(listfile):
         scanner = ScannerData()  # objet neuf à chaque itération — pas de fuite entre scanners
@@ -482,16 +482,16 @@ def initScanners():
             else:
                 scanner.TimeBeforeScan = TIME_BEFORE_SCAN_EPSON
                 scanner.TimeAfterScan = TIME_AFTER_SCAN_EPSON
-            getLogger().log("initScanners: %s associé à %s", current_file, scanner.device)
+            getLogger().info("initScanners: %s associé à %s", current_file, scanner.device)
         else:
             scanner.device = "NoScannerDetected"
             scanner.enable = 0
             scanner.error = 0
-            getLogger().log("initScanners: %s — aucun scanner physique", current_file)
+            getLogger().info("initScanners: %s — aucun scanner physique", current_file)
 
         scanner.WriteScannerConfig(current_file)
         
-    getLogger().log("End InitScanners")
+    getLogger().info("End InitScanners")
 
 
 if __name__ == "__main__":
