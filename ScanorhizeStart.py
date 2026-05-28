@@ -71,7 +71,9 @@ if args.version:
 # Etape 0 #############################################
 time.sleep(10) # Clock sync
 
-getLogger().warning("ScanorhizeStart.py version: %s", __version__)
+getLogger().info("\n")
+getLogger().info("============= START =============")
+getLogger().info("ScanorhizeStart.py version: %s", __version__)
 
 def isConfig():
     # On regarde si on est en mode configuration
@@ -94,16 +96,16 @@ def setShutdownAndWakeUpDates():
 
 
 def createRunConfigFile():
-    getLogger().warning("On passe en mode config")    
+    getLogger().info("On passe en mode config")    
     
     # On cree un fichier /run/config pour indiquer aux shells qu'on est en mode config
     cmd = "sudo touch /run/config >> Log/Scanorhize.log 2>&1"
-    getLogger().warning(cmd)
+    getLogger().info(cmd)
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     if result.returncode == 0:
-        getLogger().warning("creation /run/config OK")
+        getLogger().info("creation /run/config OK")
     else:
         getLogger().error("Failed to create /run/config: %s", result.stderr)
 
@@ -114,17 +116,17 @@ def launchServer():
     print("Launching server")
     
     #Activation de l'AP
-    getLogger().warning("Lancement du point d'accès (192.168.4.1)")
+    getLogger().info("Lancement du point d'accès (192.168.4.1)")
     try:
         run("sudo nmcli con up hub_AP", shell=True, check=True)
-        getLogger().warning("AP activé")
+        getLogger().info("AP activé")
     except Exception as e:
         getLogger().error("Echec activation AP : %s", e)
         
         
     # A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
-    getLogger().warning("SSID: %s", GetWifiSSID())
-    getLogger().warning("IP: %s", GetIP())
+    getLogger().info("SSID: %s", GetWifiSSID().strip())
+    getLogger().info("IP: %s", GetIP())
 
     #Launch server in the background
     try:
@@ -140,7 +142,7 @@ def takePictures():
     # On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
     # import TakePictures
     cmd = "python3 TakePictures.py"
-    getLogger().warning(cmd)
+    getLogger().info(cmd)
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
@@ -157,7 +159,7 @@ def updateDataFromAndToServer(configMode):
     time.sleep(15)
     hub_info = get_hub_info()
     
-    getLogger().warning(
+    getLogger().info(
         "Volts: %.2fV  Bat: %d%%  USB: %dMo %d%%  Temp: %.1f°C",
         hub_info[0],
         hub_info[1],
@@ -173,7 +175,7 @@ def updateDataFromAndToServer(configMode):
             # Teste la connectivité
             check_connectivity()
             has_internet = True
-            getLogger().warning("Internet OK !")
+            getLogger().info("Internet OK !")
 
             # On lance un sous programme qui met à jour toutes les données sur la plateforme
             # On échange avec la plateforme Web pour envoyer les paramètres
@@ -203,7 +205,7 @@ def updateDataFromAndToServer(configMode):
                 for CurrentScanner in listConfigScanner():
                     Scanner.ReadScannerConfig(CurrentScanner)
                     SendScannerConfigToServer(Scanner)
-                getLogger().warning("getTokens")
+                getLogger().info("getTokens")
                 getTokens()
             
             else: #If NOT config mode
@@ -240,7 +242,7 @@ def safeShutdown():
     result = run(
         cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    getLogger().warning(cmdeject)
+    getLogger().info(cmdeject)
 
     # On fixe l'heure d'arrêt dans 30 secondes,
     # car des fois le Witty ne s'eteint pas sur le doShutdown()

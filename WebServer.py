@@ -90,7 +90,7 @@ if args.version:
     sys.exit(0)
 
 initDisplayFile()
-getLogger().warning("Start WebServer.py version: %s", __version__)
+getLogger().info("Start WebServer.py version: %s", __version__)
 Hub = HubData()
 
 try:
@@ -100,7 +100,7 @@ try:
     check_connectivity(3)
     cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 pi@{getScanorhizeServer()} -E Log/ssh.log"
     run(cmd, shell=True, capture_output=True, text=True, check=False)
-    getLogger().warning(
+    getLogger().info(
         "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
         getSSHPort(),
         getScanorhizeServer(),
@@ -111,7 +111,7 @@ except RuntimeError as e:
         "Error pas de connectivité internet: %s, on ne lance pas le tunnel SSH", e
     )
 
-getLogger().warning("Launch Web app")
+getLogger().info("Launch Web app")
 app = Flask(__name__)
 
 
@@ -225,7 +225,7 @@ def ScannerPage(scan_num_str: str):
 
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
     Scannerparam = updateScanParameters(Scanner)
-    getLogger().warning("Scanner n° : %s", str(i_scan + 1))
+    getLogger().info("Scanner n° : %s", str(i_scan + 1))
     # Scanner.printScanner()
     filename = str(i_scan + 1) + ".jpg"
     return render_template(
@@ -325,7 +325,7 @@ def action(actionName: str, scan_num_str: str):
     i_scan = int(scan_num_str) - 1
     Scanner.ReadScannerConfig(listScannerconfigs[i_scan])
     Scanner.ScannerName = f"Scanner-{i_scan + 1}"
-    getLogger().warning("Scanner n° : %s", str(i_scan + 1))
+    getLogger().info("Scanner n° : %s", str(i_scan + 1))
     # Scanner.printScanner()
 
     if actionName == "acqimg":
@@ -443,7 +443,7 @@ def update_version():
 
     try:
         cmd_update = "s3cmd --no-preserve sync --delete-removed --exclude-from Scanorhize/s3exclude.txt s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
-        getLogger().warning("Update version: %s", cmd_update)
+        getLogger().info("Update version: %s", cmd_update)
         result = run(
             cmd_update,
             shell=True,
@@ -934,7 +934,7 @@ def process_hub_form_data(form):
             if new_schedule != old_schedule:
                 Hub.acquisition_schedule = new_schedule
                 schedule_changed = True
-                getLogger().warning(
+                getLogger().info(
                     "Acquisition schedule updated: %s -> %s", old_schedule, new_schedule
                 )
         else:
@@ -951,7 +951,7 @@ def process_hub_form_data(form):
                 from Hub import calculate_next_wakeup_from_crontab
 
                 next_wakeup = calculate_next_wakeup_from_crontab()
-                getLogger().warning(
+                getLogger().info(
                     "WittyPi wakeup updated after schedule change: %s", next_wakeup
                 )
             except Exception as e:
@@ -1064,25 +1064,25 @@ def init_hub():
         # 2. Le fichier Hub.json provient d'un autre Hub
         Hub.write_config()
 
-        getLogger().warning("Start InitScanners")
+        getLogger().info("Start InitScanners")
         # Run initScanners() to initialize scanners
         # Init Scanners before getting tokens, because this operation
         # can be completed without network
         initScanners()
-        getLogger().warning("End InitScanners")
+        getLogger().info("End InitScanners")
         Scanner = ScannerData()
         for CurrentScanner in listConfigScanner():
             Scanner.ReadScannerConfig(CurrentScanner)
             SendScannerConfigToServer(Scanner)
         # Run getTokens() to get authentication tokens
-        getLogger().warning("Start init-hub")
+        getLogger().info("Start init-hub")
         tokens_result = getTokens()
         if tokens_result != 0:
             return redirect(
                 url_for("HubPage", output=sanitize_output("Failed to get tokens"))
             )
 
-        getLogger().warning("End init-hub")
+        getLogger().info("End init-hub")
         return redirect(
             url_for("HubPage", output=sanitize_output("Hub initialized successfully"))
         )
@@ -1093,13 +1093,13 @@ def init_hub():
 
 @app.route("/scan_acq", methods=["GET", "POST"])
 def scan_acq():
-    getLogger().warning("Force scanners acquisition")
+    getLogger().info("Force scanners acquisition")
     try:
         cmd_acq = "python3 TakePictures.py -f"
-        getLogger().warning("Scan Acq: %s", cmd_acq)
+        getLogger().info("Scan Acq: %s", cmd_acq)
         result = run(cmd_acq, shell=True, capture_output=True, text=True, check=False)
         if result.returncode == 0:
-            getLogger().warning("Scan Acq: OK")
+            getLogger().info("Scan Acq: OK")
             return redirect(
                 url_for("HubPage", output=sanitize_output("Scanners acquisition OK"))
             )
@@ -1134,9 +1134,9 @@ def stop_server():
     result = run(
         cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
     )
-    getLogger().warning("Eject command: %s", cmdeject)
+    getLogger().info("Eject command: %s", cmdeject)
     if result.returncode == 0:
-        getLogger().warning("SD card ejected successfully")
+        getLogger().info("SD card ejected successfully")
     else:
         getLogger().warning(
             "SD card eject failed (return code: %d, stderr: %s)",
@@ -1153,7 +1153,7 @@ def stop_server():
     # On enlève également tout fichier DEBUG
     try:
         os.remove("DEBUG")
-        getLogger().warning("remove_image_files: removed DEBUG")
+        getLogger().info("remove_image_files: removed DEBUG")
     except (FileNotFoundError, PermissionError) as e:
         getLogger().warning("Error removing file DEBUG: %s", e)
 
