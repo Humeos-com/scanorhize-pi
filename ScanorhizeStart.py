@@ -312,7 +312,12 @@ def main():
             getLogger().error(e)
          
     
-    sys.exit(0)
+    getLogger().info("End of ScanorhizeStart.py")
+    if config:
+        while True:
+            time.sleep(60)
+    else:
+        sys.exit(0)
 
 
 main()
