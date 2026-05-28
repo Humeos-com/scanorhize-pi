@@ -4,7 +4,7 @@
 import os
 import sys
 from subprocess import run, CalledProcessError
-from time import sleep  # Add this import
+from time import sleep
 import argparse
 import shutil
 from pathlib import Path
@@ -59,7 +59,16 @@ from Miscellaneous import (
     initDisplayFile,
 )
 from utils import sanitize_output
-from WittyPy_utilities import get_shutdown_time, get_startup_time
+from WittyPy_utilities import (
+    get_shutdown_time,
+    get_startup_time,
+    get_default_on,
+    is_mc_connected,
+    is_WittyPi_3,
+    is_WittyPi_4,
+    is_WittyPi_5,
+    parse_wittypi_time
+)
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
@@ -536,14 +545,85 @@ def run_test(test_name: str):
                       for line in result.stdout.splitlines() if ":" in line}
             pictures_taken = int(stdout.get("PICTURES_TAKEN", 0))
             scanners = stdout.get("SCANNERS", "")
-            scanner_list = scanners.replace(",", ", ") if scanners else "none"
-            total = len(scanners.split(",")) if scanners else 0
+            
+            if scanners:
+                scanner_list = scanners.replace(",", ", ")
+                total = len(scanners.split(",")) if scanners else 0
 
-            if result.returncode == 0:
-                return jsonify(ok=True, message=f"{pictures_taken}/{total} picture(s) taken — scanners: {scanner_list}", next_test="wait-for-pictures-upload")
+                if result.returncode == 0:
+                    return jsonify(ok=True, message=f"{pictures_taken}/{total} picture(s) taken — scanners: {scanner_list}", next_test="wait-for-pictures-upload")
+                    
+            else:
+                return jsonify(ok=False, message=f"No scanner found")
+                
             return jsonify(ok=False, message=f"{pictures_taken}/{total} picture(s) taken — scanners: {scanner_list}\n{result.stderr or ''}")
 
-        if test_name == "scanners":
+
+        if test_name == "wittypi":
+            if not is_mc_connected():
+                return jsonify(ok=False, message="WittyPi not detected on I2C bus.")
+
+            if is_WittyPi_5():
+                model = "WittyPi 5"
+            elif is_WittyPi_4():
+                model = "WittyPi 4"
+            elif is_WittyPi_3():
+                model = "WittyPi 3"
+            else:
+                model = "WittyPi (unknown version)"
+
+            startup = parse_wittypi_time(get_startup_time())
+            shutdown = parse_wittypi_time(get_shutdown_time())
+
+            # startup/shutdown expected as datetime objects
+            from datetime import datetime
+            now = datetime.now()
+
+            if startup:
+                startup_left = startup - now
+                startup_left_str = str(startup_left).split('.')[0]
+            else:
+                startup_left_str = "N/A"
+
+            if shutdown:
+                shutdown_left = shutdown - now
+                shutdown_left_str = str(shutdown_left).split('.')[0]
+            else:
+                shutdown_left_str = "N/A"
+
+            default_on = get_default_on()  # 0=immediately on, 255=stay off
+
+            if default_on == 255:
+                default_on = "<b style='font-weight:bold; color:orange;'>⚠ OFF</b>"
+            elif default_on == 0:
+                default_on = "Immediately turn ON"
+            else:
+                default_on = f"Turn ON after {default_on}s"
+                
+            warning_text = ""
+            
+            try:
+                if startup and shutdown and startup < shutdown:
+                    warning_text = "\n  → <b style='font-weight:bold; color:orange;'>⚠ WARNING</b>:        Next wakeup occurs BEFORE next shutdown."
+            except Exception:
+                warning_text = ""
+                pass
+                
+                
+            return jsonify(
+                ok=True,
+                message=(
+                    f"\n"
+                    f"  → Model:            {model}\n"
+                    f"  → Default on power: {default_on}\n"
+                    f"  → Next <span style='color:red'>shutdown</span>:    {shutdown} ({shutdown_left_str} left)\n"
+                    f"  → Next <span style='color:green'>wakeup</span>:      {startup} ({startup_left_str} left)"
+                    f"{warning_text}"
+                ),
+            )
+
+
+        if test_name == "scanners-config-files":
             configs = listConfigScanner()
             if not configs:
                 return jsonify(ok=False, message="No scanner config files found.")

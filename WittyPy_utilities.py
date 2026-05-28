@@ -743,6 +743,15 @@ def doShutdown():
     return do_shutdown(HALT_PIN, is_mc_connected())
 
 
+def get_default_on() -> bool:
+    """Return True if WittyPi is configured to turn on automatically when powered."""
+    if is_WittyPi_5():
+        value = WittyPi().i2c_read_byte(I2C_CONF_DEFAULT_ON_WP5)
+    else:
+        value = WittyPi().i2c_read_byte(I2C_CONF_DEFAULT_ON)
+    return value
+
+
 def get_low_voltage_threshold() -> float:
     """Get low voltage threshold using direct I2C access."""
     # Pour WittyPi 5 : 0 => disabled ; entier = vseuil x10
@@ -865,6 +874,38 @@ def get_rtc_timestamp() -> int:
 
     return -1
 
+def parse_wittypi_time(value):
+    """
+    Converts Witty Pi format:
+        '28 08:02:12'
+    into a datetime using current month/year.
+    """
+    from datetime import datetime
+    now = datetime.now()
+
+    parts = value.strip().split(" ")
+    day = int(parts[0])
+
+    t = datetime.strptime(parts[1], "%H:%M:%S")
+
+    dt = datetime(
+        year=now.year,
+        month=now.month,
+        day=day,
+        hour=t.hour,
+        minute=t.minute,
+        second=t.second,
+    )
+
+    # Handle next month rollover
+    if dt < now:
+        if now.month == 12:
+            dt = dt.replace(year=now.year + 1, month=1)
+        else:
+            dt = dt.replace(month=now.month + 1)
+
+    return dt
+    
 
 def get_startup_time() -> str:
     """Get startup time using direct I2C access."""
