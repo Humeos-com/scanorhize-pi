@@ -7,6 +7,11 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 
 import sys
 import time
+from ConfigApp import is_debug, getLogger
+from version import __version__
+getLogger().info("============= START =============")
+getLogger().info("ScanorhizeStart.py version: %s", __version__)
+
 from subprocess import run, CalledProcessError, Popen
 import argparse
 from ConfigApp import getUsbDir
@@ -23,7 +28,7 @@ from Miscellaneous import (
     ReadGPIOConfig,
 )
 from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
-from ConfigApp import is_debug, getLogger
+
 from Scanner import (
     initScanners,
     listConfigScanner,
@@ -49,7 +54,7 @@ from Hub import (
     GetIP,
     calculate_next_wakeup_from_crontab,
 )
-from version import __version__
+
 
 parser = argparse.ArgumentParser(
     prog="ScanorhizeStart.py",
@@ -69,11 +74,10 @@ if args.version:
     sys.exit(0)
 
 # Etape 0 #############################################
+getLogger().info("10 second delay... (Clock sync)")
 time.sleep(10) # Clock sync
 
-getLogger().info("\n")
-getLogger().info("============= START =============")
-getLogger().info("ScanorhizeStart.py version: %s", __version__)
+
 
 def isConfig():
     # On regarde si on est en mode configuration
@@ -289,21 +293,24 @@ def main():
     config = isConfig()
     
     if config:
-        print("Config mode")
+        getLogger().info("======= CONFIG MODE =======")
         launchServer()  #Launch web server in the background
         createRunConfigFile()
         initScanners()
     
     else: #Default mode
-        print("Default mode")
+        getLogger().info("======= DEFAULT MODE =======")
         takePictures()
         
     #Update data from and to server
     #And, if not config mode, wait for pictures to upload
     if not getOffline():
         try:
+            getLogger().info("==============")
             enable4G()
+            getLogger().info("==============")
             updateDataFromAndToServer(configMode=config)
+            getLogger().info("==============")
             
             #In default mode, wait for pictures to upload to server before shutting down
             if config == False:
