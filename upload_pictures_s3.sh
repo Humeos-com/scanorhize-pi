@@ -14,13 +14,12 @@
 #
 # Notes:
 # - Requires Python3 (for JSON parsing)
-# - Requires AWS CLI:
-#      sudo apt install awscli -y
-#      aws configure
-#           AWS Access Key ID [None]: xxx
-#           AWS Secret Access Key [None]: xxx
-#           Default region name [None]: eu-west-3
-#           Default output format [None]: json
+# - Requires s3cmd:
+#      sudo apt install s3cmd -y
+#      s3cmd --configure
+#           Access Key: xxx
+#           Secret Key: xxx
+#           Default Region: eu-west-3
 #
 #
 # FREE TIP: simulate internet connection latency and packet loss (for test purposes)
@@ -174,7 +173,7 @@ PYTHON
             echo ""
             echo "[$LABEL] Uploading: $REL_PATH → $S3_DEST"
 
-            if aws s3 cp "$FILE" "$S3_DEST" --only-show-errors; then
+            if s3cmd put "$FILE" "$S3_DEST"; then
                 echo "    ✔  Upload successful"
                 echo "    → Deleting file"
                 rm "$FILE"

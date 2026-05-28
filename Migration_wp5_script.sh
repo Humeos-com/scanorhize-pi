@@ -297,9 +297,6 @@ fi
 info "Creating $SERVICE_FILE..."
 if true; then
 
-read -p "  AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
-read -p "  AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
-
     cat > "$SERVICE_FILE" << SVCEOF
 [Unit]
 Description=Upload pictures
@@ -312,9 +309,6 @@ WorkingDirectory=/home/pi/Scanorhize
 ExecStart=/bin/bash -c '/home/pi/Scanorhize/upload_pictures_s3.sh >> /home/pi/Scanorhize/Log/upload-pictures.log 2>&1'
 Restart=always
 RestartSec=10
-Environment=AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-Environment=AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-Environment=AWS_DEFAULT_REGION=eu-west-3
 
 [Install]
 WantedBy=multi-user.target
