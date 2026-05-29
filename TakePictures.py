@@ -40,6 +40,11 @@ parser.add_argument(
     action="store_true",
     help="Force l'acquisition même si la date de déclenchement n'est pas atteinte",
 )
+parser.add_argument(
+    "--prefix",
+    default="image",
+    help="Prefix for saved image filenames (default: image)",
+)
 # pylint: disable=duplicate-code
 parser.add_argument(
     "-v",

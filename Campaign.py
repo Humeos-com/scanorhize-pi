@@ -47,14 +47,14 @@ def CreateFolderOnUSB(directory: str):
     return Folder
 
 
-def CopyImageToUSB(Scanner, FolderImage_):
+def CopyImageToUSB(Scanner, FolderImage_, prefix="image"):
     """copie l'image et le fichier JSON sur la clé USB"""
     try:
         date = Scanner.LastImgTime
         fileName = date.replace(":", "-")
-        jp2Path = path.join(FolderImage_, f"image_{fileName}.jp2")
-        jp2JSONPath = path.join(FolderImage_, f"image_{fileName}.json")
-        thumbPath = path.join(FolderImage_, f"image_{fileName}_thumb.jpg")
+        jp2Path = path.join(FolderImage_, f"{prefix}_{fileName}.jp2")
+        jp2JSONPath = path.join(FolderImage_, f"{prefix}_{fileName}.json")
+        thumbPath = path.join(FolderImage_, f"{prefix}_{fileName}_thumb.jpg")
 
         # Check if source file exists
         if not os.path.exists(Scanner.LastImgFile):
