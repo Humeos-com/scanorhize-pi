@@ -18,13 +18,6 @@
                     onclick="runAll()">
                 Run all
             </button>
-
-            <!-- Visible only while a test is running; aborts the in-flight request -->
-            <button class="btn btn-danger me-2" id="stop-btn"
-                    onclick="stopTests()"
-                    style="display:none;">
-                Stop
-            </button>
         </div>
     </div>
 
@@ -79,6 +72,17 @@
         </div>
 
         <div class="card-body">
+            <!-- 4G modem detection and connection state -->
+            <!-- <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('4g', true)">
+                4G Modem
+            </button> -->
+
+            <!-- System timezone check: must be UTC -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('timezone', true)">
+                Timezone (UTC)
+            </button>
 
             <!-- WittyPi I2C connectivity + next wakeup/shutdown times -->
             <button class="btn btn-primary me-2 run-test-btn"
@@ -86,9 +90,15 @@
                 WittyPi
             </button>
 
+            <!-- Full shutdown/wakeup cycle test: programs WittyPi, monitors countdown, pings after reboot -->
+            <button class="btn btn-warning me-2 run-test-btn"
+                    onclick="runTest('wittypi-cycle', true)">
+                WittyPi Cycle
+            </button>
+
             <!-- Scanner hardware test -->
             <button class="btn btn-primary me-2 run-test-btn"
-                    onclick="runTest('scanners', true)">
+                    onclick="runTest('scanners-config-files', true)">
                 Scanners
             </button>
 
@@ -105,19 +115,27 @@
          TEST RESULTS OUTPUT
     ========================== -->
     <div class="card mb-4">
-        <div class="card-header">
-            <h4>Results</h4>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Results</h4>
+            <!-- Visible only while a test is running; aborts the in-flight request -->
+            <button class="btn btn-danger btn-sm" id="stop-btn"
+                    onclick="stopTests()"
+                    style="display:none;">
+                Stop
+            </button>
         </div>
 
-        <div class="card-body">
+        <div class="card-body" style="padding: 0;">
 
             <!-- Console-like output area -->
             <pre id="test-output"
-                 class="bg-light p-3"
+                 class="bg-dark p-3"
                  style="min-height: 100px;
                         max-height: 400px;
                         overflow-y: auto;
-                        white-space: pre-wrap;">
+                        white-space: pre-wrap;
+                        color: white;
+                        margin-bottom: 0;">
             </pre>
 
         </div>
@@ -127,6 +145,14 @@
 <script>
 
 document.getElementById('test-output').innerHTML = ""
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function fmtUTC(d) {
+    return d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+}
 
 /* =========================================================
    GLOBAL STATE
@@ -143,6 +169,10 @@ let allTestResults = ""
 
 // AbortController for cancelling the in-flight fetch request
 let abortController = null
+
+// Interval ID and pending ping timeout for the wittypi-cycle monitor
+let cycleMonitorInterval = null
+let cycleMonitorPingTimeout = null
 
 
 /* =========================================================
@@ -209,6 +239,39 @@ function stopTests() {
     if (abortController) {
         abortController.abort();
     }
+    if (cycleMonitorInterval) {
+        clearInterval(cycleMonitorInterval);
+        cycleMonitorInterval = null;
+        if (cycleMonitorPingTimeout) {
+            clearTimeout(cycleMonitorPingTimeout);
+            cycleMonitorPingTimeout = null;
+        }
+        const output = document.getElementById('test-output');
+        const reconnectHint = document.getElementById('cycle-reconnect');
+        if (reconnectHint) reconnectHint.remove();
+        window.retryWittypiCyclePing = null;
+        const now = fmtUTC(new Date());
+        output.insertAdjacentHTML('beforeend', `<br>[${now}] <b style="color:orange;">⏹ STOPPED</b>`);
+        // Try to cancel on Pi side and show the result (Pi may already be off)
+        fetch('/tests/run/wittypi-cycle-cancel')
+            .then(r => r.json())
+            .then(d => {
+                const ts = fmtUTC(new Date());
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${d.message}`);
+            })
+            .catch(() => {
+                const ts = fmtUTC(new Date());
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] Pi already unreachable — cancel skipped.`);
+            })
+            .finally(() => {
+                output.insertAdjacentHTML('beforeend', '<hr>');
+                document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                output.scrollTop = output.scrollHeight;
+            });
+    }
+    // Always reset UI — covers the case where no fetch is in flight
+    // (e.g. the 2s gap between Run All tests) so AbortError never fires
+    initTestButtonStates();
 }
 
 
@@ -241,8 +304,8 @@ function runTest(testName, showTestName) {
     // Output console element
     const output = document.getElementById('test-output');
 
-    // Current timestamp
-    const now = new Date().toLocaleString();
+    // Timestamp for "Running…" line (captured at call time)
+    const now = fmtUTC(new Date());
 
     /* -----------------------------------------------------
        DISPLAY RUNNING MESSAGE
@@ -263,10 +326,21 @@ function runTest(testName, showTestName) {
         // Parse JSON response
         .then(response => response.json())
         .then(data => {
+            const now = fmtUTC(new Date());
             /* ---------------------------------------------
                DISPLAY TEST RESULT
             --------------------------------------------- */
             output.innerHTML +=`<br>[${now}] ${data.processing ? '<b style="color:orange;">⌛ IN PROGRESS</b>' : (data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>')}: ${data.message}`;
+
+            /* ---------------------------------------------
+               WITTYPI CYCLE TEST — hand off to cycle monitor
+            --------------------------------------------- */
+            if (data.shutdown_at && data.wakeup_at) {
+                document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                output.scrollTop = output.scrollHeight;
+                runWittypiCycleMonitor(data.shutdown_at, data.wakeup_at, output, now);
+                return;
+            }
 
             /* ---------------------------------------------
                SAVE SUMMARY RESULTS
@@ -333,7 +407,7 @@ function runTest(testName, showTestName) {
 
                     else {
                         initTestButtonStates()
-                        output.innerHTML +=`<br>[${now}] <b style="color:green;">✔ PASSED: </b>${allTestResults}`;
+                        output.innerHTML +=`<br>[${now}] <b style="color:green;">🙌 SUCCESS: </b>${allTestResults}`;
                     }
                 }
 
@@ -358,10 +432,11 @@ function runTest(testName, showTestName) {
         ------------------------------------------------- */
 
         .catch(error => {
+            const now = fmtUTC(new Date());
             if (error.name === 'AbortError') {
                 output.innerHTML += `<br>[${now}] <b style="color:orange;">⏹ STOPPED</b><hr>`;
             } else {
-                output.innerHTML += `<br>[${now}]<b style="color:red;">✘ ERROR</b>: ${error}<hr>`;
+                output.innerHTML += `<br>[${now}] <b style="color:red;">✘ ERROR</b>: ${error}<hr>`;
             }
 
             // Scroll to bottom
@@ -371,6 +446,190 @@ function runTest(testName, showTestName) {
             // Reset buttons
             initTestButtonStates()
         });
+}
+
+/* =========================================================
+   WITTYPI CYCLE MONITOR
+   Runs entirely in the browser after the backend schedules
+   the WittyPi shutdown/wakeup.  Phases:
+     1. Countdown to shutdown
+     2. Countdown to wakeup  (Pi is off during this phase)
+     3. Ping /tests/run/ping every 10s until reply or 30s timeout
+========================================================= */
+
+function runWittypiCycleMonitor(shutdownAt, wakeupAt, output, startNow) {
+
+    const shutdownTime = new Date(shutdownAt);
+    const wakeupTime   = new Date(wakeupAt);
+
+    // Live status line — insertAdjacentHTML keeps existing DOM references valid
+    output.insertAdjacentHTML('beforeend', '<br><span></span>');
+    const statusEl = output.lastElementChild;
+
+    // Phase state machine: shutdown → wakeup → booting → pinging-silent → pinging → done
+    let phase = 'shutdown';
+    let pingDeadline = null;       // deadline for the 'pinging' phase (after reconnect hint)
+    let bootingEndTime = null;     // when the 15s boot wait ends
+    let silentPingDeadline = null; // deadline for the 'pinging-silent' phase
+    let pingActive = false;        // false when paused waiting for Retry click
+
+    // Format milliseconds as "Xm Ys" or "Ys"
+    function fmt(ms) {
+        const s = Math.max(0, Math.ceil(ms / 1000));
+        const m = Math.floor(s / 60);
+        return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+    }
+
+    // 1-second tick: update status line and drive phase transitions
+    cycleMonitorInterval = setInterval(() => {
+
+        const now = new Date();
+
+        // Phase 1: countdown until WittyPi shuts the Pi down
+        if (phase === 'shutdown') {
+            const left = shutdownTime - now;
+            if (left > 0) {
+                statusEl.innerHTML = `⏱ Waiting for shutdown… <b>${fmt(left)}</b> remaining`;
+            } else {
+                phase = 'wakeup';
+            }
+
+        // Phase 2: Pi is off — count down to scheduled wakeup
+        } else if (phase === 'wakeup') {
+            const left = wakeupTime - now;
+            if (left > 0) {
+                statusEl.innerHTML = `🔴 Pi is off. Wakeup in <b>${fmt(left)}</b> - <span style="background: red; color: white; border-radius: 5px; filter: drop-shadow(3px 3px 3px #555); padding: 0px 5px;">DO NOT RELOAD THE PAGE!</span>`;
+            } else {
+                phase = 'booting';
+                bootingEndTime = new Date(wakeupTime.getTime() + 25*1000);
+            }
+
+        // Phase 3: fixed 25s wait for the Pi to finish booting
+        } else if (phase === 'booting') {
+            const bootLeft = Math.max(0, Math.ceil((bootingEndTime - now) / 1000));
+            statusEl.innerHTML = `🟡 Waiting for Pi to boot up… <b>${bootLeft}s</b>`;
+            if (now >= bootingEndTime) {
+                phase = 'pinging-silent';
+                silentPingDeadline = new Date(Date.now() + 20*1000);
+                pingActive = true;
+                doPing();
+            }
+
+        // Phase 4: auto-ping every 5s for 20s — no reconnect prompt yet
+        } else if (phase === 'pinging-silent') {
+            statusEl.innerHTML = `🔍 Pinging server…`;
+            if (now >= silentPingDeadline) {
+                // Silent phase expired without reply — show reconnect hint and pause pinging
+                phase = 'pinging';
+                pingDeadline = new Date(Date.now() + 30*1000);
+                pingActive = false;
+                if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+                output.insertAdjacentHTML('beforeend', `<br><span id="cycle-reconnect">⚠ Lost WiFi? Reconnect to <b>Scanorhize_Hub</b>, then click 👉 <button class="btn btn-sm btn-outline-warning" onclick="retryWittypiCyclePing()">Retry ping</button></span>`);
+                scrollToBottom();
+                // Retry button: resets 30s deadline and resumes pinging
+                window.retryWittypiCyclePing = function() {
+                    if (phase !== 'pinging') return;
+                    pingDeadline = new Date(Date.now() + 30*1000);
+                    pingActive = true;
+                    if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+                    statusEl.innerHTML = `🔍 Retrying — pinging server…`;
+                    doPing();
+                };
+            }
+
+        // Phase 5: pinging paused — waiting for Retry click; fail if 30s deadline expires
+        } else if (phase === 'pinging') {
+            const left = pingDeadline - now;
+            if (left <= 0) {
+                finish(false, 'No reply from server within 30s.');
+            }
+        }
+
+    }, 1000);
+
+    /* -------------------------------------------------
+       PING HELPERS
+    ------------------------------------------------- */
+
+    function scrollToBottom() {
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    // Send one ping; on failure schedule the next one if pingActive
+    function doPing() {
+        const pingStart = new Date();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+        output.insertAdjacentHTML('beforeend', `<br>[${fmtUTC(pingStart)}] 🔍 Ping…`);
+        scrollToBottom();
+        fetch('/tests/run/ping', { signal: controller.signal })
+            .then(r => { clearTimeout(timeoutId); return r.json(); })
+            .then(d => {
+                const rtt = Math.round(new Date() - pingStart);
+                if (d.ok) {
+                    output.insertAdjacentHTML('beforeend', `<br>[${fmtUTC(new Date())}] 🟢 Ping OK (${rtt}ms)`);
+                    scrollToBottom();
+                    finish(true, "");
+                } else {
+                    output.insertAdjacentHTML('beforeend', `<br>[${fmtUTC(new Date())}] 🔴 Ping failed (${rtt}ms)`);
+                    scrollToBottom();
+                    scheduleNextPing();
+                }
+            })
+            .catch(() => {
+                clearTimeout(timeoutId);
+                const rtt = Math.round(new Date() - pingStart);
+                output.insertAdjacentHTML('beforeend', `<br>[${fmtUTC(new Date())}] 🔴 Ping unreachable (${rtt}ms)`);
+                scrollToBottom();
+                scheduleNextPing();
+            });
+    }
+
+    // Schedule the next ping in 5s — only if pinging is active and deadline not passed
+    function scheduleNextPing() {
+        if (!pingActive) return;  // paused — waiting for Retry click
+        const deadline = phase === 'pinging-silent' ? silentPingDeadline : pingDeadline;
+        if (deadline && new Date() < deadline) {
+            cycleMonitorPingTimeout = setTimeout(doPing, 5000);
+        }
+    }
+
+    function finish(ok, msg) {
+        clearInterval(cycleMonitorInterval);
+        cycleMonitorInterval = null;
+        if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+        phase = 'done';
+        window.retryWittypiCyclePing = null;
+
+        const ts = fmtUTC(new Date());
+        statusEl.remove();
+        const reconnectHint = document.getElementById('cycle-reconnect');
+        if (reconnectHint) reconnectHint.remove();
+        output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${ok
+            ? '<b style="color:green;">✔ PASS</b>'
+            : '<b style="color:red;">✘ FAIL</b>: '}${msg}<hr>`);
+
+        scrollToBottom();
+
+        if (ok && runningAll && runningTestBtn) {
+            if (runningAll) allTestResults += `<br>         → WittyPi cycle: PASS`;
+            const runTestButtons = [...document.querySelectorAll('.run-test-btn:not(.run-all-btn)')];
+            runningTestBtn = runTestButtons[runTestButtons.indexOf(runningTestBtn) + 1] || null;
+            if (runningTestBtn) {
+                setTimeout(() => {
+                    runningTestBtn.disabled = false;
+                    runningTestBtn.click();
+                    runningTestBtn.disabled = true;
+                }, 2000);
+            } else {
+                initTestButtonStates();
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] <b style="color:green;">🙌 SUCCESS: </b>${allTestResults}`);
+            }
+        } else {
+            initTestButtonStates();
+        }
+    }
 }
 
 </script>

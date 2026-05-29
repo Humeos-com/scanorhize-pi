@@ -74,12 +74,20 @@ if args.version:
     sys.exit(0)
 
 # Etape 0 #############################################
-getLogger().info("10 second delay... (Clock sync)")
-time.sleep(10) # Clock sync
+getLogger().info("2 second delay... (Clock sync)")
+time.sleep(2) # Clock sync
 
 
+
+WITTYPI_TEST_FLAG = Path("wittypi_test_mode")
 
 def isConfig():
+    # WittyPi cycle test: flag file forces config mode for exactly one boot
+    if WITTYPI_TEST_FLAG.exists():
+        WITTYPI_TEST_FLAG.unlink()
+        getLogger().warning("WITTYPI CYCLE TEST FLAG FOUND — STARTING IN CONFIG MODE")
+        EndGPIO()
+        return True
     # On regarde si on est en mode configuration
     config = not ReadGPIOConfig() or is_reason_click()  # 0 ou 1
     EndGPIO()

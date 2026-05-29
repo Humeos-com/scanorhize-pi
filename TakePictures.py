@@ -60,6 +60,7 @@ if args.version:
     sys.exit(0)
 
 force = bool(args.force)
+prefix = args.prefix
 
 CurrentDate = GetCurrentDate()
 initDisplayFile()
@@ -102,7 +103,7 @@ for CurrentScanner in listScannerconfigs:
             sleep(5)  # Voir si on peut réduire ce timer
             FolderImage = CreateFolderOnUSB(Scanner.projectId)
             FolderImage = CreateFolderOnUSB(path.join(FolderImage, Scanner.sampleId))
-            copyerror = CopyImageToUSB(Scanner, FolderImage)
+            copyerror = CopyImageToUSB(Scanner, FolderImage, prefix=prefix)
             if copyerror == 0:
                 getLogger().info("Image copied to USB")
                 pictures_taken += 1
