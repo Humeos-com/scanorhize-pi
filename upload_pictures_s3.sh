@@ -85,7 +85,8 @@ PYTHON
 
     if [ -z "$SCANNERS" ]; then
         echo "❌ ERROR: No valid scanner JSON files found in $CONFIG_DIR"
-        exit 1
+        sleep 10
+        continue
     fi
 
     echo "✔ Scanner definitions found:"
@@ -112,7 +113,8 @@ PYTHON
 
     if [ ${#SOURCES[@]} -eq 0 ]; then
         echo "❌ ERROR: No valid source folders found"
-        exit 1
+        sleep 10
+        continue
     fi
 
     echo ""
