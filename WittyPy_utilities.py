@@ -415,6 +415,20 @@ class WittyPi:
             return False
 
 
+def get_fw_revision() -> Optional[str]:
+    """Return firmware version. WittyPi 5: registers 1 (major) + 2 (minor ×100) → '1.05'.
+    Other models: register 12 → raw integer string."""
+    wp = WittyPi()
+    if wp.is_WittyPi_5():
+        major = wp.i2c_read_byte(1)
+        minor_raw = wp.i2c_read_byte(2)
+        if major is None or minor_raw is None:
+            return None
+        return f"{major}.{minor_raw:02d}"
+    val = wp.i2c_read_byte(I2C_FW_REVISION)
+    return str(val) if val is not None else None
+
+
 def get_power_mode() -> int:
     """Get current power mode using direct I2C access."""
     if is_WittyPi_5() :
