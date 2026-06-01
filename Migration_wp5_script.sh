@@ -213,8 +213,8 @@ else
     # LED on duration: 100ms
     wp5set 20 100 "LED on duration = 100ms"
 
-    # Startup delay on power connection: 255 = stay off (no auto power-on)
-    wp5set 17 255 "startup delay = 255 (no auto power-on on power connection)"
+    # Startup delay on power connection: 250 seconds
+    wp5set 17 250 "startup delay = 250 seconds"
 
     # Delay between Pi shutdown and power cut: 5 seconds
     wp5set 18 5 "shutdown delay after button = 5s"
