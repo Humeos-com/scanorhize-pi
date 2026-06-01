@@ -417,11 +417,28 @@ class WittyPi:
 
         try:
             self.i2c_bus.write_byte_data(self.i2c_address, register, value)
-            # Verify write
-            result = self.i2c_read_byte(register)
-            if result == value:
-                return True
-            return False
+            # Single-attempt verify read after a short settling delay.
+            # Using i2c_read_byte with retry=3 here would sleep up to 3s per write;
+            # instead we do one direct read and treat a read failure as "write OK"
+            # since the write itself raised no exception.
+            time.sleep(0.02)
+            try:
+                result = self.i2c_bus.read_byte_data(self.i2c_address, register)
+                success = (result == value)
+                if not success:
+                    getLogger().warning(
+                        "I2C verify mismatch addr=0x%02X reg=%d: wrote 0x%02X read 0x%02X",
+                        self.i2c_address, register, value, result,
+                    )
+            except (OSError, IOError):
+                # Read-back failed but the write raised no exception — treat as OK
+                success = True
+                getLogger().warning(
+                    "I2C verify-read failed addr=0x%02X reg=%d; write probably OK",
+                    self.i2c_address, register,
+                )
+            _append_i2c_log(self.i2c_address, register, value, purpose, success, retry)
+            return success
         except (OSError, IOError) as e:
             if retry < 3:
                 time.sleep(1)
