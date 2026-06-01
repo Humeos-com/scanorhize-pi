@@ -249,7 +249,26 @@ I2C_RTC_TIMER_MODE_WP5 = 93     # Via registre extension
 
 #La WP5 n'utilise plus aucun GPIO hors I2C
 
+I2C_LOG_FILE = "/home/pi/Scanorhize/Log/i2c.log"
 
+
+def _append_i2c_log(address: int, register: int, value: int, purpose: str, success: bool, retry: int = 0):
+    """Append one line to the I2C write log file. Only writes when /run/config exists (config mode)."""
+    if not os.path.exists("/run/config"):
+        return
+    status = "OK" if success else "FAIL"
+    retry_str = f" retry={retry}" if retry > 0 else ""
+    line = (
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | WRITE"
+        f" | addr=0x{address:02X} | reg={register} (0x{register:02X})"
+        f" | val={value} (0x{value:02X}) | {purpose}{retry_str} | {status}\n"
+    )
+    try:
+        os.makedirs(os.path.dirname(I2C_LOG_FILE), exist_ok=True)
+        with open(I2C_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass  # never crash because of logging
 
 
 class WittyPi:
@@ -391,7 +410,7 @@ class WittyPi:
             getLogger().error(message)
             return None
 
-    def i2c_write_byte(self, register: int, value: int, retry: int = 0) -> bool:
+    def i2c_write_byte(self, register: int, value: int, retry: int = 0, purpose: str = "") -> bool:
         """Write a single byte to I2C register using SMBus."""
         if not self.i2c_bus:
             return False
@@ -408,8 +427,9 @@ class WittyPi:
                 time.sleep(1)
                 message = f"I2C write {self.i2c_address:02X}:{register:02X} {value:02X} failed, retrying {retry + 1}..."
                 getLogger().info(message)
-                return self.i2c_write_byte(register, value, retry + 1)
+                return self.i2c_write_byte(register, value, retry + 1, purpose)
 
+            _append_i2c_log(self.i2c_address, register, value, purpose, False, retry)
             message = f"I2C write {self.i2c_address:02X}:{register:02X} {value:02X} failed after {retry} retries: {e}"
             getLogger().error(message)
             return False
@@ -734,10 +754,10 @@ def clear_alarm_flags(ctrl2_value: Optional[int] = None):
 
         if ctrl2_value is not None:
             ctrl2_value &= 0xBF  # Clear bit 6 of CTRL2 - PCF85063 (wp4)
-            WittyPi().i2c_write_byte(I2C_RTC_CTRL2, ctrl2_value)
+            WittyPi().i2c_write_byte(I2C_RTC_CTRL2, ctrl2_value, purpose="clear alarm flag bit in RTC CTRL2 (PCF85063)")
 
-        WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM1, 0) #clear startup alrm wp4
-        WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM2, 0) #clear shutdown alrm wp4
+        WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM1, 0, purpose="clear startup alarm flag")
+        WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM2, 0, purpose="clear shutdown alarm flag")
 
     
 
@@ -811,9 +831,9 @@ def get_recovery_voltage_threshold() -> float:
 def set_low_voltage_threshold(value: int):
     """Set low voltage threshold using direct I2C access."""
     if not is_WittyPi_5():
-        WittyPi().i2c_write_byte(I2C_CONF_LOW_VOLTAGE, value)
+        WittyPi().i2c_write_byte(I2C_CONF_LOW_VOLTAGE, value, purpose="set low voltage shutdown threshold")
     else:
-        WittyPi().i2c_write_byte(I2C_CONF_LOW_VOLTAGE_WP5, value)
+        WittyPi().i2c_write_byte(I2C_CONF_LOW_VOLTAGE_WP5, value, purpose="set low voltage shutdown threshold (WP5)")
 
 
 def set_recovery_voltage_threshold(value: int):
@@ -829,9 +849,9 @@ def set_recovery_voltage_threshold(value: int):
         else:
             value = int(value)
     if not is_WittyPi_5():
-        WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE, value)
+        WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE, value, purpose="set minimum Vin to allow startup (recovery voltage)")
     else:
-        WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE_WP5, value)
+        WittyPi().i2c_write_byte(I2C_CONF_RECOVERY_VOLTAGE_WP5, value, purpose="set minimum Vin to allow startup (recovery voltage, WP5)")
 
 
 
@@ -844,9 +864,9 @@ def set_over_temperature_action(action: int, temperature: int):
     ):
         return
     if not is_WittyPi_5():
-        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION, action)
+        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION, action, purpose="set action when over-temp threshold crossed")
     else:
-        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION_WP5, action)
+        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_ACTION_WP5, action, purpose="set action when over-temp threshold crossed (WP5)")
 
     # Handle negative temperatures
     temp_value = temperature
@@ -854,10 +874,10 @@ def set_over_temperature_action(action: int, temperature: int):
         temp_value = temperature + 256
 
     if not is_WittyPi_5() :
-        WittyPi().i2c_write_byte(I2C_LM75B_TOS, temp_value)
-        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_POINT, temp_value)
+        WittyPi().i2c_write_byte(I2C_LM75B_TOS, temp_value, purpose="set LM75B over-temp trip point (TOS register)")
+        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_POINT, temp_value, purpose="set over-temperature threshold point")
     else:
-        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_POINT_WP5, temp_value) 
+        WittyPi().i2c_write_byte(I2C_CONF_OVER_TEMP_POINT_WP5, temp_value, purpose="set over-temperature threshold point (WP5)")
 
 
 def get_rtc_timestamp() -> int:
@@ -971,15 +991,15 @@ def set_startup_time(date: int, hour: int, minute: int, second: int):
     """Set startup time using direct I2C access."""
     try:
         if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second))
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, dec2bcd(minute))
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, dec2bcd(hour))
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, dec2bcd(date))
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second), purpose="set startup alarm seconds")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, dec2bcd(minute), purpose="set startup alarm minutes")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, dec2bcd(hour), purpose="set startup alarm hours")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, dec2bcd(date), purpose="set startup alarm day")
         else:
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, dec2bcd(second))
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, dec2bcd(minute))
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour))
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date))
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, dec2bcd(second), purpose="set startup seconds (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, dec2bcd(minute), purpose="set startup minutes (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour), purpose="set startup hours (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date), purpose="set startup day (WP5)")
 
     except (OSError, IOError) as e:
         getLogger().error("Error setting startup time: %s", e)
@@ -1032,15 +1052,15 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access."""
     try:
         if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second))
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, dec2bcd(minute))
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, dec2bcd(hour))
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date))
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, dec2bcd(minute), purpose="set shutdown alarm minutes")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, dec2bcd(hour), purpose="set shutdown alarm hours")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date), purpose="set shutdown alarm day")
         else:
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, dec2bcd(second))
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, dec2bcd(minute))
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, dec2bcd(hour))
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, dec2bcd(date))
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, dec2bcd(second), purpose="set shutdown seconds (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, dec2bcd(minute), purpose="set shutdown minutes (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, dec2bcd(hour), purpose="set shutdown hours (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, dec2bcd(date), purpose="set shutdown day (WP5)")
 
     except (OSError, IOError) as e:
         getLogger().error("Error setting shutdown time: %s", e)
@@ -1069,15 +1089,15 @@ def clear_startup_time():
     """Clear startup time using direct I2C access."""
     try:
         if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, 0x00)
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, 0x00, purpose="clear startup alarm seconds")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, 0x00, purpose="clear startup alarm minutes")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, 0x00, purpose="clear startup alarm hours")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, 0x00, purpose="clear startup alarm day")
         else:
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, 0x00)
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, 0x00, purpose="clear startup seconds (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, 0x00, purpose="clear startup minutes (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, 0x00, purpose="clear startup hours (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, 0x00, purpose="clear startup day (WP5)")
     except (OSError, IOError) as e:
         getLogger().error("Error clearing startup time: %s", e)
 
@@ -1086,15 +1106,15 @@ def clear_shutdown_time():
     """Clear shutdown time using direct I2C access."""
     try:
         if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, 0x00)
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, 0x00, purpose="clear shutdown alarm seconds")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, 0x00, purpose="clear shutdown alarm minutes")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, 0x00, purpose="clear shutdown alarm hours")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, 0x00, purpose="clear shutdown alarm day")
         else:
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, 0x00)
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, 0x00)
+            WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, 0x00, purpose="clear shutdown seconds (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, 0x00, purpose="clear shutdown minutes (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, 0x00, purpose="clear shutdown hours (WP5)")
+            WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, 0x00, purpose="clear shutdown day (WP5)")
     except (OSError, IOError) as e:
         getLogger().error("Error clearing shutdown time: %s", e)
 
@@ -1149,21 +1169,21 @@ def system_to_rtc():
         # Write to RTC registers using direct I2C access
 
         if not is_WittyPi_5:
-            WittyPi().i2c_write_byte(I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec))
-            WittyPi().i2c_write_byte(I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min))
-            WittyPi().i2c_write_byte(I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour))
-            WittyPi().i2c_write_byte(I2C_RTC_DAYS, dec2bcd(time_struct.tm_mday))
-            WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS, dec2bcd(time_struct.tm_wday))
-            WittyPi().i2c_write_byte(I2C_RTC_MONTHS, dec2bcd(time_struct.tm_mon))
-            WittyPi().i2c_write_byte(I2C_RTC_YEARS, dec2bcd(time_struct.tm_year % 100))
+            WittyPi().i2c_write_byte(I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec), purpose="sync system seconds to RTC")
+            WittyPi().i2c_write_byte(I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min), purpose="sync system minutes to RTC")
+            WittyPi().i2c_write_byte(I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour), purpose="sync system hours to RTC")
+            WittyPi().i2c_write_byte(I2C_RTC_DAYS, dec2bcd(time_struct.tm_mday), purpose="sync system day to RTC")
+            WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS, dec2bcd(time_struct.tm_wday), purpose="sync system weekday to RTC")
+            WittyPi().i2c_write_byte(I2C_RTC_MONTHS, dec2bcd(time_struct.tm_mon), purpose="sync system month to RTC")
+            WittyPi().i2c_write_byte(I2C_RTC_YEARS, dec2bcd(time_struct.tm_year % 100), purpose="sync system year to RTC")
         else:
-            WittyPi().i2c_write_byte(I2C_RTC_SECONDS_WP5, dec2bcd(time_struct.tm_sec))
-            WittyPi().i2c_write_byte(I2C_RTC_MINUTES_WP5, dec2bcd(time_struct.tm_min))
-            WittyPi().i2c_write_byte(I2C_RTC_HOURS_WP5, dec2bcd(time_struct.tm_hour))
-            WittyPi().i2c_write_byte(I2C_RTC_DAYS_WP5, dec2bcd(time_struct.tm_mday))
-            WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS_WP5, dec2bcd(time_struct.tm_wday))
-            WittyPi().i2c_write_byte(I2C_RTC_MONTHS_WP5, dec2bcd(time_struct.tm_mon))
-            WittyPi().i2c_write_byte(I2C_RTC_YEARS_WP5, dec2bcd(time_struct.tm_year % 100))
+            WittyPi().i2c_write_byte(I2C_RTC_SECONDS_WP5, dec2bcd(time_struct.tm_sec), purpose="sync system seconds to RTC (WP5)")
+            WittyPi().i2c_write_byte(I2C_RTC_MINUTES_WP5, dec2bcd(time_struct.tm_min), purpose="sync system minutes to RTC (WP5)")
+            WittyPi().i2c_write_byte(I2C_RTC_HOURS_WP5, dec2bcd(time_struct.tm_hour), purpose="sync system hours to RTC (WP5)")
+            WittyPi().i2c_write_byte(I2C_RTC_DAYS_WP5, dec2bcd(time_struct.tm_mday), purpose="sync system day to RTC (WP5)")
+            WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS_WP5, dec2bcd(time_struct.tm_wday), purpose="sync system weekday to RTC (WP5)")
+            WittyPi().i2c_write_byte(I2C_RTC_MONTHS_WP5, dec2bcd(time_struct.tm_mon), purpose="sync system month to RTC (WP5)")
+            WittyPi().i2c_write_byte(I2C_RTC_YEARS_WP5, dec2bcd(time_struct.tm_year % 100), purpose="sync system year to RTC (WP5)")
 
         getLogger().info("  Done :-)")
     except (OSError, IOError) as e:
