@@ -187,7 +187,7 @@ I2C_CONF_DEFAULT_ON_WP5 = 17
 I2C_CONF_PULSE_INTERVAL_WP5 = 18
 I2C_CONF_LOW_VOLTAGE_WP5 = 22 #OK
 I2C_CONF_BLINK_LED_WP5 = 20
-I2C_CONF_POWER_CUT_DELAY_WP5 = 21
+I2C_CONF_POWER_CUT_DELAY_WP5 = 18
 I2C_CONF_RECOVERY_VOLTAGE_WP5 = 23 #OK
 I2C_CONF_DUMMY_LOAD_WP5 = 23
 I2C_CONF_ADJ_VIN_WP5 = 24
@@ -427,6 +427,14 @@ def get_fw_revision() -> Optional[str]:
         return f"{major}.{minor_raw:02d}"
     val = wp.i2c_read_byte(I2C_FW_REVISION)
     return str(val) if val is not None else None
+
+
+def get_power_cut_delay() -> Optional[int]:
+    """Return power cut delay in seconds. WittyPi 5: register 18. Other models: register 21."""
+    wp = WittyPi()
+    if wp.is_WittyPi_5():
+        return wp.i2c_read_byte(I2C_CONF_POWER_CUT_DELAY_WP5)
+    return wp.i2c_read_byte(I2C_CONF_POWER_CUT_DELAY)
 
 
 def get_power_mode() -> int:
