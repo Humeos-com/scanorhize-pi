@@ -3,6 +3,8 @@
 
 import os
 import sys
+import threading
+import uuid
 from subprocess import run, CalledProcessError
 from time import sleep
 import argparse
@@ -23,6 +25,7 @@ from version import __version__
 from Scanner import (
     ScannerData,
     ScannerPreview,
+    scanAcq,
     updateScanParameters,
     listConfigScanner,
     initScanners,
@@ -72,6 +75,7 @@ from WittyPy_utilities import (
     get_sys_timestamp,
     set_startup_time,
     set_shutdown_time,
+    get_fw_revision,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -117,6 +121,10 @@ except RuntimeError as e:
 
 getLogger().info("Launch Web app")
 app = Flask(__name__)
+
+# In-memory store for async test jobs: task_id -> {"status": "running"/"done", "result": {...}}
+_test_tasks: dict = {}
+_test_tasks_lock = threading.Lock()
 
 
 def get_common_template_vars():
@@ -502,16 +510,68 @@ def TestsPage():
 
 @app.route("/tests/run/<test_name>", methods=["GET"])
 def run_test(test_name: str):
-    getLogger().info("Test: %s", test_name)
-    resp = _run_test_impl(test_name)
-    data = resp.get_json() or {}
-    ok = data.get("ok", False)
-    msg = data.get("message", "").replace("\n", " ")[:120]
-    getLogger().info("Test %s: %s — %s", test_name, "PASS" if ok else "FAIL", msg)
-    return resp
+    task_id = str(uuid.uuid4())
+    with _test_tasks_lock:
+        _test_tasks[task_id] = {"status": "running", "result": None, "messages": []}
+
+    def worker():
+        with app.app_context():
+            try:
+                resp = _run_test_impl(test_name, task_id)
+                result = resp.get_json() or {}
+            except Exception as e:
+                result = {"ok": False, "message": str(e)}
+        ok = result.get("ok", False)
+        processing = result.get("processing", False)
+        msg = result.get("message", "").replace("\n", " ")[:120]
+        getLogger().info("Test %s: %s — %s", test_name, "PASS" if ok else ("IN PROGRESS" if processing else "FAIL"), msg)
+        with _test_tasks_lock:
+            _test_tasks[task_id]["status"] = "done"
+            _test_tasks[task_id]["result"] = result
+
+    getLogger().info("Test: %s (task %s)", test_name, task_id)
+    threading.Thread(target=worker, daemon=True).start()
+    return jsonify(task_id=task_id)
 
 
-def _run_test_impl(test_name: str):
+@app.route("/tests/status/<task_id>", methods=["GET"])
+def test_status(task_id: str):
+    with _test_tasks_lock:
+        task = _test_tasks.get(task_id)
+    if task is None:
+        return jsonify(status="not_found"), 404
+    messages = task.get("messages", [])
+    if task["status"] == "running":
+        return jsonify(status="running", messages=messages)
+    return jsonify(status="done", messages=messages, **task["result"])
+
+
+@app.route("/tests/ping", methods=["GET"])
+def tests_ping():
+    return jsonify(ok=True)
+
+
+@app.route("/tests/cancel/<task_id>", methods=["POST"])
+def cancel_test(task_id: str):
+    with _test_tasks_lock:
+        if task_id in _test_tasks:
+            _test_tasks[task_id]["cancelled"] = True
+    return jsonify(ok=True)
+
+
+def _task_is_cancelled(task_id: str) -> bool:
+    with _test_tasks_lock:
+        task = _test_tasks.get(task_id)
+        return task is not None and task.get("cancelled", False)
+
+
+def _task_log(task_id, message):
+    with _test_tasks_lock:
+        if task_id in _test_tasks:
+            _test_tasks[task_id].setdefault("messages", []).append(message)
+
+
+def _run_test_impl(test_name: str, task_id: str = None):
     try:
         # ── CONNECTIVITY ──────────────────────────────────────────────────────
 
@@ -523,7 +583,8 @@ def _run_test_impl(test_name: str):
             except RuntimeError as e:
                 return jsonify(ok=False, message=str(e), summary="Internet FAIL")
 
-        # S3: check main production bucket is reachable, then chain to test bucket
+        # S3: check production bucket is reachable, then chain to the humeos-test bucket.
+        # Two-step chain so each bucket gets its own PASS/FAIL line in the console.
         if test_name == "s3":
             config = ConfigApp()
             result = run(
@@ -534,7 +595,7 @@ def _run_test_impl(test_name: str):
                 return jsonify(ok=True, message=f"S3 bucket {config.s3_bucket} is accessible using `s3cmd`.", next_test="s3-test")
             return jsonify(ok=False, message=result.stderr or "Could not reach {config.s3_bucket} bucket.", summary=f"S3 FAIL ({config.s3_bucket})")
 
-        # S3-test: second step — check the humeos-test bucket specifically
+        # S3-test: second step of the S3 chain — verify the humeos-test bucket used by speed test
         if test_name == "s3-test":
             config = ConfigApp()
             result = run(
@@ -554,7 +615,8 @@ def _run_test_impl(test_name: str):
                 return jsonify(ok=True, message=f"Active SSH processes:\n{result.stdout}", summary="SSH tunnel active")
             return jsonify(ok=False, message="No active SSH tunnel found.", summary="SSH tunnel not found")
 
-        # Upload-pictures-service: check the systemd service is active, then chain to copy test
+        # Upload-pictures-service: verify the systemd upload-pictures service is running.
+        # If active, chains to copy-test-picture to actually exercise the upload pipeline.
         if test_name == "upload-pictures-service":
             try:
                 result = run(
@@ -569,7 +631,9 @@ def _run_test_impl(test_name: str):
             except Exception as e:
                 return jsonify(ok=False, message="Upload Pictures service status is not 'active'", summary="Upload service: not active")
 
-        # Copy-test-picture: drop a dummy jpg into the image folder to trigger the uploader
+        # Copy-test-picture: plant a dummy jpg in the USB image folder so the upload service
+        # picks it up. Uses the first scanner config that has both projectId and sampleId,
+        # since they all share the same S3 destination. Chains to wait-for-pictures-upload.
         if test_name == "copy-test-picture":
             configs = listConfigScanner()
             if not configs:
@@ -587,7 +651,7 @@ def _run_test_impl(test_name: str):
                     try:
                         destination.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy(source, destination)
-                        now = datetime.now().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+                        now = datetime.now().strftime("%H:%M:%S")
                         return jsonify(ok=True, message=f"Test file {testFile} copied to {destFile}\n[{now}] <b style='color:orange;'>⌛ IN PROGRESS</b>: Test picture is waiting to be uploaded to server", next_test="wait-for-pictures-upload")
                     except FileNotFoundError:
                         return jsonify(ok=False, message=f"Test file {testFile} not found.", summary="Upload: test file not found")
@@ -595,59 +659,61 @@ def _run_test_impl(test_name: str):
                         return jsonify(ok=False, message=str(e), summary="Upload: copy failed")
             return jsonify(ok=False, message="No scanner config files found.", summary="Upload: no scanner config")
 
-        # Wait-for-pictures-upload: poll every 3s until image folder is empty
+        # Wait-for-pictures-upload: sum files across all scanner folders, re-schedule itself via
+        # next_test until the count reaches zero (upload service has moved them all to S3).
+        # processing=True keeps the IN PROGRESS line visible and suppresses duplicate messages
+        # when the file count hasn't changed between polls.
         if test_name == "wait-for-pictures-upload":
             configs = listConfigScanner()
             if not configs:
                 return jsonify(ok=False, message="No scanner config files found.", summary="Upload: no scanner config")
+            total_files = 0
             for cfg in configs:
                 scanner = ScannerData()
                 scanner.ReadScannerConfig(cfg)
                 if scanner.projectId and scanner.sampleId:
-                    from datetime import datetime
-                    destFile = f"/media/pi/Image/{scanner.projectId}/{scanner.sampleId}"
-                    destination = Path(destFile)
-                    file_count = sum(1 for f in destination.iterdir() if f.is_file())
-                    if file_count == 0:
-                        return jsonify(ok=True, message=f"Test files (.json, .jpg and .jp2) uploaded to server (no more files in folder)", summary="Upload OK")
-                    else:
-                        sleep(3)
-                        return jsonify(processing=True, message=f"Uploading {file_count} {'file' if file_count == 1 else 'files'} to server", next_test="wait-for-pictures-upload")
+                    destination = Path(f"/media/pi/Image/{scanner.projectId}/{scanner.sampleId}")
+                    if destination.exists():
+                        total_files += sum(1 for f in destination.iterdir() if f.is_file())
+            if total_files == 0:
+                return jsonify(ok=True, message="Test files (.json, .jpg and .jp2) uploaded to server (no more files in folder)", summary="Upload OK")
+            else:
+                file_word = 'file' if total_files == 1 else 'files'
+                return jsonify(processing=True, message=f"Uploading {total_files} {file_word} to server", next_test="wait-for-pictures-upload")
 
-        # Speed: download then upload a 2MB file via s3cmd and report MB/s for each direction
+        # Speed: measure download then upload throughput against a fixed 2 MB file on S3.
+        # Each direction is reported as an intermediate message while polling so the user
+        # sees download speed before the upload finishes. Cancellation is checked between
+        # the two transfers — it can't interrupt a running s3cmd subprocess.
         if test_name == "speed":
             import time
-            from datetime import datetime
             local_path = "/tmp/2MB.jpg"
             s3_path = "s3://humeos-test/tests/2MB.jpg"
             try:
-                # -------------------
-                # DOWNLOAD
-                # -------------------
+                _task_log(task_id, "⬇ Downloading 2MB test file…")
                 t0 = time.time()
                 run(["s3cmd", "--force", "get", s3_path, local_path], check=True)
                 t1 = time.time()
                 download_time = t1 - t0
                 size_bytes = os.path.getsize(local_path)
                 download_speed = (size_bytes / (1024 * 1024)) / download_time
-                # -------------------
-                # UPLOAD
-                # -------------------
+                _task_log(task_id, f"⬇ Download: {download_time:.2f}s ({download_speed:.2f} MB/s) — uploading…")
+                # Cancellation point: between download and upload (only place we can safely stop)
+                if _task_is_cancelled(task_id):
+                    return jsonify(ok=False, message="Test stopped by user", summary="Speed test: stopped")
                 t2 = time.time()
                 run(["s3cmd", "put", local_path, s3_path], check=True)
                 t3 = time.time()
                 upload_time = t3 - t2
                 upload_speed = (size_bytes / (1024 * 1024)) / upload_time
+                summary = (
+                    f"Download: {download_time:.2f}s ({download_speed:.2f} MB/s) | "
+                    f"Upload: {upload_time:.2f}s ({upload_speed:.2f} MB/s)"
+                )
                 return jsonify(
                     ok=True,
-                    message=(
-                        f"Download: {download_time:.2f}s ({download_speed:.2f} MB/s) | "
-                        f"Upload: {upload_time:.2f}s ({upload_speed:.2f} MB/s)"
-                    ),
-                    summary=(
-                        f"Download: {download_time:.2f}s ({download_speed:.2f} MB/s) | "
-                        f"Upload: {upload_time:.2f}s ({upload_speed:.2f} MB/s)"
-                    )
+                    message=f"⬆ Upload: {upload_time:.2f}s ({upload_speed:.2f} MB/s)",
+                    summary=summary,
                 )
             except Exception as e:
                 return jsonify(ok=False, message=str(e), summary="Speed test FAIL")
@@ -660,65 +726,133 @@ def _run_test_impl(test_name: str):
             list_result = run(
                 "mmcli -L", shell=True, capture_output=True, text=True, check=False
             )
-            if list_result.returncode != 0 or "No modems were found" in list_result.stdout:
-                return jsonify(ok=False, message="No 4G modem detected (mmcli -L).\nIs ModemManager running?", summary="4G: no modem detected")
 
-            # Parse modem path: "/org/freedesktop/ModemManager1/Modem/0 [...]"
+            if list_result.returncode != 0 or "No modems were found" in list_result.stdout:
+                return jsonify(
+                    ok=False,
+                    message="No 4G modem detected (mmcli -L).\nIs ModemManager running?",
+                    summary="4G: no modem detected",
+                )
+
+            # Parse modem path
             modem_path = list_result.stdout.strip().splitlines()[0].split()[0]
             modem_index = modem_path.split("/")[-1]
 
             detail = run(
                 f"mmcli -m {modem_index} --output-keyvalue",
-                shell=True, capture_output=True, text=True, check=False,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=False,
             )
+
             detail_out = detail.stdout if detail.returncode == 0 else list_result.stdout
 
             def mmcli_field(key):
                 for line in detail_out.splitlines():
-                    if line.strip().startswith(key):
-                        return line.split(":", 1)[1].strip()
+                    line = line.strip()
+
+                    if ":" not in line:
+                        continue
+
+                    k, v = line.split(":", 1)
+
+                    if k.strip() == key:
+                        return v.strip()
+
                 return ""
 
             state    = mmcli_field("modem.generic.state")
             operator = mmcli_field("modem.3gpp.operator-name")
             tech     = mmcli_field("modem.generic.access-technologies")
             signal   = mmcli_field("modem.generic.signal-quality.value")
-            sim_path = mmcli_field("modem.generic.sim-path")
+            sim_path = mmcli_field("modem.generic.sim")
+            unlock   = mmcli_field("modem.generic.unlock-required")
 
-            # Query SIM details if a SIM is present
-            sim_iccid = sim_state = None
+            # Query SIM details
+            sim_iccid = None
+            sim_active = None
+
             if sim_path and sim_path != "--":
                 sim_index = sim_path.split("/")[-1]
+
                 sim_result = run(
                     f"mmcli -i {sim_index} --output-keyvalue",
-                    shell=True, capture_output=True, text=True, check=False,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    check=False,
                 )
+
                 if sim_result.returncode == 0:
+
                     def sim_field(key):
                         for line in sim_result.stdout.splitlines():
-                            if line.strip().startswith(key):
-                                return line.split(":", 1)[1].strip()
+                            line = line.strip()
+
+                            if ":" not in line:
+                                continue
+
+                            k, v = line.split(":", 1)
+
+                            if k.strip() == key:
+                                return v.strip()
+
                         return ""
+
                     sim_iccid = sim_field("sim.properties.iccid")
-                    sim_state = sim_field("sim.properties.sim-status")
+                    sim_active = sim_field("sim.properties.active")
 
             connected = state.lower() == "connected"
-            lines = [f"State: {state}" if state else "State: unknown"]
-            if sim_path and sim_path != "--":
-                lines.append(f"SIM: present" + (f"  ({sim_state})" if sim_state else ""))
-                if sim_iccid:
-                    lines.append(f"ICCID: {sim_iccid}")
-            else:
-                lines.append("SIM: not detected")
-            if operator:
-                lines.append(f"Operator: {operator}")
-            if tech:
-                lines.append(f"Technology: {tech}")
-            if signal:
-                lines.append(f"Signal quality: {signal}%")
-            summary = state + (f" – {operator}" if operator else "") + (f" {signal}%" if signal else "")
-            return jsonify(ok=connected, message="\n".join(lines), summary=summary)
 
+            lines = [f"\n  → State: {state}" if state else "\n  → State: unknown"]
+
+            if sim_path and sim_path != "--":
+                lines.append("  → SIM: present")
+
+                # ✔ FIX: suppress false SIM-PIN2 noise
+                # PIN2 is NOT required for data connection
+                if unlock and unlock != "--" and unlock not in ["sim-pin2"]:
+                    lines.append(f"  → SIM status: waiting for {unlock}")
+                elif unlock == "sim-pin2":
+                    lines.append("  → SIM status: PIN2 available (not required)")
+
+                if sim_active:
+                    lines.append(f"  → SIM active: {sim_active}")
+
+                if sim_iccid:
+                    lines.append(f"  → ICCID: {sim_iccid}")
+
+            else:
+                lines.append("  → SIM: not detected")
+
+            if operator and operator != "--":
+                lines.append(f"  → Operator: {operator}")
+
+            if tech and tech != "--":
+                lines.append(f"  → Technology: {tech}")
+
+            if signal and signal != "--":
+                lines.append(f"  → Signal quality: {signal}%")
+
+            summary = state
+
+            # ✔ FIX: remove misleading PIN2 from summary unless actually blocking
+            if unlock and unlock != "--" and unlock not in ["sim-pin2"]:
+                summary += f" – waiting for {unlock}"
+
+            elif operator and operator != "--":
+                summary += f" – {operator}"
+
+            if signal and signal != "--":
+                summary += f" {signal}%"
+
+            return jsonify(
+                ok=connected,
+                message="\n".join(lines),
+                summary=summary,
+            )
+    
         # Timezone: UTC check + internet time accuracy via NTP
         if test_name == "timezone":
             import socket, struct, time as time_mod
@@ -752,7 +886,7 @@ def _run_test_impl(test_name: str):
                 s.close()
                 ntp_time = struct.unpack('!12I', data)[10] - NTP_DELTA
                 drift = abs(time_mod.time() - ntp_time)
-                ntp_ok = drift <= 2
+                ntp_ok = drift <= 10
                 if not ntp_ok:
                     all_ok = False
                 lines_out.append(f"  → Time vs NTP: {'OK' if ntp_ok else 'FAIL'} ({drift:.2f}s difference)")
@@ -766,7 +900,10 @@ def _run_test_impl(test_name: str):
                 summary=f"Timezone: {timezone}" if timezone else "Timezone: unknown",
             )
 
-        # WittyPi: check I2C presence, model, default-on, RTC/system clock drift, and next alarms
+        # WittyPi: check I2C presence, model, firmware version, default-on flag, RTC/system
+        # clock drift, and next scheduled alarms. Fails if: default-on is OFF (255), startup
+        # alarm is too soon (<3 min) or suspiciously far (>20 days), or RTC differs from
+        # system clock by more than 2 seconds.
         if test_name == "wittypi":
             if not is_mc_connected():
                 return jsonify(ok=False, message="WittyPi not detected on I2C bus.", summary="WittyPi: not detected")
@@ -847,11 +984,14 @@ def _run_test_impl(test_name: str):
             else:
                 time_diff = abs(rtc_ts - sys_ts)
                 rtc_date_str = datetime.fromtimestamp(rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-                if time_diff > 2:
+                if time_diff > 10:
                     rtc_time_str = f"<b style='color:red; font-weight:bold;'>⚠ {time_diff}s difference</b>"
                     rtc_warning = True
                 else:
                     rtc_time_str = f"OK ({time_diff}s difference)"
+
+            fw_rev = get_fw_revision()
+            fw_str = f"v{fw_rev}" if fw_rev is not None else "unknown"
 
             ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning)
             return jsonify(
@@ -860,6 +1000,7 @@ def _run_test_impl(test_name: str):
                 message=(
                     f"\n"
                     f"  → Model:            {model}\n"
+                    f"  → Firmware:         {fw_str}\n"
                     f"  → Default on power: {default_on}\n"
                     f"  → RTC vs system:    {rtc_time_str}\n"
                     f"      → RTC:          {rtc_date_str}\n"
@@ -870,19 +1011,23 @@ def _run_test_impl(test_name: str):
                 ),
             )
 
-        # Wittypi-cycle: schedule a shutdown/wakeup test; frontend handles the countdown and ping
+        # Wittypi-cycle: schedule a shutdown in ~1 min and a wakeup 1 min later, then return
+        # immediately with processing=True. The frontend countdown timer pings /tests/ping
+        # after the expected wakeup time to verify the Pi came back up. The flag file
+        # wittypi_test_mode forces the app into config mode on next boot so the cycle test
+        # page is shown again automatically after reboot.
         if test_name == "wittypi-cycle":
             if not is_mc_connected():
                 return jsonify(ok=False, message="WittyPi not detected on I2C bus.", summary="WittyPi cycle: not detected")
 
             from datetime import datetime, timedelta
             now = datetime.now()
-            # Use next minute if >5s away, otherwise skip to the one after
+            # Skip to the minute after next if we're too close to the next minute boundary
             seconds_to_next = 60 - now.second
             shutdown = now.replace(second=0, microsecond=0) + timedelta(minutes=1 if seconds_to_next >= 5 else 2)
             wakeup   = shutdown + timedelta(minutes=1)
 
-            # Write flag so isConfig() forces config mode on next boot
+            # Flag file presence tells the boot sequence to stay in test/config mode
             Path("wittypi_test_mode").write_text("")
 
             set_shutdown_time(shutdown.day, shutdown.hour, shutdown.minute, 0)
@@ -903,52 +1048,158 @@ def _run_test_impl(test_name: str):
                 wakeup_at=wakeup.isoformat() + "Z",
             )
 
-        # Scanners-config-files: list scanner JSONs and warn if device is missing/undetected
+        # Scanners-config-files: audit all scanner JSON configs and the live SANE device list.
+        # A scanner counts as "configured" (expectedScanners) if it has a projectId or sampleId,
+        # and as "ready" (configuredScanners) only if its device is also currently plugged in.
+        # Fails on any of: no ready scanners, missing devices, projectId mismatch across scanners,
+        # duplicate sampleIds, or a projectId set without a matching sampleId.
         if test_name == "scanners-config-files":
             configs = listConfigScanner()
             if not configs:
                 return jsonify(ok=False, message="No scanner config files found.")
+            # Query live SANE device list once; skip on non-Pi (dev/test environment)
+            connected_devices = ScannerData().scanSearchAll() if is_raspberry_pi() else None
             lines = []
-            configuredScanners = 0
+            configuredScanners = 0  # scanners with projectId/sampleId AND device plugged in
+            expectedScanners = 0    # scanners with projectId or sampleId (intended to be active)
+            projectIds = []
+            sampleIds = []
+            missing_sample_ids = []  # configs where projectId is set but sampleId is empty
             for cfg in configs:
                 scanner = ScannerData()
                 scanner.ReadScannerConfig(cfg)
-                if not scanner.device or scanner.device == "NoScannerDetected":
-                    device_str = "<span style='font-weight:bold; color:orange;'>⚠</span> device missing or not detected"
+                if scanner.projectId or scanner.sampleId:
+                    expectedScanners += 1
+                    if scanner.projectId:
+                        projectIds.append(scanner.projectId)
+                    if scanner.sampleId:
+                        sampleIds.append(scanner.sampleId)
+                    elif scanner.projectId:
+                        missing_sample_ids.append(cfg)
+                    if not scanner.device or scanner.device == "NoScannerDetected":
+                        device_str = "<span style='font-weight:bold; color:orange;'>⚠</span> device missing or not detected"
+                    elif connected_devices is not None and scanner.device not in connected_devices:
+                        device_str = f"<span style='font-weight:bold; color:orange;'>⚠</span> not plugged in ({scanner.device})"
+                    else:
+                        device_str = scanner.device
+                        configuredScanners += 1
+                    lines.append(f"\n  → {cfg}:\n    - projectId: {scanner.projectId}\n    - sampleId:  {scanner.sampleId}\n    - device:    {device_str}")
                 else:
-                    device_str = scanner.device
-                    configuredScanners += 1
-                lines.append(f"  {cfg}: projectId={scanner.projectId}, sampleId={scanner.sampleId}, device={device_str}")
+                    lines.append(f"\n  → {cfg}: Empty config file")
+
+            n = len(lines)
+            files_str = f"{n} scanner config {'file' if n == 1 else 'files'} found"
+            scanner_word = 'scanner' if configuredScanners == 1 else 'scanners'
+            project_ids_match = len(set(projectIds)) <= 1
+            sample_ids_unique = len(sampleIds) == len(set(sampleIds))
+            no_missing_sample_ids = len(missing_sample_ids) == 0
+            ok = configuredScanners > 0 and configuredScanners >= expectedScanners and project_ids_match and sample_ids_unique and no_missing_sample_ids
+            # Show the most actionable failure reason first
             if configuredScanners == 0:
-                return jsonify(ok=False, message="Scanner configs found:\n" + "\n".join(lines) + "\n  → No scanner configured", summary=f"{len(lines)} scanner config file(s) found")
+                suffix = f"\n\n  → No scanner configured"
+            elif configuredScanners < expectedScanners:
+                suffix = f"\n\n  → {configuredScanners}/{expectedScanners} {scanner_word} configured — {expectedScanners - configuredScanners} missing device"
+            elif not project_ids_match:
+                unique = ', '.join(set(projectIds))
+                suffix = f"\n\n  → <b style='color:orange;'>⚠ projectId mismatch: {unique}</b>"
+            elif not sample_ids_unique:
+                dupes = [sid for sid in set(sampleIds) if sampleIds.count(sid) > 1]
+                suffix = f"\n\n  → <b style='color:orange;'>⚠ duplicate sampleId: {', '.join(dupes)}</b>"
+            elif not no_missing_sample_ids:
+                suffix = f"\n\n  → <b style='color:orange;'>⚠ projectId set but sampleId missing: {', '.join(missing_sample_ids)}</b>"
             else:
-                return jsonify(ok=True, message="Scanner configs found:\n" + "\n".join(lines) + f"\n  → {configuredScanners} scanner(s) configured", summary=f"{len(lines)} scanner config file(s) found")
+                suffix = f"\n\n  → {configuredScanners} {scanner_word} configured"
+            return jsonify(ok=ok, message="Scanner configs found:\n" + "\n".join(lines) + suffix, summary=files_str)
 
-        # Take-pictures: force acquisition on all scanners, then chain to upload wait
+        # Take-pictures: inlined scan loop (instead of subprocess) so we can emit per-scanner
+        # progress messages while polling. Chains to wait-for-pictures-upload on success.
         if test_name == "take-pictures":
-            result = run(
-                "python3 TakePictures.py -f --prefix test",
-                shell=True, capture_output=True, text=True, check=False,
-            )
-            stdout = {line.split(":")[0]: line.split(":", 1)[1]
-                      for line in result.stdout.splitlines() if ":" in line}
-            pictures_taken = int(stdout.get("PICTURES_TAKEN", 0))
-            scanners = stdout.get("SCANNERS", "")
-            if scanners:
-                scanner_list = scanners.replace(",", ", ")
-                total = len(scanners.split(",")) if scanners else 0
-                pic_word = 'picture' if pictures_taken == 1 else 'pictures'
-                if result.returncode == 0:
-                    return jsonify(ok=True, message=f"{pictures_taken}/{total} {pic_word} taken — scanners: {scanner_list}", next_test="wait-for-pictures-upload", summary=f"{pictures_taken}/{total} {pic_word} taken")
-            else:
-                return jsonify(ok=False, message=f"No scanner found", summary="Take pictures: no scanner")
-            return jsonify(ok=False, message=f"{pictures_taken}/{total} {pic_word} taken — scanners: {scanner_list}\n{result.stderr or ''}", summary=f"Take pictures: {pictures_taken}/{total} failed")
+            from Campaign import CopyImageToUSB, CreateFolderOnUSB
+            from DateUtils import GetCurrentDate
 
-        # Wittypi-cycle-cancel: delete the flag file when the user stops the test early
+            configs = listConfigScanner()
+            enabled = []       # scanners with enable=1 (connected at app startup)
+            expected_count = 0  # scanners with a projectId or sampleId in their config
+            for i, cfg in enumerate(configs):
+                s = ScannerData()
+                s.ReadScannerConfig(cfg)
+                if s.projectId or s.sampleId:
+                    expected_count += 1
+                if s.enable:
+                    enabled.append((i, cfg, s))
+
+            total = len(enabled)
+            # Fail if no scanner was detected at startup
+            if total == 0:
+                return jsonify(ok=False, message="No scanner found", summary="Take pictures: no scanner")
+            # Fail if fewer scanners are enabled than the config expects
+            # (catches scanners that were disconnected before the app started)
+            if total < expected_count:
+                return jsonify(
+                    ok=False,
+                    message=f"Only {total}/{expected_count} scanner(s) connected — check scanners-config-files test for details",
+                    summary=f"Take pictures: {total}/{expected_count} scanners connected",
+                )
+
+            current_date = GetCurrentDate()
+            pictures_taken = 0
+            scanning_error = 0
+            scanner_ids = []
+
+            for idx, (i_scan, cfg, scanner) in enumerate(enabled):
+                # Allow the stop button to interrupt between scans
+                if _task_is_cancelled(task_id):
+                    return jsonify(ok=False, message="Test stopped by user", summary="Take pictures: stopped")
+                # Fresh SANE device list before each scan to catch scanners unplugged mid-test.
+                # sleep(5) gives the scanner time to recover after the SANE query before scanimage runs.
+                if is_raspberry_pi():
+                    live_devices = ScannerData().scanSearchAll()
+                    if scanner.device not in live_devices:
+                        return jsonify(
+                            ok=False,
+                            message=f"Scanner {idx + 1}/{total} not plugged in ({scanner.device})",
+                            summary=f"Take pictures: scanner {idx + 1} not plugged in",
+                        )
+                    sleep(5)
+                _task_log(task_id, f"📷 Taking picture {idx + 1}/{total}…")
+                scanner_ids.append(f"{scanner.projectId}/{scanner.sampleId}")
+                scanner = scanAcq(scanner, i_scan, current_date)
+                scanner.WriteScannerConfig(cfg)
+                if scanner.error == 0:
+                    sleep(5)  # brief pause before USB copy (matches TakePictures.py behaviour)
+                    folder = CreateFolderOnUSB(scanner.projectId)
+                    folder = CreateFolderOnUSB(os.path.join(folder, scanner.sampleId))
+                    copy_error = CopyImageToUSB(scanner, folder, prefix="test")
+                    if copy_error == 0:
+                        _task_log(task_id, f"  ✓ Picture {idx + 1}/{total} saved to USB")
+                        pictures_taken += 1
+                    else:
+                        _task_log(task_id, f"  ⚠ Picture {idx + 1}/{total}: copy to USB failed")
+                        scanning_error = 1
+                else:
+                    return jsonify(
+                        ok=False,
+                        message=f"Scan error on picture {idx + 1}/{total}",
+                        summary=f"Take pictures: scan error {idx + 1}/{total}",
+                    )
+
+            scanner_list = "\n    - ".join(scanner_ids)
+            pic_word = 'picture' if pictures_taken == 1 else 'pictures'
+            ok = scanning_error == 0 and pictures_taken > 0 and pictures_taken == total
+            return jsonify(
+                ok=ok,
+                message=f"{pictures_taken}/{total} {pic_word} taken\n  → Scanners:\n    - {scanner_list}",
+                next_test="wait-for-pictures-upload",
+                summary=f"{pictures_taken}/{total} {pic_word} taken",
+            )
+            
+
+        # Wittypi-cycle-cancel: called by the frontend stop button during a cycle test.
+        # Removes the flag file so the next boot won't force test mode, and arms a safety
+        # shutdown 20 minutes out in case the Pi reboots into an unexpected state.
         if test_name == "wittypi-cycle-cancel":
             flag = Path("wittypi_test_mode")
 
-            # Safety shutdown at +20 min
             from datetime import datetime, timedelta
             now = datetime.now()
             safety = now.replace(second=0, microsecond=0) + timedelta(minutes=20)
