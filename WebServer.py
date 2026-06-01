@@ -76,6 +76,7 @@ from WittyPy_utilities import (
     set_startup_time,
     set_shutdown_time,
     get_fw_revision,
+    get_power_cut_delay,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -993,7 +994,16 @@ def _run_test_impl(test_name: str, task_id: str = None):
             fw_rev = get_fw_revision()
             fw_str = f"v{fw_rev}" if fw_rev is not None else "unknown"
 
-            ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning)
+            power_cut_delay = get_power_cut_delay()
+            power_cut_delay_warning = power_cut_delay is not None and power_cut_delay > 30
+            if power_cut_delay is None:
+                power_cut_str = "unknown"
+            elif power_cut_delay_warning:
+                power_cut_str = f"<b style='color:red; font-weight:bold;'>⚠ {power_cut_delay}s (too high, max 30s)</b>"
+            else:
+                power_cut_str = f"{power_cut_delay}s"
+
+            ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning)
             return jsonify(
                 ok=ok,
                 summary=f"{model} {'OK' if ok else 'FAIL'}",
@@ -1002,6 +1012,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     f"  → Model:            {model}\n"
                     f"  → Firmware:         {fw_str}\n"
                     f"  → Default on power: {default_on}\n"
+                    f"  → Power cut delay:  {power_cut_str}\n"
                     f"  → RTC vs system:    {rtc_time_str}\n"
                     f"      → RTC:          {rtc_date_str}\n"
                     f"      → System:       {sys_date_str}\n"
@@ -1032,6 +1043,23 @@ def _run_test_impl(test_name: str, task_id: str = None):
 
             set_shutdown_time(shutdown.day, shutdown.hour, shutdown.minute, 0)
             set_startup_time(wakeup.day,   wakeup.hour,   wakeup.minute,   0)
+
+            # Verify the values were actually stored in I2C registers
+            shutdown_expected = f"{shutdown.day:02d} {shutdown.hour:02d}:{shutdown.minute:02d}:00"
+            wakeup_expected   = f"{wakeup.day:02d} {wakeup.hour:02d}:{wakeup.minute:02d}:00"
+            shutdown_readback = get_shutdown_time()
+            wakeup_readback   = get_startup_time()
+            if shutdown_readback != shutdown_expected or wakeup_readback != wakeup_expected:
+                Path("wittypi_test_mode").unlink(missing_ok=True)
+                return jsonify(
+                    ok=False,
+                    summary="WittyPi cycle: I2C write verification failed",
+                    message=(
+                        f"\n  ⚠ I2C readback mismatch — times were not stored correctly.\n"
+                        f"  → Shutdown expected: {shutdown_expected}  got: {shutdown_readback}\n"
+                        f"  → Wakeup expected:   {wakeup_expected}  got: {wakeup_readback}"
+                    ),
+                )
 
             getLogger().info(
                 "WittyPi cycle test: shutdown at %s, wakeup at %s",
