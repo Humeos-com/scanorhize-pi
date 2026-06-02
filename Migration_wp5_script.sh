@@ -164,18 +164,23 @@ info "Removing WP4 files..."
 systemctl daemon-reload
 log "systemd daemon reloaded"
 
-## --- 4c. Install WP5 ---
-echo "[OK] Downloading WP5 package..."
-wget -O "$HOME/wp5_latest.deb" \
-    https://www.uugear.com/repo/WittyPi5/wp5_latest.deb
+# --- 4c. Install WP5 ---
+# The .deb package must be compiled on your PC and placed in
+# C:\Users\Wakaw\Desktop\Scanorhize_Transfert before running this script.
+# It will be picked up from /home/pi/Scanorhize after the scp transfer.
+section "4c - WP5 deb install"
 
-log "[OK] Moving package to /tmp..."
-sudo mv "$HOME/wp5_latest.deb" /tmp/
+WP5_DEB=$(ls /home/pi/Scanorhize/*.deb 2>/dev/null | head -n 1)
 
-log "[OK] Installing package..."
-sudo apt install -y /tmp/wp5_latest.deb
-
-log "[OK] Installation complete."
+if [ -n "$WP5_DEB" ]; then
+    info "Found deb package: $WP5_DEB"
+    dpkg -i "$WP5_DEB"
+    log "WP5 installed ($WP5_DEB)"
+else
+    error "No .deb file found in /home/pi/Scanorhize"
+    error "Build the package on your PC and transfer it via Scanorhize_Transfert before running this script"
+    exit 1
+fi
 
 systemctl daemon-reload
 systemctl restart wp5d.service
