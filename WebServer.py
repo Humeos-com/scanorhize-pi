@@ -66,6 +66,7 @@ from WittyPy_utilities import (
     get_shutdown_time,
     get_startup_time,
     get_default_on,
+    set_default_on,
     is_mc_connected,
     is_WittyPi_3,
     is_WittyPi_4,
@@ -946,7 +947,11 @@ def _run_test_impl(test_name: str, task_id: str = None):
             default_on_raw = get_default_on()  # 0=immediately on, 255=stay off
 
             if default_on_raw == 255:
-                default_on = "<b style='font-weight:bold; color:red;'>⚠ OFF</b>"
+                if set_default_on(15) and get_default_on() == 15:
+                    default_on_raw = 15
+                    default_on = "Turn ON after 15s <i style='color:orange'>(updated from OFF by default)</i>"
+                else:
+                    default_on = "<b style='font-weight:bold; color:red;'>⚠ OFF (reschedule failed)</b>"
             elif default_on_raw == 0:
                 default_on = "Immediately turn ON"
             else:
@@ -955,6 +960,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             from datetime import timedelta
             warning_text = ""
             startup_warning = ""
+            startup_reschedule_note = ""
 
             try:
                 if startup and shutdown and startup < shutdown:
@@ -979,6 +985,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     if readback_str == expected_str:
                         startup = new_wakeup.replace(second=0, microsecond=0)
                         startup_warning = ""
+                        startup_reschedule_note = f" <i style='color:orange;'>(rescheduled from invalid time → +10 min)</i>"
                         startup_left = startup - now
                         startup_left_str = str(startup_left).split('.')[0]
                     else:
@@ -995,7 +1002,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
 
             shutdown_str = f"{shutdown}" + (f" ({shutdown_left_str} left)" if shutdown else "") if shutdown else "<span style='color:red; font-weight:bold;'>⚠ not set</span>"
             startup_str  = f"{startup}"  + (f" ({startup_left_str} left)"  if startup  else "") if startup  else "<span style='color:red; font-weight:bold;'>⚠ not set</span>"
-            startup_str += startup_warning
+            startup_str += startup_warning + startup_reschedule_note
 
             from datetime import timezone as tz
             rtc_ts = get_rtc_timestamp()

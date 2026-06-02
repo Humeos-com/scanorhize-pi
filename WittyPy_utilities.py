@@ -815,6 +815,15 @@ def get_default_on() -> bool:
     return value
 
 
+def set_default_on(value: int) -> bool:
+    """Write the default-on delay register (0=immediately, 255=stay off, N=delay in seconds).
+    Returns True if the write was confirmed by readback."""
+    reg = I2C_CONF_DEFAULT_ON_WP5 if is_WittyPi_5() else I2C_CONF_DEFAULT_ON
+    WittyPi().i2c_write_byte(reg, value)
+    readback = WittyPi().i2c_read_byte(reg)
+    return readback == value
+
+
 def get_low_voltage_threshold() -> float:
     """Get low voltage threshold using direct I2C access."""
     # Pour WittyPi 5 : 0 => disabled ; entier = vseuil x10
