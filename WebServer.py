@@ -964,10 +964,34 @@ def _run_test_impl(test_name: str, task_id: str = None):
 
             if startup:
                 delta = startup - now
+                reschedule = False
                 if delta < timedelta(minutes=3):
                     startup_warning = " <b style='color:red; font-weight:bold;'>⚠ too soon (&lt;3 min)</b>"
+                    reschedule = True
                 elif delta > timedelta(days=20):
                     startup_warning = " <b style='color:red;font-weight:bold;'>⚠ too far (&gt;20 days - probably in the past)</b>"
+                    reschedule = True
+                if reschedule:
+                    new_wakeup = now + timedelta(minutes=10)
+                    set_startup_time(new_wakeup.day, new_wakeup.hour, new_wakeup.minute, 0)
+                    expected_str = f"{new_wakeup.day:02d} {new_wakeup.hour:02d}:{new_wakeup.minute:02d}:00"
+                    readback_str = get_startup_time()
+                    if readback_str == expected_str:
+                        startup = new_wakeup.replace(second=0, microsecond=0)
+                        startup_warning = ""
+                        startup_left = startup - now
+                        startup_left_str = str(startup_left).split('.')[0]
+                    else:
+                        return jsonify(
+                            ok=False,
+                            summary=f"{model} FAIL",
+                            message=(
+                                f"\n  ⚠ Startup time was invalid and reschedule to "
+                                f"{new_wakeup.strftime('%H:%M')} failed.\n"
+                                f"  → Expected: {expected_str}\n"
+                                f"  → Readback: {readback_str}"
+                            ),
+                        )
 
             shutdown_str = f"{shutdown}" + (f" ({shutdown_left_str} left)" if shutdown else "") if shutdown else "<span style='color:red; font-weight:bold;'>⚠ not set</span>"
             startup_str  = f"{startup}"  + (f" ({startup_left_str} left)"  if startup  else "") if startup  else "<span style='color:red; font-weight:bold;'>⚠ not set</span>"
