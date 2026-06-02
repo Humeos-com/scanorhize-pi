@@ -1016,7 +1016,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     f"  → RTC vs system:    {rtc_time_str}\n"
                     f"      → RTC:          {rtc_date_str}\n"
                     f"      → System:       {sys_date_str}\n"
-                    f"  → Next <span style='color:red'>shutdown</span>:    {shutdown_str}\n"
+                    f"  → Next <span style='color:orange'>shutdown</span>:    {shutdown_str}\n"
                     f"  → Next <span style='color:green'>wakeup</span>:      {startup_str}"
                     f"{warning_text}"
                 ),
@@ -1069,7 +1069,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 ok=True,
                 processing=True,
                 message=(
-                    f"\n  → Test <span style='color:red;'>shutdown</span>:    {shutdown.strftime('%H:%M:%S')}\n"
+                    f"\n  → Test <span style='color:orange;'>shutdown</span>:    {shutdown.strftime('%H:%M:%S')}\n"
                     f"  → Test <span style='color:green;'>wakeup</span>:      {wakeup.strftime('%H:%M:%S')}"
                 ),
                 shutdown_at=shutdown.isoformat() + "Z",
