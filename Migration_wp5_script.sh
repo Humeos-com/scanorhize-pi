@@ -245,6 +245,20 @@ else
     log "WP5 I2C configuration complete"
 fi
 
+# --- 4c-3. Set I2C baudrate to 50kHz for WP5 reliability ---
+section "4c-3 - I2C baudrate (50kHz)"
+
+CONFIG_FILE="/boot/firmware/config.txt"
+BAUDRATE_LINE="dtparam=i2c_arm_baudrate=50000"
+
+if grep -qF "$BAUDRATE_LINE" "$CONFIG_FILE"; then
+    warn "$BAUDRATE_LINE already set in $CONFIG_FILE"
+else
+    echo "" >> "$CONFIG_FILE"
+    echo "$BAUDRATE_LINE" >> "$CONFIG_FILE"
+    log "Added $BAUDRATE_LINE to $CONFIG_FILE"
+fi
+
 # --- 4d. Create scanorhize-startup service ---
 section "4d - scanorhize-startup service"
 

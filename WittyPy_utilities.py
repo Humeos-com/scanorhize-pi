@@ -391,7 +391,7 @@ class WittyPi:
             getLogger().error(message)
             return None
 
-    def i2c_read_word(self, register: int, retry: int = 3) -> Optional[int]:
+    def i2c_read_word(self, register: int, retry: int = 100) -> Optional[int]:
         """Read a word (16-bit) from I2C register using SMBus."""
         if not self.i2c_bus:
             return None
@@ -417,18 +417,22 @@ class WittyPi:
 
         try:
             self.i2c_bus.write_byte_data(self.i2c_address, register, value)
-            # Single-attempt verify read after a short settling delay.
-            # Using i2c_read_byte with retry=3 here would sleep up to 3s per write;
-            # instead we do one direct read and treat a read failure as "write OK"
-            # since the write itself raised no exception.
             time.sleep(0.02)
             try:
                 result = self.i2c_bus.read_byte_data(self.i2c_address, register)
                 success = (result == value)
                 if not success:
-                    getLogger().warning(
-                        "I2C verify mismatch addr=0x%02X reg=%d: wrote 0x%02X read 0x%02X",
-                        self.i2c_address, register, value, result,
+                    #Retry up to 100 times!
+                    if retry < 100:
+                        time.sleep(0.05)
+                        getLogger().info(
+                            "I2C verify mismatch addr=0x%02X reg=%d: wrote 0x%02X read 0x%02X, retrying %d...",
+                            self.i2c_address, register, value, result, retry + 1,
+                        )
+                        return self.i2c_write_byte(register, value, retry + 1, purpose)
+                    getLogger().error(
+                        "I2C verify mismatch addr=0x%02X reg=%d: wrote 0x%02X read 0x%02X after %d retries",
+                        self.i2c_address, register, value, result, retry,
                     )
             except (OSError, IOError):
                 # Read-back failed but the write raised no exception — treat as OK
