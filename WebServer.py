@@ -78,6 +78,7 @@ from WittyPy_utilities import (
     set_shutdown_time,
     get_fw_revision,
     get_power_cut_delay,
+    set_power_cut_delay,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -1026,11 +1027,17 @@ def _run_test_impl(test_name: str, task_id: str = None):
             fw_str = f"v{fw_rev}" if fw_rev is not None else "unknown"
 
             power_cut_delay = get_power_cut_delay()
-            power_cut_delay_warning = power_cut_delay is not None and power_cut_delay > 30
+            power_cut_delay_warning = power_cut_delay is not None and power_cut_delay > 20
             if power_cut_delay is None:
                 power_cut_str = "unknown"
             elif power_cut_delay_warning:
-                power_cut_str = f"<b style='color:red; font-weight:bold;'>⚠ {power_cut_delay}s (too high, max 30s)</b>"
+                old_delay = power_cut_delay
+                if set_power_cut_delay(20) and get_power_cut_delay() == 20:
+                    power_cut_delay = 20
+                    power_cut_delay_warning = False
+                    power_cut_str = f"20s <i style='color:orange;'>(was {old_delay}s, updated to 20s)</i>"
+                else:
+                    power_cut_str = f"<b style='color:red; font-weight:bold;'>⚠ {power_cut_delay}s (too high, max 20s — update failed)</b>"
             else:
                 power_cut_str = f"{power_cut_delay}s"
 

@@ -478,6 +478,15 @@ def get_power_cut_delay() -> Optional[int]:
     return wp.i2c_read_byte(I2C_CONF_POWER_CUT_DELAY)
 
 
+def set_power_cut_delay(value: int) -> bool:
+    """Write the power cut delay register. Returns True if confirmed by readback."""
+    wp = WittyPi()
+    reg = I2C_CONF_POWER_CUT_DELAY_WP5 if wp.is_WittyPi_5() else I2C_CONF_POWER_CUT_DELAY
+    wp.i2c_write_byte(reg, value)
+    readback = wp.i2c_read_byte(reg)
+    return readback == value
+
+
 def get_power_mode() -> int:
     """Get current power mode using direct I2C access."""
     if is_WittyPi_5() :
