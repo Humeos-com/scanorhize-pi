@@ -1032,7 +1032,16 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     rtc_time_str = f"OK ({time_diff}s difference)"
 
             fw_rev = get_fw_revision()
-            fw_str = f"v{fw_rev}" if fw_rev is not None else "unknown"
+            try:
+                fw_parts = tuple(int(x) for x in fw_rev.split(".")) if fw_rev else (0,)
+                fw_too_old = fw_parts < (1, 4)
+            except (ValueError, AttributeError):
+                fw_parts = (0,)
+                fw_too_old = True
+            if fw_too_old:
+                fw_str = f"<b style='color:red; font-weight:bold;'>⚠ v{fw_rev} (too old, min 1.4)</b>"
+            else:
+                fw_str = f"v{fw_rev}" if fw_rev is not None else "unknown"
 
             power_cut_delay = get_power_cut_delay()
             power_cut_delay_warning = power_cut_delay is not None and power_cut_delay > 20
@@ -1049,7 +1058,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             else:
                 power_cut_str = f"{power_cut_delay}s"
 
-            ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning)
+            ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning and not fw_too_old)
             return jsonify(
                 ok=ok,
                 summary=f"{model} {'OK' if ok else 'FAIL'}",
