@@ -7,7 +7,7 @@ import os
 from os import path
 import sys
 import json
-from subprocess import run
+from subprocess import run, TimeoutExpired
 
 
 from Miscellaneous import (
@@ -168,10 +168,17 @@ class ScannerData:
     def scanSearchAll(self):
         """Renvoie une liste des ID de tous les scanners branchés (tous ports simultanément)."""
         if is_raspberry_pi():
-            command = "scanimage -f '%d%n'"
-            result = run(command, capture_output=True, universal_newlines=True, shell=True)
-            if result.returncode == 0 and result.stdout.strip():
-                return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            try:
+                result = run(
+                    "timeout 15 scanimage -f '%d%n'",
+                    capture_output=True, universal_newlines=True, shell=True, timeout=20
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+                if result.returncode == 124:
+                    getLogger().warning("scanSearchAll: scanimage timed out after 15s")
+            except TimeoutExpired:
+                getLogger().warning("scanSearchAll: scanimage timed out (subprocess hung)")
         return []
 
 
