@@ -496,6 +496,17 @@ def get_power_mode() -> int:
     return result if result is not None else 0
 
 
+def get_usb_voltage() -> float:
+    """Get USB 5V input voltage (WittyPi 5 only). Returns 0.0 on WP3/WP4."""
+    if not is_WittyPi_5():
+        return 0.0
+    lsb = WittyPi().i2c_read_byte(I2C_VOLTAGE_IN_USB_LSB_WP5)
+    msb = WittyPi().i2c_read_byte(I2C_VOLTAGE_IN_USB_MSB_WP5)
+    if lsb is not None and msb is not None:
+        return (msb * 256 + lsb) / 1000
+    return 0.0
+
+
 def get_input_voltage() -> float:
     """Get input voltage using direct I2C access."""
     

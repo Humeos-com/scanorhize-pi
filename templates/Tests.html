@@ -22,7 +22,30 @@
     </div>
 
     <!-- =========================
-         CONNECTIVITY TESTS
+        POWER MANAGEMENT TESTS
+    ========================== -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Power Management</h4>
+        </div>
+
+        <div class="card-body">
+            <!-- Battery voltage and current from WittyPi -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('battery', true)">
+                Battery
+            </button>
+
+            <!-- Victron MPPT status via VE.Direct -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('mppt', true)">
+                ☀ Solar MPPT
+            </button>
+        </div>
+    </div>
+
+    <!-- =========================
+        CONNECTIVITY TESTS
     ========================== -->
     <div class="card mb-4">
         <div class="card-header">
@@ -30,6 +53,11 @@
         </div>
 
         <div class="card-body">
+            <!-- 4G modem detection and connection state -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('4g', true)">
+                4G Modem
+            </button>
 
             <!-- Internet connectivity test -->
             <button class="btn btn-primary me-2 run-test-btn"
@@ -64,20 +92,37 @@
     </div>
 
     <!-- =========================
-         HARDWARE TESTS
+        SCANNER TESTS
     ========================== -->
     <div class="card mb-4">
         <div class="card-header">
-            <h4>Hardware</h4>
+            <h4>Scanners</h4>
         </div>
 
         <div class="card-body">
-            <!-- 4G modem detection and connection state -->
+            <!-- Scanner hardware test -->
             <button class="btn btn-primary me-2 run-test-btn"
-                    onclick="runTest('4g', true)">
-                4G Modem
+                    onclick="runTest('scanners-config-files', true)">
+                Scanners
             </button>
 
+            <!-- Trigger a forced acquisition on all scanners -->
+            <button class="btn btn-primary me-2 run-test-btn"
+                    onclick="runTest('take-pictures', true)">
+                Take pictures
+            </button>
+        </div>
+    </div>
+
+    <!-- =========================
+        TIME TESTS
+    ========================== -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Time Management</h4>
+        </div>
+
+        <div class="card-body">
             <!-- System timezone check: must be UTC -->
             <button class="btn btn-primary me-2 run-test-btn"
                     onclick="runTest('timezone', true)">
@@ -103,24 +148,13 @@
                     onclick="runTest('wittypi', true)">
                 WittyPi
             </button>
-
-            <!-- Scanner hardware test -->
-            <button class="btn btn-primary me-2 run-test-btn"
-                    onclick="runTest('scanners-config-files', true)">
-                Scanners
-            </button>
-
-            <!-- Trigger a forced acquisition on all scanners -->
-            <button class="btn btn-primary me-2 run-test-btn"
-                    onclick="runTest('take-pictures', true)">
-                Take pictures
-            </button>
-
         </div>
     </div>
 
+
+
     <!-- =========================
-         TEST RESULTS OUTPUT
+        TEST RESULTS OUTPUT
     ========================== -->
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -327,21 +361,27 @@ function runTest(testName, showTestName) {
 
     if (showTestName) {
         testStartTime = Date.now();
-        output.innerHTML += `[${now}] Running <b>${testName}</b> test...`
+        const displayName = testName.replace(/-/g, ' ').toUpperCase();
+        output.innerHTML += `[${now}] Running <b>${displayName}</b> test...`
         document.documentElement.scrollTop = document.documentElement.scrollHeight;
         output.scrollTop = output.scrollHeight;
     }
 
     // Ask backend to start the job — returns task_id immediately
     fetch('/tests/run/' + testName, { signal: abortController.signal })
-        .then(response => response.json())
+        .then(response => {
+            if (response.status === 409) {
+                return response.json().then(data => { throw new Error('already running — wait for it to finish'); });
+            }
+            return response.json();
+        })
         .then(({ task_id }) => {
             startPolling(task_id);
         })
         .catch(error => {
             if (error.name !== 'AbortError') {
                 const now = fmtUTC(new Date());
-                output.innerHTML += `<br>[${now}] <b style="color:red;">✘ ERROR</b>: ${error}<hr>`;
+                output.innerHTML += `<br>[${now}] <b style="color:orange;">⚠ ${error.message || error}</b><hr>`;
                 document.documentElement.scrollTop = document.documentElement.scrollHeight;
                 output.scrollTop = output.scrollHeight;
             }
@@ -447,7 +487,11 @@ function handleTestResult(data) {
         const duration = isFinal && testStartTime
             ? ` <span style="color:gray;">(${((Date.now() - testStartTime) / 1000).toFixed(1)}s)</span>`
             : '';
-        insert(`<br>[${now}] ${data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>'}: ${data.message}${duration}`);
+        if (data.panel_disconnected) {
+            insert(`<br>[${now}] <b style="color:orange;">⌛ PENDING</b>: ${data.message}${duration}`);
+        } else {
+            insert(`<br>[${now}] ${data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>'}: ${data.message}${duration}`);
+        }
     }
 
     // WittyPi cycle test — hand off to cycle monitor
@@ -467,6 +511,8 @@ function handleTestResult(data) {
     // Multi-step test: chain to next step
     if (data.next_test) {
         runTest(data.next_test, false);
+    } else if (data.panel_disconnected) {
+        showPanelDisconnectedPrompt(data, output);
     } else {
         output.insertAdjacentHTML('beforeend', '<hr>');
 
@@ -677,6 +723,75 @@ function runWittypiCycleMonitor(shutdownAt, wakeupAt, output, startNow) {
             initTestButtonStates();
         }
     }
+}
+
+/* =========================================================
+   MPPT — PANEL DISCONNECTED PROMPT
+   Shows when VPV = 0. Asks user if panel is connected
+   (e.g. it's night). Auto-passes after 30s with no reply.
+========================================================= */
+
+function showPanelDisconnectedPrompt(data, output) {
+    let countdown = 30;
+
+    output.insertAdjacentHTML('beforeend', `
+        <br><div id="mppt-panel-prompt" style="background:#333;padding:8px;border-radius:4px;margin-top:4px;">
+            <b style="color:orange;">⚠ Panel voltage is 0V — panel may be disconnected.</b><br>
+            Is the solar panel physically connected?
+            <br>
+            <button class="btn btn-sm btn-success me-2" onclick="resolveMpptPrompt(true)">✔ Yes, it's dark outside</button>
+            <button class="btn btn-sm btn-danger  me-2" onclick="resolveMpptPrompt(false)">✘ No, panel is not connected</button>
+            <span style="color:gray;"> — auto-pass in <b id="mppt-timer">${countdown}</b>s</span>
+        </div>`);
+    document.documentElement.scrollTop = document.documentElement.scrollHeight;
+    output.scrollTop = output.scrollHeight;
+
+    const timerInterval = setInterval(() => {
+        countdown--;
+        const el = document.getElementById('mppt-timer');
+        if (el) el.textContent = countdown;
+        if (countdown <= 0) {
+            clearInterval(timerInterval);
+            resolveMpptPrompt(true, true);  // auto-pass: no user response
+        }
+    }, 1000);
+
+    window.resolveMpptPrompt = function(connected, auto = false) {
+        clearInterval(timerInterval);
+        window.resolveMpptPrompt = null;
+        const prompt = document.getElementById('mppt-panel-prompt');
+        if (prompt) prompt.remove();
+
+        const ts  = fmtUTC(new Date());
+        const ok  = connected;
+        const msg = auto ? 'no user response within 30s (auto-pass)' : (connected ? 'panel connected (dark outside)' : 'panel not connected');
+        output.insertAdjacentHTML('beforeend',
+            `<br>[${ts}] ${ok
+                ? '<b style="color:green;">✔ PASS</b>'
+                : '<b style="color:red;">✘ FAIL</b>'}: Solar MPPT — ${msg}<hr>`);
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+
+        if (runningAll && data.summary)
+            allTestResults += `<br>         → ${data.summary} (${msg})`;
+
+        if (ok && runningAll && runningTestBtn) {
+            const all = [...document.querySelectorAll('.run-test-btn:not(.run-all-btn)')];
+            runningTestBtn = all[all.indexOf(runningTestBtn) + 1] || null;
+            if (runningTestBtn) {
+                setTimeout(() => {
+                    runningTestBtn.disabled = false;
+                    runningTestBtn.click();
+                    runningTestBtn.disabled = true;
+                }, 2000);
+            } else {
+                initTestButtonStates();
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] <b style="color:green;">🙌 SUCCESS: </b>${allTestResults}`);
+            }
+        } else {
+            initTestButtonStates();
+        }
+    };
 }
 
 </script>

@@ -80,6 +80,12 @@ from WittyPy_utilities import (
     get_fw_revision,
     get_power_cut_delay,
     set_power_cut_delay,
+    get_usb_voltage,
+    get_input_voltage,
+    get_output_voltage,
+    get_output_current,
+    get_low_voltage_threshold,
+    get_recovery_voltage_threshold,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -129,6 +135,7 @@ app = Flask(__name__)
 # In-memory store for async test jobs: task_id -> {"status": "running"/"done", "result": {...}}
 _test_tasks: dict = {}
 _test_tasks_lock = threading.Lock()
+_active_tests: set = set()  # test names currently running
 
 
 def get_common_template_vars():
@@ -514,8 +521,11 @@ def TestsPage():
 
 @app.route("/tests/run/<test_name>", methods=["GET"])
 def run_test(test_name: str):
-    task_id = str(uuid.uuid4())
     with _test_tasks_lock:
+        if test_name in _active_tests:
+            return jsonify(error="busy", message=f"Test '{test_name}' is already running"), 409
+        _active_tests.add(test_name)
+        task_id = str(uuid.uuid4())
         _test_tasks[task_id] = {"status": "running", "result": None, "messages": []}
 
     def worker():
@@ -530,6 +540,7 @@ def run_test(test_name: str):
         msg = result.get("message", "").replace("\n", " ")[:120]
         getLogger().info("Test %s: %s — %s", test_name, "PASS" if ok else ("IN PROGRESS" if processing else "FAIL"), msg)
         with _test_tasks_lock:
+            _active_tests.discard(test_name)
             _test_tasks[task_id]["status"] = "done"
             _test_tasks[task_id]["result"] = result
 
@@ -622,6 +633,15 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # Upload-pictures-service: verify the systemd upload-pictures service is running.
         # If active, chains to copy-test-picture to actually exercise the upload pipeline.
         if test_name == "upload-pictures-service":
+            from Campaign import getUsbDir
+            usb_dir = getUsbDir()
+            if is_raspberry_pi() and not os.path.ismount(usb_dir):
+                return jsonify(
+                    ok=False,
+                    message=f"USB drive not found at {usb_dir} — insert the USB drive and retry",
+                    summary="Upload service: no USB drive",
+                )
+
             try:
                 result = run(
                     ["systemctl", "is-active", "upload-pictures"],
@@ -948,16 +968,17 @@ def _run_test_impl(test_name: str, task_id: str = None):
 
             default_on_raw = get_default_on()  # 0=immediately on, 255=stay off
 
-            if default_on_raw == 255:
-                if set_default_on(15) and get_default_on() == 15:
-                    default_on_raw = 15
-                    default_on = "Turn ON after 15s <i style='color:orange'>(updated from OFF by default)</i>"
+            if default_on_raw != 250:
+                _prev = default_on_raw
+                if set_default_on(250) and get_default_on() == 250:
+                    default_on_raw = 250
+                    _prev_str = "OFF" if _prev == 255 else f"{_prev}s"
+                    default_on = f"Turn ON after 250s <i style='color:orange'>(updated from {_prev_str})</i>"
                 else:
-                    default_on = "<b style='font-weight:bold; color:red;'>⚠ OFF (reschedule failed)</b>"
-            elif default_on_raw == 0:
-                default_on = "Immediately turn ON"
+                    _prev_str = "OFF" if _prev == 255 else f"{_prev}s"
+                    default_on = f"<b style='font-weight:bold; color:red;'>⚠ {_prev_str} (update to 250s failed)</b>"
             else:
-                default_on = f"Turn ON after {default_on_raw}s"
+                default_on = "Turn ON after 250s"
 
             from datetime import timedelta
             warning_text = ""
@@ -1044,19 +1065,28 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 fw_str = f"v{fw_rev}" if fw_rev is not None else "unknown"
 
             power_cut_delay = get_power_cut_delay()
-            power_cut_delay_warning = power_cut_delay is not None and power_cut_delay > 20
+            power_cut_delay_warning = power_cut_delay is not None and power_cut_delay != 10
             if power_cut_delay is None:
                 power_cut_str = "unknown"
             elif power_cut_delay_warning:
                 old_delay = power_cut_delay
-                if set_power_cut_delay(20) and get_power_cut_delay() == 20:
-                    power_cut_delay = 20
+                if set_power_cut_delay(10) and get_power_cut_delay() == 10:
+                    power_cut_delay = 10
                     power_cut_delay_warning = False
-                    power_cut_str = f"20s <i style='color:orange;'>(was {old_delay}s, updated to 20s)</i>"
+                    power_cut_str = f"10s <i style='color:orange;'>(was {old_delay}s, updated to 10s)</i>"
                 else:
-                    power_cut_str = f"<b style='color:red; font-weight:bold;'>⚠ {power_cut_delay}s (too high, max 20s — update failed)</b>"
+                    power_cut_str = f"<b style='color:red; font-weight:bold;'>⚠ {power_cut_delay}s (expected 10s — update failed)</b>"
             else:
                 power_cut_str = f"{power_cut_delay}s"
+
+            vin  = get_input_voltage()
+            vusb = get_usb_voltage()
+            usb_powered = vusb > 1.0 and vin < 1.0
+            power_str = (
+                f"<b style='color:orange;font-weight:bold;'>⚠ USB ({vusb:.2f}V) — not on battery</b>"
+                if usb_powered else
+                f"Vin {vin:.2f}V"
+            )
 
             ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning and not fw_too_old)
             return jsonify(
@@ -1066,6 +1096,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     f"\n"
                     f"  → Model:            {model}\n"
                     f"  → Firmware:         {fw_str}\n"
+                    f"  → Power source:     {power_str}\n"
                     f"  → Default on power: {default_on}\n"
                     f"  → Power cut delay:  {power_cut_str}\n"
                     f"  → RTC vs system:    {rtc_time_str}\n"
@@ -1197,8 +1228,17 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # Take-pictures: inlined scan loop (instead of subprocess) so we can emit per-scanner
         # progress messages while polling. Chains to wait-for-pictures-upload on success.
         if test_name == "take-pictures":
-            from Campaign import CopyImageToUSB, CreateFolderOnUSB
+            from Campaign import CopyImageToUSB, CreateFolderOnUSB, USBSpace, getUsbDir
             from DateUtils import GetCurrentDate
+
+            usb_dir = getUsbDir()
+            if is_raspberry_pi() and not os.path.ismount(usb_dir):
+                return jsonify(
+                    ok=False,
+                    message=f"USB drive not found at {usb_dir} — insert the USB drive and retry",
+                    summary="Take pictures: no USB drive",
+                )
+            usb_free_mb, usb_free_pct, _ = USBSpace()
 
             configs = listConfigScanner()
             enabled = []       # scanners with enable=1 (connected at app startup)
@@ -1271,7 +1311,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             ok = scanning_error == 0 and pictures_taken > 0 and pictures_taken == total
             return jsonify(
                 ok=ok,
-                message=f"{pictures_taken}/{total} {pic_word} taken\n  → Scanners:\n    - {scanner_list}",
+                message=f"{pictures_taken}/{total} {pic_word} taken\n  → USB free: {usb_free_mb} MB ({usb_free_pct}%)\n  → Scanners:\n    - {scanner_list}",
                 next_test="wait-for-pictures-upload",
                 summary=f"{pictures_taken}/{total} {pic_word} taken",
             )
@@ -1306,6 +1346,137 @@ def _run_test_impl(test_name: str, task_id: str = None):
             )
 
         # Ping: simple liveness check used by the wittypi-cycle monitor after reboot
+        # Battery: read WittyPi input/output voltage and current
+        if test_name == "battery":
+            if not is_mc_connected():
+                return jsonify(ok=False, message="WittyPi not detected — cannot read battery voltage.", summary="Battery: WittyPi not detected")
+
+            vin  = get_input_voltage()
+            vusb = get_usb_voltage()
+            vout = get_output_voltage()
+            iout = get_output_current()
+            low_v      = get_low_voltage_threshold()
+            recovery_v = get_recovery_voltage_threshold()
+
+            # Determine power source
+            usb_powered = vusb > 1.0 and vin < 1.0
+            if usb_powered:
+                power_source = "<b style='color:orange;font-weight:bold;'>USB (5V)</b>"
+                ok = True  # USB power is valid, just not a field deployment
+            else:
+                power_source = "Battery"
+                ok = vin >= 10.0
+
+            if usb_powered:
+                vin_str = f"{vusb:.2f}V (USB)"
+            elif vin < 10.0:
+                vin_str = f"<b style='color:red;font-weight:bold;'>⚠ {vin:.2f}V (critical)</b>"
+            elif vin < 11.5:
+                vin_str = f"<b style='color:orange;font-weight:bold;'>⚠ {vin:.2f}V (low)</b>"
+            else:
+                vin_str = f"{vin:.2f}V"
+
+            return jsonify(
+                ok=ok,
+                summary=f"Battery {'OK' if ok else 'FAIL'} ({'USB' if usb_powered else f'{vin:.2f}V'})",
+                message=(
+                    f"\n"
+                    f"  → Power source:           {power_source}\n"
+                    f"  → Input voltage (Vin):    {vin_str}\n"
+                    f"  → USB voltage (Vusb):     {vusb:.2f}V\n"
+                    f"  → Output voltage (Vout):  {vout:.2f}V\n"
+                    f"  → Output current (Iout):  {iout:.3f}A\n"
+                    f"  → Low voltage threshold:  {low_v:.1f}V\n"
+                    f"  → Recovery threshold:     {recovery_v:.1f}V"
+                ),
+            )
+
+        # MPPT: read Victron MPPT data via VE.Direct USB cable
+        if test_name == "mppt":
+            try:
+                from MPPT_utilities import read_mppt, read_config, MPPTReader
+            except ImportError:
+                return jsonify(ok=False, message="MPPT_utilities not available.", summary="MPPT: not available")
+
+            port = MPPTReader.find_vedirect_port()
+            if port is None:
+                return jsonify(ok=False, message="No VE.Direct port detected. Is the USB cable plugged in?", summary="MPPT: not detected")
+
+            try:
+                frame = read_mppt(port=port, timeout=10.0)
+            except TimeoutError:
+                return jsonify(ok=False, message=f"No data from MPPT on {port} within 10s.", summary="MPPT: no data")
+
+            try:
+                config        = read_config(port=port, timeout=10.0)
+                config_checks = config.check_lifepo4_12v(capacity_ah=6.0)
+                config_error  = None
+            except Exception as _cfg_exc:
+                config        = None
+                config_checks = []
+                config_error  = str(_cfg_exc)
+
+            config_ok = all(s != "fail" for s, _, _ in config_checks)
+
+            FW_MIN = 174
+            try:
+                fw_int = int(frame.firmware_version) if frame.firmware_version else 0
+            except (ValueError, TypeError):
+                fw_int = 0
+            fw_display = f"{fw_int / 100:.2f}" if fw_int else (frame.firmware_version or "?")
+            fw_ok = fw_int >= FW_MIN
+            fw_str = (
+                f"<b style='color:red;font-weight:bold;'>⚠ v{fw_display} (min v{FW_MIN / 100:.2f} → Update Victron firmware version using <a target='_blank' href=''>VictronConnect</a>)</b>"
+                if not fw_ok else f"v{fw_display}"
+            )
+
+            ok = frame.error in (None, "No error") and config_ok and fw_ok
+            panel_disconnected = (frame.panel_voltage is not None and frame.panel_voltage < 0.1)
+
+            batt_v_raw = frame.battery_voltage
+            if batt_v_raw is not None:
+                if batt_v_raw < 12.2:
+                    batt_v = f"<b style='color:orange;font-weight:bold;'>⚠ {batt_v_raw:.2f}V (low)</b>"
+                else:
+                    batt_v = f"{batt_v_raw:.2f}V"
+            else:
+                batt_v = "N/A"
+
+            panel_v = f"{frame.panel_voltage:.2f}V" if frame.panel_voltage is not None else "N/A"
+            panel_w = f"{frame.panel_power}W"        if frame.panel_power   is not None else "N/A"
+
+            if config_error:
+                config_msg = f"\n  → Config check:      failed — {config_error}\n"
+            elif config_checks:
+                _icons = {"ok": "<b style='color:green;'>✔</b>",
+                          "warn": "<b style='color:orange;font-weight:bold;'>⚠</b>",
+                          "fail": "<b style='color:red;font-weight:bold;'>✘</b>"}
+                config_msg = "\n  ── LiFePO4 12.8V / 6Ah config ──\n"
+                for status, label, detail in config_checks:
+                    config_msg += f"  → {label:<22} {_icons[status]} {detail}\n"
+            else:
+                config_msg = "\n  → Config check:      N/A (no registers responded)\n"
+
+            return jsonify(
+                ok=ok,
+                panel_disconnected=panel_disconnected,
+                summary=f"MPPT {'OK' if ok else 'FAIL'} ({frame.charge_state})",
+                message=(
+                    f"\n"
+                    f"  → Port:              {port}\n"
+                    f"  → Battery voltage:   {batt_v}\n"
+                    f"  → Panel voltage:     {panel_v}\n"
+                    f"  → Panel power:       {panel_w}\n"
+                    f"  → Charge state:      {frame.charge_state}\n"
+                    f"  → MPPT mode:         {frame.mppt_mode}\n"
+                    f"  → Error:             {frame.error or 'None'}\n"
+                    f"  → Yield today:       {frame.yield_today} kWh\n"
+                    f"  → Yield total:       {frame.yield_total} kWh\n"
+                    f"  → Firmware:          {fw_str}\n"
+                    + config_msg
+                ),
+            )
+
         if test_name == "ping":
             return jsonify(ok=True, message="Server is up.")
 
