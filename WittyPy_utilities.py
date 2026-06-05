@@ -987,23 +987,26 @@ def parse_wittypi_time(value, reference=None):
         '28 08:02:12'
     into a datetime using reference month/year (defaults to system time).
     Pass a datetime derived from get_rtc_timestamp() to compare against RTC time.
+    Returns None if value is malformed or contains an invalid time (e.g. unset register returning '26:00:00').
     """
     from datetime import datetime
     now = reference or datetime.now()
 
-    parts = value.strip().split(" ")
-    day = int(parts[0])
-
-    t = datetime.strptime(parts[1], "%H:%M:%S")
-
-    dt = datetime(
-        year=now.year,
-        month=now.month,
-        day=day,
-        hour=t.hour,
-        minute=t.minute,
-        second=t.second,
-    )
+    try:
+        parts = value.strip().split(" ")
+        day = int(parts[0])
+        t = datetime.strptime(parts[1], "%H:%M:%S")
+        dt = datetime(
+            year=now.year,
+            month=now.month,
+            day=day,
+            hour=t.hour,
+            minute=t.minute,
+            second=t.second,
+        )
+    except (ValueError, IndexError) as e:
+        getLogger().warning("parse_wittypi_time: invalid value %r: %s", value, e)
+        return None
 
     # Handle next month rollover
     if dt < now:
@@ -1016,59 +1019,89 @@ def parse_wittypi_time(value, reference=None):
     
 
 def get_startup_time() -> str:
-    """Get startup time using direct I2C access."""
-    try:
-        if not is_WittyPi_5():
-            sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM1) or 0)
-            minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_ALARM1) or 0)
-            hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_ALARM1) or 0)
-            date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_ALARM1) or 0)
-        else:
-            sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_STARTUP_WP5) or 0)
-            minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_STARTUP_WP5) or 0)
-            hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_STARTUP_WP5) or 0)
-            date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_STARTUP_WP5) or 0)
-        return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
-    except (OSError, IOError, ValueError, IndexError) as e:
-        getLogger().error("Error reading startup time: %s", e)
-        return "00 00:00:00"
+    """Get startup time using direct I2C access. Retries up to 10 times if registers return invalid values."""
+    for attempt in range(10):
+        try:
+            if not is_WittyPi_5():
+                sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM1) or 0)
+                minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_ALARM1) or 0)
+                hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_ALARM1) or 0)
+                date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_ALARM1) or 0)
+            else:
+                sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_STARTUP_WP5) or 0)
+                minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_STARTUP_WP5) or 0)
+                hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_STARTUP_WP5) or 0)
+                date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_STARTUP_WP5) or 0)
+        except (OSError, IOError, ValueError, IndexError) as e:
+            getLogger().error("Error reading startup time (attempt %d/10): %s", attempt + 1, e)
+            time.sleep(1)
+            continue
+        if hour < 24 and minutes < 60 and sec < 60:
+            return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
+        getLogger().warning(
+            "Startup time has invalid values (attempt %d/10): %02d %02d:%02d:%02d",
+            attempt + 1, date, hour, minutes, sec,
+        )
+        time.sleep(1)
+    getLogger().error("Failed to read valid startup time after 10 attempts")
+    return "00 00:00:00"
 
 
 def get_shutdown_time() -> str:
-    """Get shutdown time using direct I2C access."""
-    try:
-        if not is_WittyPi_5():
-            sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM2) or 0)
-            minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_ALARM2) or 0)
-            hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_ALARM2) or 0)
-            date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_ALARM2) or 0)
-        else:
-            sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_SHUTDOWN_WP5) or 0)
-            minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5) or 0)
-            hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_SHUTDOWN_WP5) or 0)
-            date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_SHUTDOWN_WP5) or 0)
-        return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
-    except (OSError, IOError, ValueError, IndexError) as e:
-        getLogger().error("Error reading shutdown time: %s", e)
-        return "00 00:00:00"
+    """Get shutdown time using direct I2C access. Retries up to 10 times if registers return invalid values."""
+    for attempt in range(10):
+        try:
+            if not is_WittyPi_5():
+                sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_ALARM2) or 0)
+                minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_ALARM2) or 0)
+                hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_ALARM2) or 0)
+                date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_ALARM2) or 0)
+            else:
+                sec = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_SECOND_SHUTDOWN_WP5) or 0)
+                minutes = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5) or 0)
+                hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_SHUTDOWN_WP5) or 0)
+                date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_SHUTDOWN_WP5) or 0)
+        except (OSError, IOError, ValueError, IndexError) as e:
+            getLogger().error("Error reading shutdown time (attempt %d/10): %s", attempt + 1, e)
+            time.sleep(1)
+            continue
+        if hour < 24 and minutes < 60 and sec < 60:
+            return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
+        getLogger().warning(
+            "Shutdown time has invalid values (attempt %d/10): %02d %02d:%02d:%02d",
+            attempt + 1, date, hour, minutes, sec,
+        )
+        time.sleep(1)
+    getLogger().error("Failed to read valid shutdown time after 10 attempts")
+    return "00 00:00:00"
 
 
 def set_startup_time(date: int, hour: int, minute: int, second: int):
-    """Set startup time using direct I2C access."""
-    try:
-        if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second), purpose="set startup alarm seconds")
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, dec2bcd(minute), purpose="set startup alarm minutes")
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, dec2bcd(hour), purpose="set startup alarm hours")
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, dec2bcd(date), purpose="set startup alarm day")
-        else:
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, dec2bcd(second), purpose="set startup seconds (WP5)")
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, dec2bcd(minute), purpose="set startup minutes (WP5)")
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour), purpose="set startup hours (WP5)")
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date), purpose="set startup day (WP5)")
-
-    except (OSError, IOError) as e:
-        getLogger().error("Error setting startup time: %s", e)
+    """Set startup time using direct I2C access. Retries up to 5 times with readback verification."""
+    expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
+    for attempt in range(5):
+        try:
+            if not is_WittyPi_5():
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second), purpose="set startup alarm seconds")
+                WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, dec2bcd(minute), purpose="set startup alarm minutes")
+                WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, dec2bcd(hour), purpose="set startup alarm hours")
+                WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, dec2bcd(date), purpose="set startup alarm day")
+            else:
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, dec2bcd(second), purpose="set startup seconds (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, dec2bcd(minute), purpose="set startup minutes (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour), purpose="set startup hours (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date), purpose="set startup day (WP5)")
+        except (OSError, IOError) as e:
+            getLogger().error("Error setting startup time (attempt %d/5): %s", attempt + 1, e)
+            time.sleep(1)
+            continue
+        readback = get_startup_time()
+        if readback == expected:
+            getLogger().info("Startup time set: %s (attempt %d)", expected, attempt + 1)
+            return
+        getLogger().warning("Startup time readback mismatch (attempt %d/5): expected %s got %s", attempt + 1, expected, readback)
+        time.sleep(1)
+    getLogger().error("Failed to set startup time to %s after 5 attempts", expected)
 
 
 def SetNextStartDate(date):  # date en UTC!!
@@ -1115,26 +1148,37 @@ def SetNextStartDate(date):  # date en UTC!!
 
 
 def set_shutdown_time(date: int, hour: int, minute: int, second: int):
-    """Set shutdown time using direct I2C access."""
+    """Set shutdown time using direct I2C access. Retries up to 5 times with readback verification."""
     pre_shutdown_checks()
-    try:
-        if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, dec2bcd(minute), purpose="set shutdown alarm minutes")
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, dec2bcd(hour), purpose="set shutdown alarm hours")
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date), purpose="set shutdown alarm day")
-        else:
-            WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, dec2bcd(second), purpose="set shutdown seconds (WP5)")
-            WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, dec2bcd(minute), purpose="set shutdown minutes (WP5)")
-            WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, dec2bcd(hour), purpose="set shutdown hours (WP5)")
-            WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, dec2bcd(date), purpose="set shutdown day (WP5)")
-
-    except (OSError, IOError) as e:
-        getLogger().error("Error setting shutdown time: %s", e)
+    expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
+    for attempt in range(100):
+        try:
+            if not is_WittyPi_5():
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
+                WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, dec2bcd(minute), purpose="set shutdown alarm minutes")
+                WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, dec2bcd(hour), purpose="set shutdown alarm hours")
+                WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date), purpose="set shutdown alarm day")
+            else:
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, dec2bcd(second), purpose="set shutdown seconds (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, dec2bcd(minute), purpose="set shutdown minutes (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, dec2bcd(hour), purpose="set shutdown hours (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, dec2bcd(date), purpose="set shutdown day (WP5)")
+        except (OSError, IOError) as e:
+            getLogger().error("Error setting shutdown time (attempt %d/5): %s", attempt + 1, e)
+            time.sleep(1)
+            continue
+        readback = get_shutdown_time()
+        if readback == expected:
+            getLogger().info("Shutdown time set: %s (attempt %d)", expected, attempt + 1)
+            break
+        getLogger().warning("Shutdown time readback mismatch (attempt %d/5): expected %s got %s", attempt + 1, expected, readback)
+        time.sleep(1)
+    else:
+        getLogger().error("Failed to set shutdown time to %s after 5 attempts", expected)
 
     rtc_ts = get_rtc_timestamp()
     rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
-    shutdown_dt = parse_wittypi_time(f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}", reference=rtc_now)
+    shutdown_dt = parse_wittypi_time(expected, reference=rtc_now)
     _ensure_wakeup_after_shutdown(shutdown_dt)
 
 
@@ -1376,7 +1420,7 @@ def _ensure_wakeup_in_future():
         rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
         startup_str = get_startup_time()
         startup_dt = parse_wittypi_time(startup_str, reference=rtc_now)
-        if startup_dt > rtc_now + timedelta(minutes=1):
+        if startup_dt is not None and startup_dt > rtc_now + timedelta(minutes=1):
             getLogger().info("Wake-up OK: %s → %s (RTC: %s)", startup_str, startup_dt, rtc_now)
             return
         wakeup = rtc_now + timedelta(hours=1)
@@ -1432,7 +1476,7 @@ def _ensure_wakeup_after_shutdown(shutdown_dt: datetime):
         rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
         startup_str = get_startup_time()
         startup_dt = parse_wittypi_time(startup_str, reference=rtc_now)
-        if startup_dt > shutdown_dt + timedelta(minutes=1):
+        if startup_dt is not None and startup_dt > shutdown_dt + timedelta(minutes=1):
             getLogger().info("Wake-up %s is after shutdown %s OK", startup_dt, shutdown_dt)
             return
         wakeup = shutdown_dt + timedelta(hours=1)
