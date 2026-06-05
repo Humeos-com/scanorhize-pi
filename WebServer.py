@@ -1157,7 +1157,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             now = datetime.now()
             # Skip to the minute after next if we're too close to the next minute boundary
             seconds_to_next = 60 - now.second
-            shutdown = now.replace(second=0, microsecond=0) + timedelta(minutes=1 if seconds_to_next >= 5 else 2)
+            shutdown = now.replace(second=0, microsecond=0) + timedelta(minutes=1 if seconds_to_next >= 15 else 2)
             wakeup   = shutdown + timedelta(minutes=1)
 
             # Flag file presence tells the boot sequence to stay in test/config mode

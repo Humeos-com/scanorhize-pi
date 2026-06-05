@@ -304,22 +304,25 @@ function stopTests() {
         window.retryWittypiCyclePing = null;
         const now = fmtUTC(new Date());
         output.insertAdjacentHTML('beforeend', `<br>[${now}] <b style="color:orange;">⏹ STOPPED</b>`);
-        // Try to cancel on Pi side; Pi may already be off
+        // Try to cancel on Pi side; Pi may already be off.
+        // Keep buttons disabled until cancel finishes to prevent concurrent I2C access.
         fetch('/tests/run/wittypi-cycle-cancel')
             .then(r => r.json())
-            .then(({ task_id }) => pollForCancel(task_id, output))
+            .then(({ task_id }) => pollForCancel(task_id, output, initTestButtonStates))
             .catch(() => {
                 const ts = fmtUTC(new Date());
                 output.insertAdjacentHTML('beforeend', `<br>[${ts}] Pi already unreachable — cancel skipped.<hr>`);
                 document.documentElement.scrollTop = document.documentElement.scrollHeight;
                 output.scrollTop = output.scrollHeight;
+                initTestButtonStates();
             });
+        return; // buttons re-enabled by initTestButtonStates callback above
     }
 
     initTestButtonStates();
 }
 
-function pollForCancel(taskId, output) {
+function pollForCancel(taskId, output, onDone) {
     const interval = setInterval(() => {
         fetch('/tests/status/' + taskId)
             .then(r => r.json())
@@ -330,6 +333,7 @@ function pollForCancel(taskId, output) {
                 output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${data.message}<hr>`);
                 document.documentElement.scrollTop = document.documentElement.scrollHeight;
                 output.scrollTop = output.scrollHeight;
+                if (onDone) onDone();
             })
             .catch(() => {
                 clearInterval(interval);
@@ -337,6 +341,7 @@ function pollForCancel(taskId, output) {
                 output.insertAdjacentHTML('beforeend', `<br>[${ts}] Pi already unreachable — cancel skipped.<hr>`);
                 document.documentElement.scrollTop = document.documentElement.scrollHeight;
                 output.scrollTop = output.scrollHeight;
+                if (onDone) onDone();
             });
     }, 1000);
 }

@@ -1079,7 +1079,7 @@ def get_shutdown_time() -> str:
 def set_startup_time(date: int, hour: int, minute: int, second: int):
     """Set startup time using direct I2C access. Retries up to 5 times with readback verification."""
     expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
-    for attempt in range(5):
+    for attempt in range(20):
         try:
             if not is_WittyPi_5():
                 WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second), purpose="set startup alarm seconds")
@@ -1151,7 +1151,7 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access. Retries up to 5 times with readback verification."""
     pre_shutdown_checks()
     expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
-    for attempt in range(100):
+    for attempt in range(20):
         try:
             if not is_WittyPi_5():
                 WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
@@ -1176,10 +1176,17 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     else:
         getLogger().error("Failed to set shutdown time to %s after 5 attempts", expected)
 
-    rtc_ts = get_rtc_timestamp()
-    rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
-    shutdown_dt = parse_wittypi_time(expected, reference=rtc_now)
-    _ensure_wakeup_after_shutdown(shutdown_dt)
+    for attempt in range(20):
+        rtc_ts = get_rtc_timestamp()
+        rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
+        shutdown_dt = parse_wittypi_time(expected, reference=rtc_now)
+        if shutdown_dt is not None:
+            _ensure_wakeup_after_shutdown(shutdown_dt)
+            break
+        getLogger().warning("set_shutdown_time: could not parse %r with reference %s (attempt %d/10)", expected, rtc_now, attempt + 1)
+        time.sleep(1)
+    else:
+        getLogger().error("set_shutdown_time: failed to parse shutdown datetime from %r after 10 attempts, skipping wakeup check", expected)
 
 
 # pylint: disable=duplicate-code
