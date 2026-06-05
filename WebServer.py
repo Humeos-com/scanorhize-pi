@@ -80,12 +80,15 @@ from WittyPy_utilities import (
     get_fw_revision,
     get_power_cut_delay,
     set_power_cut_delay,
+    get_power_priority,
+    set_power_priority,
     get_usb_voltage,
     get_input_voltage,
     get_output_voltage,
     get_output_current,
     get_low_voltage_threshold,
     get_recovery_voltage_threshold,
+    set_recovery_voltage_threshold,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -1079,6 +1082,37 @@ def _run_test_impl(test_name: str, task_id: str = None):
             else:
                 power_cut_str = f"{power_cut_delay}s"
 
+            power_priority = get_power_priority()  # 0=Vusb first, 1=Vin first
+            power_priority_warning = False
+            if power_priority is None:
+                power_priority_str = "unknown"
+            elif power_priority != 1:  # 1 = Vin first (expected)
+                old_priority = power_priority
+                if set_power_priority(1) and get_power_priority() == 1:
+                    power_priority_warning = False
+                    power_priority_str = f"Vin first <i style='color:orange;'>(was {'Vusb first' if old_priority == 0 else old_priority}, updated)</i>"
+                else:
+                    power_priority_warning = True
+                    power_priority_str = f"<b style='color:red; font-weight:bold;'>⚠ {'Vusb first' if power_priority == 0 else power_priority} (expected Vin first — update failed)</b>"
+            else:
+                power_priority_str = "Vin first"
+
+            recovery_v = get_recovery_voltage_threshold()
+            recovery_v_warning = False
+            if recovery_v is None:
+                recovery_v_str = "unknown"
+            elif recovery_v != 10.0:
+                old_rv = recovery_v
+                set_recovery_voltage_threshold(100)  # 100 = 10.0V
+                new_rv = get_recovery_voltage_threshold()
+                if new_rv == 10.0:
+                    recovery_v_str = f"10.0V <i style='color:orange;'>(was {old_rv:.1f}V, updated)</i>"
+                else:
+                    recovery_v_warning = True
+                    recovery_v_str = f"<b style='color:red; font-weight:bold;'>⚠ {old_rv:.1f}V (expected 10.0V — update failed)</b>"
+            else:
+                recovery_v_str = "10.0V"
+
             vin  = get_input_voltage()
             vusb = get_usb_voltage()
             usb_powered = vusb > 1.0 and vin < 1.0
@@ -1088,7 +1122,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 f"Vin {vin:.2f}V"
             )
 
-            ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning and not fw_too_old)
+            ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning and not fw_too_old and not power_priority_warning and not recovery_v_warning)
             return jsonify(
                 ok=ok,
                 summary=f"{model} {'OK' if ok else 'FAIL'}",
@@ -1097,6 +1131,8 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     f"  → Model:            {model}\n"
                     f"  → Firmware:         {fw_str}\n"
                     f"  → Power source:     {power_str}\n"
+                    f"  → Power priority:   {power_priority_str}\n"
+                    f"  → Recovery voltage: {recovery_v_str}\n"
                     f"  → Default on power: {default_on}\n"
                     f"  → Power cut delay:  {power_cut_str}\n"
                     f"  → RTC vs system:    {rtc_time_str}\n"

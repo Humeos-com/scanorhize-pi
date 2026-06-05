@@ -184,13 +184,13 @@ I2C_FW_REVISION_WP5 = 12
 
 I2C_CONF_ADDRESS_WP5 = 16
 I2C_CONF_DEFAULT_ON_WP5 = 17
-I2C_CONF_PULSE_INTERVAL_WP5 = 18
 I2C_CONF_LOW_VOLTAGE_WP5 = 22 #OK
 I2C_CONF_BLINK_LED_WP5 = 20
 I2C_CONF_POWER_CUT_DELAY_WP5 = 18
 I2C_CONF_RECOVERY_VOLTAGE_WP5 = 23 #OK
 I2C_CONF_DUMMY_LOAD_WP5 = 23
 I2C_CONF_ADJ_VIN_WP5 = 24
+I2C_CONF_POWER_PRIORITY_WP5 = 24  # 0=Vusb first, 1=Vin first
 I2C_CONF_ADJ_VOUT_WP5 = 25
 I2C_CONF_ADJ_IOUT_WP5 = 26
 
@@ -217,7 +217,6 @@ I2C_CONF_BELOW_TEMP_ACTION_WP5 = 43
 I2C_CONF_BELOW_TEMP_POINT_WP5 = 44
 I2C_CONF_OVER_TEMP_ACTION_WP5 = 42 #OK
 I2C_CONF_OVER_TEMP_POINT_WP5 = 43 #OK
-I2C_CONF_DEFAULT_ON_DELAY_WP5 = 47
 
 # Capteur de température (Mappé sur registres virtuels 96-98)
 I2C_TEMPERATURE_MSB_WP5 = 96  # MSB de la température [cite: 1648]
@@ -485,6 +484,22 @@ def set_power_cut_delay(value: int) -> bool:
     wp.i2c_write_byte(reg, value)
     readback = wp.i2c_read_byte(reg)
     return readback == value
+
+
+def get_power_priority() -> Optional[int]:
+    """Return power input priority. WP5 only: 0=Vusb first, 1=Vin first. None if not WP5 or read error."""
+    if not is_WittyPi_5():
+        return None
+    return WittyPi().i2c_read_byte(I2C_CONF_POWER_PRIORITY_WP5)
+
+
+def set_power_priority(value: int) -> bool:
+    """Set power input priority (0=Vusb first, 1=Vin first). Returns True if confirmed by readback."""
+    if not is_WittyPi_5():
+        return False
+    wp = WittyPi()
+    wp.i2c_write_byte(I2C_CONF_POWER_PRIORITY_WP5, value)
+    return wp.i2c_read_byte(I2C_CONF_POWER_PRIORITY_WP5) == value
 
 
 def get_power_mode() -> int:
@@ -966,14 +981,15 @@ def get_rtc_timestamp() -> int:
 
     return -1
 
-def parse_wittypi_time(value):
+def parse_wittypi_time(value, reference=None):
     """
     Converts Witty Pi format:
         '28 08:02:12'
-    into a datetime using current month/year.
+    into a datetime using reference month/year (defaults to system time).
+    Pass a datetime derived from get_rtc_timestamp() to compare against RTC time.
     """
     from datetime import datetime
-    now = datetime.now()
+    now = reference or datetime.now()
 
     parts = value.strip().split(" ")
     day = int(parts[0])
@@ -1100,6 +1116,7 @@ def SetNextStartDate(date):  # date en UTC!!
 
 def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access."""
+    pre_shutdown_checks()
     try:
         if not is_WittyPi_5():
             WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
@@ -1114,6 +1131,11 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
 
     except (OSError, IOError) as e:
         getLogger().error("Error setting shutdown time: %s", e)
+
+    rtc_ts = get_rtc_timestamp()
+    rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
+    shutdown_dt = parse_wittypi_time(f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}", reference=rtc_now)
+    _ensure_wakeup_after_shutdown(shutdown_dt)
 
 
 # pylint: disable=duplicate-code
@@ -1330,3 +1352,106 @@ if __name__ == "__main__":
 
     # Clean up I2C bus when done
     close_i2c_bus()
+
+
+# ---------------------------------------------------------------------------
+# Pre-shutdown checks — call pre_shutdown_checks() before any poweroff
+# ---------------------------------------------------------------------------
+
+def _ensure_rtc_synced():
+    for attempt in range(100):
+        system_to_rtc()
+        rtc_ts = get_rtc_timestamp()
+        if rtc_ts != -1:
+            getLogger().info("RTC synced: %s (attempt %d)", datetime.fromtimestamp(rtc_ts), attempt + 1)
+            return
+        getLogger().warning("RTC sync failed, retrying (attempt %d)", attempt + 1)
+        time.sleep(1)
+    getLogger().error("Failed to sync RTC after 100 attempts")
+
+
+def _ensure_wakeup_in_future():
+    for attempt in range(100):
+        rtc_ts = get_rtc_timestamp()
+        rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
+        startup_str = get_startup_time()
+        startup_dt = parse_wittypi_time(startup_str, reference=rtc_now)
+        if startup_dt > rtc_now + timedelta(minutes=1):
+            getLogger().info("Wake-up OK: %s → %s (RTC: %s)", startup_str, startup_dt, rtc_now)
+            return
+        wakeup = rtc_now + timedelta(hours=1)
+        getLogger().warning(
+            "Wake-up %s is not 1min+ in the future, setting to +1h: %s (attempt %d, RTC: %s)",
+            startup_str, wakeup.strftime("%d %H:%M:%S"), attempt + 1, rtc_now
+        )
+        set_startup_time(wakeup.day, wakeup.hour, wakeup.minute, wakeup.second)
+        time.sleep(1)
+    getLogger().error("Failed to set a future wake-up time after 100 attempts")
+
+
+def _ensure_power_priority_vin():
+    for attempt in range(100):
+        priority = get_power_priority()
+        if priority == 1:  # Vin priority
+            getLogger().info("Power priority: Vin OK")
+            return
+        getLogger().warning("Power priority is %s (not Vin), fixing (attempt %d)", priority, attempt + 1)
+        set_power_priority(1)
+        time.sleep(1)
+    getLogger().error("Failed to set power priority to Vin after 100 attempts")
+
+
+def _ensure_default_on_250():
+    for attempt in range(100):
+        value = get_default_on()
+        if value == 250:
+            getLogger().info("Default on: 250s OK")
+            return
+        getLogger().warning("Default on is %s (not 250), fixing (attempt %d)", value, attempt + 1)
+        set_default_on(250)
+        time.sleep(1)
+    getLogger().error("Failed to set default_on to 250 after 100 attempts")
+
+
+def _ensure_recovery_voltage_set():
+    for attempt in range(100):
+        value = get_recovery_voltage_threshold()
+        if value > 0:
+            getLogger().info("Recovery voltage threshold: %.1fV OK", value)
+            return
+        getLogger().warning("Recovery voltage threshold is 0, setting to 10.0V (attempt %d)", attempt + 1)
+        set_recovery_voltage_threshold(100)  # 100 = 10.0V
+        time.sleep(1)
+    getLogger().error("Failed to set recovery voltage threshold after 100 attempts")
+
+
+def _ensure_wakeup_after_shutdown(shutdown_dt: datetime):
+    """Ensure wake-up time is at least 1 minute after shutdown_dt, fixing to +1h if not."""
+    for attempt in range(100):
+        rtc_ts = get_rtc_timestamp()
+        rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
+        startup_str = get_startup_time()
+        startup_dt = parse_wittypi_time(startup_str, reference=rtc_now)
+        if startup_dt > shutdown_dt + timedelta(minutes=1):
+            getLogger().info("Wake-up %s is after shutdown %s OK", startup_dt, shutdown_dt)
+            return
+        wakeup = shutdown_dt + timedelta(hours=1)
+        getLogger().warning(
+            "Wake-up %s is not 1min+ after shutdown %s, setting to +1h: %s (attempt %d)",
+            startup_str, shutdown_dt, wakeup.strftime("%d %H:%M:%S"), attempt + 1
+        )
+        set_startup_time(wakeup.day, wakeup.hour, wakeup.minute, wakeup.second)
+        time.sleep(1)
+    getLogger().error("Failed to set wake-up after shutdown after 100 attempts")
+
+
+def pre_shutdown_checks():
+    """Run all mandatory WittyPi register checks before powering off. WittyPi 5 only."""
+    if not is_WittyPi_5():
+        getLogger().info("pre_shutdown_checks: skipped (not WittyPi 5)")
+        return
+    _ensure_rtc_synced()           # sync system clock → RTC before sleep
+    _ensure_wakeup_in_future()     # wake-up alarm must be ≥1min ahead (RTC time)
+    _ensure_power_priority_vin()   # Vin must take priority over USB on next boot
+    _ensure_default_on_250()       # WittyPi must auto-start after 250s on power restore
+    _ensure_recovery_voltage_set() # don't allow restart below 10V Vin

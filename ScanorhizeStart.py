@@ -20,14 +20,17 @@ from pathlib import Path
 
 from OSUtils import is_raspberry_pi
 from WittyPy_utilities import is_reason_click
-from WittyPy_utilities import doShutdown, setNextShutdownDate
+from WittyPy_utilities import (
+    doShutdown,
+    set_shutdown_time, get_shutdown_time,
+    pre_shutdown_checks,
+)
 from Miscellaneous import (
     EndGPIO,
     enable4G,
     check_connectivity,
     ReadGPIOConfig,
 )
-from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
 
 from Scanner import (
     initScanners,
@@ -242,33 +245,24 @@ def updateDataFromAndToServer(configMode):
 
 
 def safeShutdown():
-    # On éteint le Raspberry Pi et le WittyPi
-    nextStartDateValue = calculate_next_wakeup_from_crontab()
-    if is_debug():  # Debug mode
-        getLogger().warning(
-            "Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé"
-        )
+    from datetime import datetime, timedelta
+
+    if is_debug():
+        getLogger().warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
         sys.exit(0)
 
+    #Ensure mandatory register values before turning off board
+    pre_shutdown_checks()
+
     cmdeject = "sudo eject /dev/sda"
-    result = run(
-        cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
+    run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)
     getLogger().info(cmdeject)
 
-    # On fixe l'heure d'arrêt dans 30 secondes,
-    # car des fois le Witty ne s'eteint pas sur le doShutdown()
-    date_now = GetCurrentDate()
-    secs_now = DateToSeconds(date_now)
-    date_new = SecondsToDate(secs_now + 30)
-    getLogger().warning("Next stop at: %s", date_new)
-    setNextShutdownDate(date_new)
-
-    # lance le poweroff du Raspberry et éteint le WittyPi
-    # en principe le doShutdown() lance le shutdown -h now,
-    # sauf s'il y a un fichier /boot/wittypi.lock
-    # Donc on ajoute un poweroff en plus...
-    getLogger().warning("doShutdown until: %s", nextStartDateValue)
+    # Force shutdown in 30s as a safety net if doShutdown() doesn't trigger
+    stop_at = datetime.now() + timedelta(seconds=30)
+    set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
+    readback = get_shutdown_time()
+    getLogger().warning("Next stop at: %s (readback: %s)", stop_at.strftime("%d %H:%M:%S"), readback)
 
     if not is_raspberry_pi():
         getLogger().warning("Not a Raspberry Pi, so no poweroff")
@@ -277,7 +271,7 @@ def safeShutdown():
     doShutdown()
     cmd = "sudo poweroff"
     getLogger().warning(cmd)
-    result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
 
 
 def waitingForPicturesToUpload():
