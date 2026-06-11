@@ -1348,7 +1348,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             return jsonify(
                 ok=ok,
                 message=f"{pictures_taken}/{total} {pic_word} taken\n  → USB free: {usb_free_mb} MB ({usb_free_pct}%)\n  → Scanners:\n    - {scanner_list}",
-                next_test="wait-for-pictures-upload",
+                **({'next_test': 'wait-for-pictures-upload'} if ok else {}),
                 summary=f"{pictures_taken}/{total} {pic_word} taken",
             )
             
