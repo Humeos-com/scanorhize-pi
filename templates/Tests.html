@@ -5,6 +5,23 @@
     <h1>Tests</h1>
 
     <!-- =========================
+         SIMPLE START + EXPERT TOGGLE
+    ========================== -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <button class="btn btn-success btn-lg run-test-btn run-all-btn"
+                onclick="runAll()">
+            Démarrer le test de fonctionnalité
+        </button>
+        <a href="#" id="expert-mode-link" onclick="toggleExpertMode(); return false;"
+           style="font-size:0.9rem;">
+            Mode expert ▼
+        </a>
+    </div>
+
+    <!-- Expert mode: all individual test cards, hidden by default -->
+    <div id="expert-section" style="display:none;">
+
+    <!-- =========================
          MASTER TEST CONTROLS
     ========================== -->
     <div class="card mb-4">
@@ -153,6 +170,8 @@
 
 
 
+    </div><!-- /expert-section -->
+
     <!-- =========================
         TEST RESULTS OUTPUT
     ========================== -->
@@ -193,6 +212,14 @@
 <script>
 
 document.getElementById('test-output').innerHTML = ""
+
+function toggleExpertMode() {
+    const section = document.getElementById('expert-section');
+    const link = document.getElementById('expert-mode-link');
+    const visible = section.style.display !== 'none';
+    section.style.display = visible ? 'none' : 'block';
+    link.textContent = visible ? 'Mode expert ▼' : 'Mode expert ▲';
+}
 
 /* =========================================================
    HELPERS
