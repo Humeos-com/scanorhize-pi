@@ -593,6 +593,15 @@ def _run_test_impl(test_name: str, task_id: str = None):
     try:
         # ── CONNECTIVITY ──────────────────────────────────────────────────────
 
+        # Hotspot SSID: verify hub_AP SSID matches Humeos_{eth0 mac}
+        if test_name == "hotspot-ssid":
+            mac = open("/sys/class/net/eth0/address").read().strip().replace(":", "")
+            expected = f"Humeos_{mac}"
+            actual = GetWifiSSID()
+            if actual == expected:
+                return jsonify(ok=True, message=f"Hotspot SSID: {actual}", summary="Hotspot SSID OK")
+            return jsonify(ok=False, message=f"SSID mismatch — expected: {expected}, got: {actual}", summary="Hotspot SSID FAIL")
+
         # Internet: one connectivity probe
         if test_name == "internet":
             try:
@@ -931,9 +940,9 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # clock drift, and next scheduled alarms. Fails if: default-on is OFF (255), startup
         # alarm is too soon (<3 min) or suspiciously far (>20 days), or RTC differs from
         # system clock by more than 2 seconds.
-        if test_name == "wittypi":
+        if test_name == "on-off":
             if not is_mc_connected():
-                return jsonify(ok=False, message="WittyPi not detected on I2C bus.", summary="WittyPi: not detected")
+                return jsonify(ok=False, message="ON/OFF management board not detected on I2C bus.", summary="ON/OFF management board: not detected")
 
             if is_WittyPi_5():
                 model = "WittyPi 5"
@@ -1149,9 +1158,9 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # after the expected wakeup time to verify the Pi came back up. The flag file
         # wittypi_test_mode forces the app into config mode on next boot so the cycle test
         # page is shown again automatically after reboot.
-        if test_name == "wittypi-cycle":
+        if test_name == "off-on-cycle":
             if not is_mc_connected():
-                return jsonify(ok=False, message="WittyPi not detected on I2C bus.", summary="WittyPi cycle: not detected")
+                return jsonify(ok=False, message="ON/OFF management board not detected on I2C bus.", summary="ON/OFF management board cycle: not detected")
 
             from datetime import datetime, timedelta
             now = datetime.now()
@@ -1175,7 +1184,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 Path("wittypi_test_mode").unlink(missing_ok=True)
                 return jsonify(
                     ok=False,
-                    summary="WittyPi cycle: I2C write verification failed",
+                    summary="OFF/ON cycle: I2C write verification failed",
                     message=(
                         f"\n  ⚠ I2C readback mismatch — times were not stored correctly.\n"
                         f"  → Shutdown expected: {shutdown_expected}  got: {shutdown_readback}\n"
@@ -1184,7 +1193,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 )
 
             getLogger().info(
-                "WittyPi cycle test: shutdown at %s, wakeup at %s",
+                "OFF/ON cycle test: shutdown at %s, wakeup at %s",
                 shutdown.strftime("%H:%M:%S"), wakeup.strftime("%H:%M:%S")
             )
             return jsonify(
@@ -1194,8 +1203,8 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     f"\n  → Test <span style='color:orange;'>shutdown</span>:    {shutdown.strftime('%H:%M:%S')}\n"
                     f"  → Test <span style='color:green;'>wakeup</span>:      {wakeup.strftime('%H:%M:%S')}"
                 ),
-                shutdown_at=shutdown.isoformat() + "Z",
-                wakeup_at=wakeup.isoformat() + "Z",
+                shutdown_in=(shutdown - now).total_seconds(),
+                wakeup_in=(wakeup - now).total_seconds(),
             )
 
         # Scanners-config-files: audit all scanner JSON configs and the live SANE device list.
@@ -1238,7 +1247,6 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     lines.append(f"\n  → {cfg}: Empty config file")
 
             n = len(lines)
-            files_str = f"{n} scanner config {'file' if n == 1 else 'files'} found"
             scanner_word = 'scanner' if configuredScanners == 1 else 'scanners'
             project_ids_match = len(set(projectIds)) <= 1
             sample_ids_unique = len(sampleIds) == len(set(sampleIds))
@@ -1247,19 +1255,26 @@ def _run_test_impl(test_name: str, task_id: str = None):
             # Show the most actionable failure reason first
             if configuredScanners == 0:
                 suffix = f"\n\n  → No scanner configured"
+                summary = "Scanners: no scanner configured"
             elif configuredScanners < expectedScanners:
-                suffix = f"\n\n  → {configuredScanners}/{expectedScanners} {scanner_word} configured — {expectedScanners - configuredScanners} missing device"
+                missing = expectedScanners - configuredScanners
+                suffix = f"\n\n  → {configuredScanners}/{expectedScanners} {scanner_word} configured — {missing} missing device"
+                summary = f"Scanners: {configuredScanners}/{expectedScanners} — {missing} missing device"
             elif not project_ids_match:
                 unique = ', '.join(set(projectIds))
                 suffix = f"\n\n  → <b style='color:orange;'>⚠ projectId mismatch: {unique}</b>"
+                summary = f"Scanners: projectId mismatch"
             elif not sample_ids_unique:
                 dupes = [sid for sid in set(sampleIds) if sampleIds.count(sid) > 1]
                 suffix = f"\n\n  → <b style='color:orange;'>⚠ duplicate sampleId: {', '.join(dupes)}</b>"
+                summary = f"Scanners: duplicate sampleId"
             elif not no_missing_sample_ids:
                 suffix = f"\n\n  → <b style='color:orange;'>⚠ projectId set but sampleId missing: {', '.join(missing_sample_ids)}</b>"
+                summary = f"Scanners: sampleId missing"
             else:
                 suffix = f"\n\n  → {configuredScanners} {scanner_word} configured"
-            return jsonify(ok=ok, message="Scanner configs found:\n" + "\n".join(lines) + suffix, summary=files_str)
+                summary = f"{configuredScanners} {scanner_word} configured"
+            return jsonify(ok=ok, message="Scanner configs found:\n" + "\n".join(lines) + suffix, summary=summary)
 
         # Take-pictures: inlined scan loop (instead of subprocess) so we can emit per-scanner
         # progress messages while polling. Chains to wait-for-pictures-upload on success.
@@ -1385,7 +1400,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # Battery: read WittyPi input/output voltage and current
         if test_name == "battery":
             if not is_mc_connected():
-                return jsonify(ok=False, message="WittyPi not detected — cannot read battery voltage.", summary="Battery: WittyPi not detected")
+                return jsonify(ok=False, message="ON/OFF management board not detected — cannot read battery voltage.", summary="Battery: ON/OFF management board not detected")
 
             vin  = get_input_voltage()
             vusb = get_usb_voltage()
@@ -1713,11 +1728,11 @@ def process_hub_form_data(form):
 
                 next_wakeup = calculate_next_wakeup_from_crontab()
                 getLogger().info(
-                    "WittyPi wakeup updated after schedule change: %s", next_wakeup
+                    "ON/OFF management board wakeup updated after schedule change: %s", next_wakeup
                 )
             except Exception as e:
                 getLogger().error(
-                    "Error updating WittyPi wakeup after schedule change: %s", e
+                    "Error updating ON/OFF management board wakeup after schedule change: %s", e
                 )
 
         return True, "Configuration saved successfully"

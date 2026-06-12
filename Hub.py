@@ -582,27 +582,19 @@ def SendParameters(Hub_: HubData):
 
 
 def GetWifiSSID():
-    SSID = "No SSID"
     if not is_raspberry_pi():
-        return SSID
-    cmd = "sudo iwgetid -r"
+        return "No SSID"
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            ["nmcli", "-g", "802-11-wireless.ssid", "connection", "show", "hub_AP"],
+            capture_output=True, universal_newlines=True, check=True,
         )
-        if result.returncode != 0:
-            getLogger().info(
-                "Error GetWifiSSID: return: %s error: %s",
-                result.returncode,
-                result.stderr,
-            )
-            return SSID
-        SSID = result.stdout
-    except (SubprocessError, CalledProcessError) as e:
-        getLogger().error("Error GetWifiSSID: %s", e)
-        return SSID
-
-    return SSID
+        ssid = result.stdout.strip()
+        if ssid:
+            return ssid
+    except (SubprocessError, CalledProcessError, FileNotFoundError) as e:
+        getLogger().error("GetWifiSSID: %s", e)
+    return "No SSID"
 
 
 def GetIP():
