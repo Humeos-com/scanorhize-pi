@@ -503,8 +503,8 @@ function handleTestResult(data) {
             } else {
                 initTestButtonStates();
                 const endMsg = runAllHadFailures
-                    ? `<b style="color:red;">⚠ ÉCHEC: </b>`
-                    : `<b style="color:green;">🙌 SUCCÈS: </b>`;
+                    ? `<b style="color:red;">⚠ FAILED: </b>`
+                    : `<b style="color:green;">🙌 SUCCESS: </b>`;
                 output.insertAdjacentHTML('beforeend', `<br>[${now}] ${endMsg}${allTestResults}`);
             }
         } else {
@@ -702,8 +702,8 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
             } else {
                 initTestButtonStates();
                 const endMsg = runAllHadFailures
-                    ? `<b style="color:red;">⚠ ÉCHEC: </b>`
-                    : `<b style="color:green;">🙌 SUCCÈS: </b>`;
+                    ? `<b style="color:red;">⚠ FAILED: </b>`
+                    : `<b style="color:green;">🙌 SUCCESS: </b>`;
                 output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${endMsg}${allTestResults}`);
             }
         } else {
@@ -780,8 +780,8 @@ function showPanelDisconnectedPrompt(data, output) {
             } else {
                 initTestButtonStates();
                 const endMsg = runAllHadFailures
-                    ? `<b style="color:red;">⚠ ÉCHEC: </b>`
-                    : `<b style="color:green;">🙌 SUCCÈS: </b>`;
+                    ? `<b style="color:red;">⚠ FAILED: </b>`
+                    : `<b style="color:green;">🙌 SUCCESS: </b>`;
                 output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${endMsg}${allTestResults}`);
             }
         } else {
