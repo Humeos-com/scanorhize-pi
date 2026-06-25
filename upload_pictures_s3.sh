@@ -33,7 +33,7 @@
 # -----------------------------
 CONFIG_DIR="$HOME/Scanorhize/ConfigFile"
 IMAGEFOLDER="/media/pi/Image"
-S3_BUCKET="s3://humeos-test"   # S3 bucket
+S3_BUCKET="s3://humeos-images-landing"   # S3 bucket
 EXISTING_FILES=""           # populated once at first launch
 
 while true; do
