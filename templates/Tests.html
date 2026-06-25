@@ -524,7 +524,8 @@ function handleTestResult(data) {
    the WittyPi shutdown/wakeup.  Phases:
      1. Countdown to shutdown
      2. Countdown to wakeup  (Pi is off during this phase)
-     3. Ping /tests/run/ping every 10s until reply or 30s timeout
+     3. Ping /tests/run/ping until the server replies. The monitor never
+        times out on its own — the user stops it with the Stop button.
 ========================================================= */
 
 function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
@@ -539,7 +540,6 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
 
     // Phase state machine: shutdown → wakeup → booting → pinging-silent → pinging → done
     let phase = 'shutdown';
-    let pingDeadline = null;       // deadline for the 'pinging' phase (after reconnect hint)
     let bootingEndTime = null;     // when the 15s boot wait ends
     let silentPingDeadline = null; // deadline for the 'pinging-silent' phase
     let pingActive = false;        // false when paused waiting for Retry click
@@ -590,17 +590,16 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
         } else if (phase === 'pinging-silent') {
             statusEl.innerHTML = `🔍 Pinging server…`;
             if (now >= silentPingDeadline) {
-                // Silent phase expired without reply — show reconnect hint and pause pinging
+                // Silent phase expired without reply — show reconnect hint but keep
+                // pinging indefinitely. The test never stops on its own; only the
+                // user can end it with the Stop button if it runs too long.
                 phase = 'pinging';
-                pingDeadline = new Date(Date.now() + 30*1000);
-                pingActive = false;
-                if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+                pingActive = true;
                 output.insertAdjacentHTML('beforeend', `<br><span id="cycle-reconnect">⚠ Lost WiFi? Reconnect to <b>{{ SSID }}</b>, then click 👉 <button class="btn btn-sm btn-outline-warning" onclick="retryWittypiCyclePing()">Retry ping</button></span>`);
                 scrollToBottom();
-                // Retry button: resets 30s deadline and resumes pinging
+                // Retry button: triggers an immediate ping (pinging already continues on its own)
                 window.retryWittypiCyclePing = function() {
                     if (phase !== 'pinging') return;
-                    pingDeadline = new Date(Date.now() + 30*1000);
                     pingActive = true;
                     if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
                     statusEl.innerHTML = `🔍 Retrying — pinging server…`;
@@ -608,12 +607,9 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
                 };
             }
 
-        // Phase 5: pinging paused — waiting for Retry click; fail if 30s deadline expires
+        // Phase 5: keep pinging until the server replies or the user stops the test
         } else if (phase === 'pinging') {
-            const left = pingDeadline - now;
-            if (left <= 0) {
-                finish(false, 'No reply from server within 30s.');
-            }
+            statusEl.innerHTML = `🔍 Waiting for server… <span style="opacity:0.7;">(test runs until it replies — use Stop to end it)</span>`;
         }
 
     }, 1000);
@@ -657,11 +653,16 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
             });
     }
 
-    // Schedule the next ping in 5s — only if pinging is active and deadline not passed
+    // Schedule the next ping in 5s. The silent phase stops at its deadline (then
+    // phase 'pinging' takes over); phase 'pinging' keeps pinging forever until the
+    // server replies or the user stops the test.
     function scheduleNextPing() {
-        if (!pingActive) return;  // paused — waiting for Retry click
-        const deadline = phase === 'pinging-silent' ? silentPingDeadline : pingDeadline;
-        if (deadline && new Date() < deadline) {
+        if (!pingActive) return;
+        if (phase === 'pinging-silent') {
+            if (silentPingDeadline && new Date() < silentPingDeadline) {
+                cycleMonitorPingTimeout = setTimeout(doPing, 5000);
+            }
+        } else if (phase === 'pinging') {
             cycleMonitorPingTimeout = setTimeout(doPing, 5000);
         }
     }
