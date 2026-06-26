@@ -485,7 +485,7 @@ function handleTestResult(data) {
         if (runningAll) {
             const summaryEl = document.getElementById(`run-summary-${runId}-${runningTestNumber}`);
             if (summaryEl) summaryEl.insertAdjacentHTML('beforeend',
-                data.ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERREUR</b>');
+                data.ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERROR</b>');
         }
         if (runningAll && !data.ok) runAllHadFailures = true;
         output.insertAdjacentHTML('beforeend', '<span class="run-detail"><hr></span>');
@@ -681,7 +681,7 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
         if (runningAll && !expertMode) {
             const summaryEl = document.getElementById(`run-summary-${runId}-${runningTestNumber}`);
             if (summaryEl) summaryEl.insertAdjacentHTML('beforeend',
-                ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERREUR</b>');
+                ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERROR</b>');
         }
         output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${ts}] ${ok
             ? '<b style="color:green;">✔ PASS</b>'
@@ -756,7 +756,7 @@ function showPanelDisconnectedPrompt(data, output) {
         if (runningAll && !expertMode) {
             const summaryEl = document.getElementById(`run-summary-${runId}-${runningTestNumber}`);
             if (summaryEl) summaryEl.insertAdjacentHTML('beforeend',
-                ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERREUR</b>');
+                ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERROR</b>');
         }
         output.insertAdjacentHTML('beforeend',
             `<span class="run-detail"><br>[${ts}] ${ok
