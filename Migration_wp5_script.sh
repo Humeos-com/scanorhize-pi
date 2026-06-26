@@ -320,7 +320,8 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/Scanorhize
-ExecStart=/bin/bash -c '/home/pi/Scanorhize/upload_pictures_s3.sh >> /home/pi/Scanorhize/Log/upload-pictures.log 2>&1'
+ExecStartPre=/bin/chmod +x /home/pi/Scanorhize/upload_pictures_s3.sh
+ExecStart=/bin/bash -c 'sleep 5 && /home/pi/Scanorhize/upload_pictures_s3.sh >> /home/pi/Scanorhize/Log/upload-pictures-$(date +%%Y-%%m-%%d).log 2>&1'
 Restart=always
 RestartSec=10
 

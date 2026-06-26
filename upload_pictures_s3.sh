@@ -35,8 +35,6 @@ CONFIG_DIR="$HOME/Scanorhize/ConfigFile"
 IMAGEFOLDER="/media/pi/Image"
 S3_BUCKET="s3://humeos-images-landing"   # S3 bucket
 EXISTING_FILES=""           # populated once at first launch
-LOG_DIR="$HOME/Scanorhize/Log"
-LOG_FILE=""                 # set after internet check (NTP synced)
 
 while true; do
     echo ""
@@ -58,13 +56,6 @@ while true; do
     while true; do
         if curl -s --max-time 5 -I https://clients3.google.com/generate_204 | grep -q "HTTP/.* 204"; then
             echo "✔ Internet connection detected."
-            # Redirect to dated log now that NTP has had time to sync
-            NEW_LOG="$LOG_DIR/upload-pictures-$(date +%Y-%m-%d).log"
-            if [ "$NEW_LOG" != "$LOG_FILE" ]; then
-                LOG_FILE="$NEW_LOG"
-                mkdir -p "$LOG_DIR"
-                exec >> "$LOG_FILE" 2>&1
-            fi
             break
         else
             echo "$(date '+%Y-%m-%d %H:%M:%S') ⏳ No internet connection. Retrying in 5 seconds..."
