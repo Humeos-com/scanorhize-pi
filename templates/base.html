@@ -32,7 +32,7 @@
       </style>
    </head>
    <body>         
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
+<nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top shadow">
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
             </button>
@@ -61,6 +61,17 @@
             <span>SSID: {{ SSID }}</span>
             <span>SSH: {{ SSH_PORT }}</span>
             <span>Version: {{ version }}</span>
+         </div>
+         <div class="hub-info-line" id="clock-row">
+            <span id="clock-rtc-cell" style="display:none;"></span>
+            <span id="clock-ntp-cell" style="display:none;"></span>
+         </div>
+         <div class="hub-info-line" id="wittypi-row" style="{{ '' if wittypi.connected else 'display:none;' }}">
+            <span id="wittypi-shutdown-cell" style="{{ '' if wittypi.shutdown else 'display:none;' }}">🔴 OFF: <span id="wittypi-shutdown-label">{{ wittypi.shutdown or '' }}</span> <span id="wittypi-shutdown-countdown" style="color:#aaa;"></span></span>
+            <span id="wittypi-shutdown-warning" style="color:#dc3545;{{ 'display:none;' if (wittypi.shutdown or not wittypi.connected) else '' }}">⚠ OFF not set</span>
+            <span id="wittypi-wakeup-cell" style="{{ '' if wittypi.wakeup else 'display:none;' }}">🟢 ON: <span id="wittypi-wakeup-label">{{ wittypi.wakeup or '' }}</span> <span id="wittypi-wakeup-countdown" style="color:#aaa;"></span></span>
+            <span id="wittypi-wakeup-warning" style="color:#dc3545;{{ 'display:none;' if (wittypi.wakeup or not wittypi.connected) else '' }}">⚠ ON not set</span>
+            <span style="cursor:pointer; color:#aaa;" id="wittypi-refresh-btn" title="Refresh wakeup/shutdown times">↻</span>
          </div>
       </div>
 </nav>
@@ -133,6 +144,121 @@
           </div>
         </div>
       </div>
+
+      <script>
+      (function() {
+          let shutdownIso = {{ wittypi.shutdown_iso | tojson }};
+          let wakeupIso   = {{ wittypi.wakeup_iso   | tojson }};
+
+          function fmtCountdown(isoStr) {
+              if (!isoStr) return '';
+              const diffMin = Math.round((new Date(isoStr) - new Date()) / 60000);
+              if (diffMin <= 0) return '(now)';
+              const d = Math.floor(diffMin / 1440);
+              const h = Math.floor((diffMin % 1440) / 60);
+              const m = diffMin % 60;
+              const parts = [];
+              if (d) parts.push(d + 'd');
+              if (h) parts.push(h + 'h');
+              if (m || parts.length === 0) parts.push(m + 'm');
+              return '(in ' + parts.join(' ') + ')';
+          }
+
+          function applyTimes(data) {
+              shutdownIso = data.shutdown_iso;
+              wakeupIso   = data.wakeup_iso;
+
+              const sdCell  = document.getElementById('wittypi-shutdown-cell');
+              const wuCell  = document.getElementById('wittypi-wakeup-cell');
+              const row     = document.getElementById('wittypi-row');
+              const sdWarn  = document.getElementById('wittypi-shutdown-warning');
+              const wuWarn  = document.getElementById('wittypi-wakeup-warning');
+
+              if (sdCell) {
+                  document.getElementById('wittypi-shutdown-label').textContent = data.shutdown || '';
+                  sdCell.style.display = data.shutdown ? '' : 'none';
+              }
+              if (wuCell) {
+                  document.getElementById('wittypi-wakeup-label').textContent = data.wakeup || '';
+                  wuCell.style.display = data.wakeup ? '' : 'none';
+              }
+              if (row) row.style.display = data.connected ? '' : 'none';
+              if (sdWarn) sdWarn.style.display = (data.connected && !data.shutdown) ? '' : 'none';
+              if (wuWarn) wuWarn.style.display = (data.connected && !data.wakeup)   ? '' : 'none';
+
+              document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+              document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+          }
+
+          function refresh() {
+              const btn = document.getElementById('wittypi-refresh-btn');
+              if (btn) btn.style.opacity = '0.4';
+              fetch('/api/wittypi-times')
+                  .then(r => r.json())
+                  .then(data => { applyTimes(data); })
+                  .catch(() => {
+                      document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+                      document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+                  })
+                  .finally(() => { if (btn) btn.style.opacity = ''; });
+          }
+
+          // Initial countdown render without fetch (times already in page)
+          document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+          document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+
+          // Update countdown display every minute
+          setInterval(() => {
+              document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+              document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+          }, 60000);
+
+          // Manual refresh button
+          document.getElementById('wittypi-refresh-btn').addEventListener('click', refresh);
+
+          // Expose for Tests.html to call after changing times
+          window.refreshWittypiNavbar = refresh;
+      })();
+      </script>
+
+      <script>
+      (function() {
+          function applyClockStatus(data) {
+              const rtcCell = document.getElementById('clock-rtc-cell');
+              const ntpCell = document.getElementById('clock-ntp-cell');
+
+              if (data.rtc_diff !== null && data.rtc_diff !== undefined) {
+                  const ok = data.rtc_ok;
+                  rtcCell.innerHTML = ok
+                      ? `🕐 RTC clock: <span style="color:#666;">${data.rtc_diff}s drift</span>`
+                      : `🕐 RTC clock: <span style="color:#dc3545;font-weight:bold;">⚠ ${data.rtc_diff}s drift (sync needed)</span>`;
+                  rtcCell.style.display = '';
+              } else {
+                  rtcCell.style.display = 'none';
+              }
+
+              if (data.ntp_diff !== null && data.ntp_diff !== undefined) {
+                  const ok = data.ntp_ok;
+                  ntpCell.innerHTML = ok
+                      ? `🌐 Internet time: <span style="color:#666;">${data.ntp_diff}s drift</span>`
+                      : `🌐 Internet time: <span style="color:#dc3545;font-weight:bold;">⚠ ${data.ntp_diff}s drift (clock off)</span>`;
+                  ntpCell.style.display = '';
+              } else {
+                  ntpCell.style.display = 'none';
+              }
+          }
+
+          function fetchClockStatus() {
+              fetch('/api/clock-status')
+                  .then(r => r.json())
+                  .then(applyClockStatus)
+                  .catch(() => {});
+          }
+
+          fetchClockStatus();
+          window.refreshClockStatus = fetchClockStatus;
+      })();
+      </script>
 
       <script>
       const poweroffConfirmModal   = new bootstrap.Modal(document.getElementById('poweroff-confirm-modal'));

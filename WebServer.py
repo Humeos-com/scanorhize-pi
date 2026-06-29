@@ -143,12 +143,31 @@ _active_tests: set = set()  # test names currently running
 
 def get_common_template_vars():
     """Get common variables for templates with fresh hub_info"""
+    mc = is_mc_connected()
+    wittypi_times = {"connected": mc, "shutdown": None, "wakeup": None, "shutdown_iso": None, "wakeup_iso": None}
+    if mc:
+        from datetime import datetime
+        try:
+            s = parse_wittypi_time(get_shutdown_time())
+            if s:
+                wittypi_times["shutdown"] = s.strftime("%-d %b %H:%M:%S")
+                wittypi_times["shutdown_iso"] = s.isoformat() + "Z"
+        except Exception:
+            pass
+        try:
+            w = parse_wittypi_time(get_startup_time())
+            if w:
+                wittypi_times["wakeup"] = w.strftime("%-d %b %H:%M:%S")
+                wittypi_times["wakeup_iso"] = w.isoformat() + "Z"
+        except Exception:
+            pass
     return {
         "SSID": GetWifiSSID(),
         "IP": GetIP(),
         "hub_info": get_hub_info(),
         "SSH_PORT": getSSHPort(),
         "version": __version__,
+        "wittypi": wittypi_times,
     }
 
 
@@ -567,6 +586,58 @@ def test_status(task_id: str):
 @app.route("/tests/ping", methods=["GET"])
 def tests_ping():
     return jsonify(ok=True)
+
+
+@app.route("/api/wittypi-times", methods=["GET"])
+def api_wittypi_times():
+    mc = is_mc_connected()
+    result = {"connected": mc, "shutdown": None, "wakeup": None, "shutdown_iso": None, "wakeup_iso": None}
+    if mc:
+        try:
+            s = parse_wittypi_time(get_shutdown_time())
+            if s:
+                result["shutdown"] = s.strftime("%-d %b %H:%M:%S")
+                result["shutdown_iso"] = s.isoformat() + "Z"
+        except Exception:
+            pass
+        try:
+            w = parse_wittypi_time(get_startup_time())
+            if w:
+                result["wakeup"] = w.strftime("%-d %b %H:%M:%S")
+                result["wakeup_iso"] = w.isoformat() + "Z"
+        except Exception:
+            pass
+    return jsonify(result)
+
+
+@app.route("/api/clock-status", methods=["GET"])
+def api_clock_status():
+    import socket, struct, time as time_mod
+    result = {"rtc_diff": None, "rtc_ok": None, "ntp_diff": None, "ntp_ok": None}
+    try:
+        rtc_ts = get_rtc_timestamp()
+        sys_ts = get_sys_timestamp()
+        if rtc_ts != -1:
+            diff = abs(rtc_ts - sys_ts)
+            result["rtc_diff"] = round(diff, 1)
+            result["rtc_ok"] = diff <= 10
+    except Exception:
+        pass
+    try:
+        NTP_DELTA = 2208988800
+        packet = b'\x1b' + 47 * b'\0'
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(5)
+        s.sendto(packet, ("pool.ntp.org", 123))
+        data, _ = s.recvfrom(1024)
+        s.close()
+        ntp_time = struct.unpack('!12I', data)[10] - NTP_DELTA
+        diff = abs(time_mod.time() - ntp_time)
+        result["ntp_diff"] = round(diff, 1)
+        result["ntp_ok"] = diff <= 10
+    except Exception:
+        pass
+    return jsonify(result)
 
 
 @app.route("/tests/cancel/<task_id>", methods=["POST"])
@@ -996,46 +1067,99 @@ def _run_test_impl(test_name: str, task_id: str = None):
             warning_text = ""
             startup_warning = ""
             startup_reschedule_note = ""
+            shutdown_warning = ""
+            shutdown_reschedule_note = ""
 
-            try:
-                if startup and shutdown and startup < shutdown:
-                    warning_text = "\n  → <b style='font-weight:bold; color:orange;'>⚠ WARNING</b>:        Next wakeup occurs BEFORE next shutdown."
-            except Exception:
-                warning_text = ""
-
-            if startup:
+            # --- Startup (wakeup) reschedule ---
+            reschedule = False
+            reschedule_reason = ""
+            if not startup:
+                reschedule = True
+                reschedule_reason = "not set"
+            else:
                 delta = startup - now
-                reschedule = False
                 if delta < timedelta(minutes=3):
                     startup_warning = " <b style='color:red; font-weight:bold;'>⚠ too soon (&lt;3 min)</b>"
                     reschedule = True
+                    reschedule_reason = "too soon"
                 elif delta > timedelta(days=20):
                     startup_warning = " <b style='color:red;font-weight:bold;'>⚠ too far (&gt;20 days - probably in the past)</b>"
                     reschedule = True
-                if reschedule:
-                    new_wakeup = now + timedelta(minutes=10)
-                    set_startup_time(new_wakeup.day, new_wakeup.hour, new_wakeup.minute, 0)
-                    expected_str = f"{new_wakeup.day:02d} {new_wakeup.hour:02d}:{new_wakeup.minute:02d}:00"
-                    readback_str = get_startup_time()
-                    if readback_str == expected_str:
-                        startup = new_wakeup.replace(second=0, microsecond=0)
-                        startup_warning = ""
-                        startup_reschedule_note = f" <i style='color:orange;'>(rescheduled from invalid time → +10 min)</i>"
-                        startup_left = startup - now
-                        startup_left_str = str(startup_left).split('.')[0]
-                    else:
-                        return jsonify(
-                            ok=False,
-                            summary=f"{model} FAIL",
-                            message=(
-                                f"\n  ⚠ Startup time was invalid and reschedule to "
-                                f"{new_wakeup.strftime('%H:%M')} failed.\n"
-                                f"  → Expected: {expected_str}\n"
-                                f"  → Readback: {readback_str}"
-                            ),
-                        )
+                    reschedule_reason = "too far"
+            if reschedule:
+                new_wakeup = now + timedelta(minutes=22)
+                set_startup_time(new_wakeup.day, new_wakeup.hour, new_wakeup.minute, 0)
+                expected_str = f"{new_wakeup.day:02d} {new_wakeup.hour:02d}:{new_wakeup.minute:02d}:00"
+                readback_str = get_startup_time()
+                if readback_str == expected_str:
+                    startup = new_wakeup.replace(second=0, microsecond=0)
+                    startup_warning = ""
+                    startup_reschedule_note = f" <i style='color:orange;'>(rescheduled from {reschedule_reason} → +22 min)</i>"
+                    startup_left = startup - now
+                    startup_left_str = str(startup_left).split('.')[0]
+                else:
+                    return jsonify(
+                        ok=False,
+                        summary=f"{model} FAIL",
+                        message=(
+                            f"\n  ⚠ Startup time was {reschedule_reason} and reschedule to "
+                            f"{new_wakeup.strftime('%H:%M')} failed.\n"
+                            f"  → Expected: {expected_str}\n"
+                            f"  → Readback: {readback_str}"
+                        ),
+                    )
+
+            # --- Shutdown reschedule ---
+            sd_reschedule = False
+            sd_reschedule_reason = ""
+            if not shutdown:
+                sd_reschedule = True
+                sd_reschedule_reason = "not set"
+            else:
+                sd_delta = shutdown - now
+                if sd_delta < timedelta(minutes=3):
+                    shutdown_warning = " <b style='color:red; font-weight:bold;'>⚠ too soon (&lt;3 min)</b>"
+                    sd_reschedule = True
+                    sd_reschedule_reason = "too soon"
+                elif sd_delta > timedelta(days=20):
+                    shutdown_warning = " <b style='color:red;font-weight:bold;'>⚠ too far (&gt;20 days - probably in the past)</b>"
+                    sd_reschedule = True
+                    sd_reschedule_reason = "too far"
+            if sd_reschedule:
+                new_shutdown = now + timedelta(minutes=20)
+                set_shutdown_time(new_shutdown.day, new_shutdown.hour, new_shutdown.minute, 0)
+                sd_expected_str = f"{new_shutdown.day:02d} {new_shutdown.hour:02d}:{new_shutdown.minute:02d}:00"
+                sd_readback_str = get_shutdown_time()
+                if sd_readback_str == sd_expected_str:
+                    shutdown = new_shutdown.replace(second=0, microsecond=0)
+                    shutdown_warning = ""
+                    shutdown_reschedule_note = f" <i style='color:orange;'>(rescheduled from {sd_reschedule_reason} → +20 min)</i>"
+                    shutdown_left = shutdown - now
+                    shutdown_left_str = str(shutdown_left).split('.')[0]
+                else:
+                    return jsonify(
+                        ok=False,
+                        summary=f"{model} FAIL",
+                        message=(
+                            f"\n  ⚠ Shutdown time was {sd_reschedule_reason} and reschedule to "
+                            f"{new_shutdown.strftime('%H:%M')} failed.\n"
+                            f"  → Expected: {sd_expected_str}\n"
+                            f"  → Readback: {sd_readback_str}"
+                        ),
+                    )
+
+            try:
+                if startup and shutdown:
+                    gap = startup - shutdown
+                    if gap.total_seconds() < 0:
+                        warning_text = "\n  → <b style='font-weight:bold; color:red;'>⚠ WARNING</b>:        Next wakeup occurs BEFORE next shutdown."
+                    elif gap.total_seconds() < 120:
+                        warning_text = f"\n  → <b style='font-weight:bold; color:orange;'>⚠ WARNING</b>:        Gap between shutdown and wakeup is only {int(gap.total_seconds())}s (min 2 min recommended)."
+            except Exception:
+                warning_text = ""
 
             shutdown_str = f"{shutdown}" + (f" ({shutdown_left_str} left)" if shutdown else "") if shutdown else "<span style='color:red; font-weight:bold;'>⚠ not set</span>"
+            shutdown_str += shutdown_warning + shutdown_reschedule_note
             startup_str  = f"{startup}"  + (f" ({startup_left_str} left)"  if startup  else "") if startup  else "<span style='color:red; font-weight:bold;'>⚠ not set</span>"
             startup_str += startup_warning + startup_reschedule_note
 
