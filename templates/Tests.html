@@ -25,7 +25,7 @@
     <!-- =========================
         TEST RESULTS OUTPUT
     ========================== -->
-    <div class="card mb-4" style="max-height:90dvh; display:flex; flex-direction:column;">
+    <div class="card mb-4" style="max-height:calc(100dvh - 120px); display:flex; flex-direction:column;">
         <div class="card-header d-flex justify-content-between align-items-center" style="flex-shrink:0;">
             <h4 class="mb-0">Results</h4>
             <div class="d-flex align-items-center gap-2">
@@ -95,11 +95,11 @@
 <style>
 #test-output.run-all-simple .run-detail { display: none; }
 
-/* run-all summary lines: English shown in expert mode, French shown in simple mode */
-.run-summary { display: none; }
+/* run-all summary lines */
 .run-summary-expert { display: inline; }
-#test-output.run-all-simple .run-summary { display: inline; }
+.run-summary-line { display: none; }
 #test-output.run-all-simple .run-summary-expert { display: none; }
+#test-output.run-all-simple .run-summary-line { display: inline-flex; align-items: baseline; white-space: nowrap; }
 
 #expert-section button.btn-link {
     text-decoration: none;
@@ -328,7 +328,7 @@ function runTest(testName, showTestName) {
             const spanId = `run-summary-${runId}-${n}`;
             output.innerHTML += `<br>[${now}] ` +
                 `<span class="run-summary-expert">${n}/${totalTests} — Running <b>${displayName}</b> test...</span>` +
-                `<span class="run-summary" id="${spanId}" style="display:inline-flex; align-items:baseline;"><span style="min-width:42ch;"><b>${n}/${totalTests}</b> — Running <b>${displayName}</b> test...</span></span>`;
+                `<span class="run-summary-line" id="${spanId}"><span style="display:inline-block; min-width:50ch; white-space:nowrap;"><b>${n}/${totalTests}</b> — Running <b>${displayName}</b> test...</span></span>`;
         } else {
             output.innerHTML += `[${now}] Running <b>${displayName}</b> test...`;
         }

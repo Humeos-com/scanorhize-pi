@@ -684,6 +684,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # S3: check production bucket is reachable, then chain to the humeos-test bucket.
         # Two-step chain so each bucket gets its own PASS/FAIL line in the console.
         if test_name == "s3":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="S3: no internet")
             config = ConfigApp()
             result = run(
                 f"s3cmd ls {config.s3_bucket}",
@@ -695,6 +699,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
 
         # S3-test: second step of the S3 chain — verify the humeos-test bucket used by speed test
         if test_name == "s3-test":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="S3-test: no internet")
             config = ConfigApp()
             result = run(
                 f"s3cmd ls s3://humeos-test",
@@ -706,6 +714,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
 
         # SSH: verify at least one ssh process is running (reverse tunnel)
         if test_name == "ssh":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="SSH: no internet")
             result = run(
                 "pgrep -a ssh", shell=True, capture_output=True, text=True, check=False
             )
@@ -716,6 +728,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # Upload-pictures-service: verify the systemd upload-pictures service is running.
         # If active, chains to copy-test-picture to actually exercise the upload pipeline.
         if test_name == "upload-pictures-service":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="Upload service: no internet")
             from Campaign import getUsbDir
             usb_dir = getUsbDir()
             if is_raspberry_pi() and not os.path.ismount(usb_dir):
@@ -771,6 +787,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # processing=True keeps the IN PROGRESS line visible and suppresses duplicate messages
         # when the file count hasn't changed between polls.
         if test_name == "wait-for-pictures-upload":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="Upload: no internet")
             configs = listConfigScanner()
             if not configs:
                 return jsonify(ok=False, message="No scanner config files found.", summary="Upload: no scanner config")
@@ -793,6 +813,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
         # sees download speed before the upload finishes. Cancellation is checked between
         # the two transfers — it can't interrupt a running s3cmd subprocess.
         if test_name == "speed":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="Speed: no internet")
             import time
             local_path = "/tmp/2MB.jpg"
             s3_path = "s3://humeos-test/tests/2MB.jpg"
@@ -962,6 +986,10 @@ def _run_test_impl(test_name: str, task_id: str = None):
     
         # Timezone: UTC check + internet time accuracy via NTP
         if test_name == "timezone":
+            try:
+                check_connectivity(3)
+            except RuntimeError as e:
+                return jsonify(ok=False, message=f"No internet connection: {e}", summary="Timezone: no internet")
             import socket, struct, time as time_mod
             lines_out = []
             all_ok = True
