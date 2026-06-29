@@ -1895,6 +1895,24 @@ def scan_acq():
         )
 
 
+@app.route("/set-wakeup", methods=["POST"])
+def set_wakeup():
+    if not is_mc_connected():
+        return jsonify(ok=False, message="WittyPi not connected."), 400
+    data = request.get_json(silent=True) or {}
+    minutes = data.get("minutes")
+    if not minutes or int(minutes) <= 0:
+        return jsonify(ok=False, message="Invalid duration."), 400
+    from datetime import datetime, timedelta
+    target = datetime.now() + timedelta(minutes=int(minutes))
+    try:
+        set_startup_time(target.day, target.hour, target.minute, 0)
+    except Exception as e:
+        return jsonify(ok=False, message=f"Failed to set wakeup time: {e}"), 500
+    getLogger().info("Wakeup time set to %s via poweroff modal", target.strftime("%d %H:%M"))
+    return jsonify(ok=True, message=f"Wakeup set for day {target.strftime('%d at %H:%M')}")
+
+
 @app.route("/poweroff", methods=["POST"])
 def stop_server():
 
@@ -1904,6 +1922,19 @@ def stop_server():
             output=sanitize_output("Not on Raspberry Pi"),
             **get_common_template_vars(),
         )
+
+    # Block shutdown if no wakeup is set or is more than 2 days away
+    force = (request.get_json(silent=True) or {}).get("force", False)
+    if is_mc_connected() and not force:
+        from datetime import datetime, timedelta
+        try:
+            startup = parse_wittypi_time(get_startup_time())
+        except Exception:
+            startup = None
+        if not startup:
+            return jsonify(ok=False, force_allowed=False, message="No wakeup time set on the WittyPi — set one before powering off."), 400
+        if startup > datetime.now() + timedelta(days=2):
+            return jsonify(ok=False, force_allowed=True, message=f"Wakeup time is too far away ({startup.strftime('%d %H:%M')}) — set a wakeup within the next 2 days, or power off anyway."), 400
 
     # Before remove the USB key, we need to stop the server
     cmdeject = "sudo eject /dev/sda"
@@ -1940,7 +1971,7 @@ def stop_server():
         shell=True,
         check=False,
     )
-    return "OK"
+    return jsonify(ok=True, message="Hub is powering off...")
 
 
 if __name__ == "__main__":

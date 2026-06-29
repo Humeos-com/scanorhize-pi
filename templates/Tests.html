@@ -595,7 +595,7 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
             statusEl.innerHTML = `🔍 Pinging server…`;
             if (now >= silentPingDeadline) {
                 phase = 'pinging';
-                    if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+                if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
                 showLostWifiPrompt(false);
             }
 
@@ -655,7 +655,7 @@ function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
         } else if (phase === 'pinging') {
             if (retryDeadline && new Date() < retryDeadline) {
                 // Still within retry window — keep pinging every 5s
-            cycleMonitorPingTimeout = setTimeout(doPing, 5000);
+                cycleMonitorPingTimeout = setTimeout(doPing, 5000);
             } else {
                 // Window expired — show prompt again with Abort button
                 retryDeadline = null;
