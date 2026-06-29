@@ -1283,15 +1283,12 @@ def net_to_system():
 
 
 def system_to_rtc():
-    """Write system time to RTC using direct I2C access."""
+    """Write system time to WittyPi RTC via I2C."""
     getLogger().warning("  Writing system time to RTC...")
     try:
         sys_ts = get_sys_timestamp()
         time_struct = time.localtime(sys_ts)
-
-        # Write to RTC registers using direct I2C access
-
-        if not is_WittyPi_5:
+        if not is_WittyPi_5():
             WittyPi().i2c_write_byte(I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec), purpose="sync system seconds to RTC")
             WittyPi().i2c_write_byte(I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min), purpose="sync system minutes to RTC")
             WittyPi().i2c_write_byte(I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour), purpose="sync system hours to RTC")
@@ -1307,8 +1304,7 @@ def system_to_rtc():
             WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS_WP5, dec2bcd(time_struct.tm_wday), purpose="sync system weekday to RTC (WP5)")
             WittyPi().i2c_write_byte(I2C_RTC_MONTHS_WP5, dec2bcd(time_struct.tm_mon), purpose="sync system month to RTC (WP5)")
             WittyPi().i2c_write_byte(I2C_RTC_YEARS_WP5, dec2bcd(time_struct.tm_year % 100), purpose="sync system year to RTC (WP5)")
-
-        getLogger().info("  Done :-)")
+        getLogger().info("  Done")
     except (OSError, IOError) as e:
         getLogger().error("  Error writing to RTC: %s", e)
 

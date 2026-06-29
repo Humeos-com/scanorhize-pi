@@ -1205,13 +1205,15 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 rtc_date_str = datetime.fromtimestamp(rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                 if time_diff > 10:
                     system_to_rtc()
+                    sleep(2)  # wait for WP5 firmware to tick before reading back
                     new_rtc_ts = get_rtc_timestamp()
                     new_diff = abs(new_rtc_ts - sys_ts) if new_rtc_ts != -1 else 9999
                     if new_diff <= 10:
                         rtc_date_str = datetime.fromtimestamp(new_rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                         rtc_time_str = f"OK <i style='color:orange;'>(was {time_diff}s off, synced from system)</i>"
                     else:
-                        rtc_time_str = f"<b style='color:red; font-weight:bold;'>⚠ {time_diff}s difference (sync failed, still {new_diff}s off)</b>"
+                        rtc_date_str = datetime.fromtimestamp(new_rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+                        rtc_time_str = f"<b style='color:red; font-weight:bold;'>⚠ sync failed — was {time_diff}s off, still {new_diff}s off after write</b>"
                         rtc_warning = True
                 else:
                     rtc_time_str = f"OK ({time_diff}s difference)"
