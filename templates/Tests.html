@@ -326,7 +326,7 @@ function runTest(testName, showTestName) {
             const spanId = `run-summary-${runId}-${n}`;
             output.innerHTML += `<br>[${now}] ` +
                 `<span class="run-summary-expert">${n}/${totalTests} — Running <b>${displayName}</b> test...</span>` +
-                `<span class="run-summary" id="${spanId}"><b>${n}/${totalTests}</b> — Running <b>${displayName}</b> test...</span>`;
+                `<span class="run-summary" id="${spanId}" style="display:inline-flex; align-items:baseline;"><span style="min-width:42ch;"><b>${n}/${totalTests}</b> — Running <b>${displayName}</b> test...</span></span>`;
         } else {
             output.innerHTML += `[${now}] Running <b>${displayName}</b> test...`;
         }
@@ -471,7 +471,10 @@ function handleTestResult(data) {
     }
 
     if (runningAll == true) {
-        if (data.summary) allTestResults += `<br>         → ${data.summary}`;
+        if (data.summary) {
+            const line = `<br>         → ${data.summary}`;
+            allTestResults += data.ok ? line : `<br><span style="color:red;">         → ${data.summary}</span>`;
+        }
     } else if (data.next_test == null) {
         initTestButtonStates();
     }
@@ -765,8 +768,10 @@ function showPanelDisconnectedPrompt(data, output) {
         document.documentElement.scrollTop = document.documentElement.scrollHeight;
         output.scrollTop = output.scrollHeight;
 
-        if (runningAll && data.summary)
-            allTestResults += `<br>         → ${data.summary} (${msg})`;
+        if (runningAll && data.summary) {
+            const text = `         → ${data.summary} (${msg})`;
+            allTestResults += ok ? `<br>${text}` : `<br><span style="color:red;">${text}</span>`;
+        }
 
         if (runningAll && !ok) runAllHadFailures = true;
         if ((ok || continueOnFailure()) && runningAll && runningTestBtn) {
