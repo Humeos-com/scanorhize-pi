@@ -589,7 +589,7 @@ def GetWifiSSID():
             ["nmcli", "-g", "802-11-wireless.ssid", "connection", "show", "hub_AP"],
             capture_output=True, universal_newlines=True, check=True,
         )
-        ssid = result.stdout.strip()
+        ssid = result.stdout.strip().splitlines()[0].strip()
         if ssid:
             return ssid
     except (SubprocessError, CalledProcessError, FileNotFoundError) as e:
