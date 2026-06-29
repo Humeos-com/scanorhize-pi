@@ -593,9 +593,9 @@ def _run_test_impl(test_name: str, task_id: str = None):
     try:
         # ── CONNECTIVITY ──────────────────────────────────────────────────────
 
-        # Hotspot SSID: verify hub_AP SSID matches Humeos_{eth0 mac}
+        # Hotspot SSID: verify hub_AP SSID matches Humeos_{wlan0 mac}
         if test_name == "hotspot-ssid":
-            mac = open("/sys/class/net/eth0/address").read().strip().replace(":", "")
+            mac = open("/sys/class/net/wlan0/address").read().strip().replace(":", "")
             expected = f"Humeos_{mac}"
             actual = GetWifiSSID()
             if actual == expected:
