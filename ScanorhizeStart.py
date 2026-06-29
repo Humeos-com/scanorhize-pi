@@ -1,27 +1,37 @@
 #!/usr/bin/env python3
 """Lance le scanner et programme le prochain réveil
 On gère les GPIO pour la carte 4G depuis ce programme
-Si jamais il y a un plantage de ScanorhizeProcess.py,
+Si jamais il y a un plantage de TakePictures.py,
 ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 """
 
 import sys
 import time
-from subprocess import run, CalledProcessError
+from ConfigApp import is_debug, getLogger
+from version import __version__
+getLogger().info("============= START =============")
+getLogger().info("ScanorhizeStart.py version: %s", __version__)
+
+from subprocess import run, CalledProcessError, Popen
 import argparse
+from ConfigApp import getUsbDir
+from pathlib import Path
+
 
 from OSUtils import is_raspberry_pi
 from WittyPy_utilities import is_reason_click
-from WittyPy_utilities import doShutdown, setNextShutdownDate
+from WittyPy_utilities import (
+    doShutdown,
+    set_shutdown_time, get_shutdown_time,
+    pre_shutdown_checks,
+)
 from Miscellaneous import (
     EndGPIO,
     enable4G,
-    disable4G,
     check_connectivity,
     ReadGPIOConfig,
 )
-from DateUtils import GetCurrentDate, SecondsToDate, DateToSeconds
-from ConfigApp import is_debug, getLogger
+
 from Scanner import (
     initScanners,
     listConfigScanner,
@@ -31,7 +41,6 @@ from Hub import (
     HubData,
     getTokens,
     SendParameters,
-    syncImageFiles,
     ReadScannerConfigFromServer,
     SendScannerConfigToServer,
     getOffline,
@@ -48,7 +57,7 @@ from Hub import (
     GetIP,
     calculate_next_wakeup_from_crontab,
 )
-from version import __version__
+
 
 parser = argparse.ArgumentParser(
     prog="ScanorhizeStart.py",
@@ -68,231 +77,258 @@ if args.version:
     sys.exit(0)
 
 # Etape 0 #############################################
-time.sleep(10) # Clock sync
-
-getLogger().warning("ScanorhizeStart.py version: %s", __version__)
-
-# On regarde si on est en mode configuration
-config = not ReadGPIOConfig() or is_reason_click()  # 0 ou 1
-EndGPIO()
-
-# Etape 1 #############################################
-# Mise à jour des dates de réveil et d'arrêt du WittyPi
-# Car en développement, on peut dépasser la date de réveil
-# et dans ce cas, le WittyPi ne se reveille plus !
-# Idem si on change la batterie et qu'on repart quelques jours plus tard
-# On fait le calcul de la date de réveil systématiquement
-# avec la date courante.
-# Si la batterie est morte, l'heure sera aléatoire, il faut
-# refaire l'initialisation par le mode config, qui mettra
-# le boitier à l'heure correcte.
-nextStartDateValue = calculate_next_wakeup_from_crontab()
+getLogger().info("2 second delay... (Clock sync)")
+time.sleep(2) # Clock sync
 
 
-if config:
-    getLogger().warning("On passe en mode config")
-    calculate_next_wakeup_from_crontab()
+
+WITTYPI_TEST_FLAG = Path("wittypi_test_mode")
+
+def isConfig():
+    # WittyPi cycle test: flag file forces config mode for exactly one boot
+    if WITTYPI_TEST_FLAG.exists():
+        WITTYPI_TEST_FLAG.unlink()
+        getLogger().warning("WITTYPI CYCLE TEST FLAG FOUND — STARTING IN CONFIG MODE")
+        EndGPIO()
+        return True
+    # On regarde si on est en mode configuration
+    config = not ReadGPIOConfig() or is_reason_click()  # 0 ou 1
+    EndGPIO()
+    return config
+
+
+def setShutdownAndWakeUpDates():
+    # Mise à jour des dates de réveil et d'arrêt du WittyPi
+    # Car en développement, on peut dépasser la date de réveil
+    # et dans ce cas, le WittyPi ne se reveille plus !
+    # Idem si on change la batterie et qu'on repart quelques jours plus tard
+    # On fait le calcul de la date de réveil systématiquement
+    # avec la date courante.
+    # Si la batterie est morte, l'heure sera aléatoire, il faut
+    # refaire l'initialisation par le mode config, qui mettra
+    # le boitier à l'heure correcte.
+    return calculate_next_wakeup_from_crontab()
+
+
+def createRunConfigFile():
+    getLogger().info("On passe en mode config")    
+    
     # On cree un fichier /run/config pour indiquer aux shells qu'on est en mode config
     cmd = "sudo touch /run/config >> Log/Scanorhize.log 2>&1"
-    getLogger().warning(cmd)
+    getLogger().info(cmd)
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
     )
     if result.returncode == 0:
-        getLogger().warning("creation /run/config OK")
+        getLogger().info("creation /run/config OK")
     else:
         getLogger().error("Failed to create /run/config: %s", result.stderr)
 
+
+
+def launchServer():
+    
+    print("Launching server")
+    
     #Activation de l'AP
-    getLogger().warning("Lancement du point d'accès (192.168.4.1)")
+    getLogger().info("Lancement du point d'accès (192.168.4.1)")
     try:
         run("sudo nmcli con up hub_AP", shell=True, check=True)
-        getLogger().warning("AP activé")
+        getLogger().info("AP activé")
     except Exception as e:
         getLogger().error("Echec activation AP : %s", e)
-
-    # Run initScanners() to initialize scanners
-    # Init Scanners before getting tokens, because this operation
-    # can be completed without network
-    # En plus, il faut faire l'init sans la 4G car sinon on dépasse la consommation
-    # maximale de la carte WittyPi, surtout si la batterie est faible
-    getLogger().warning("Start InitScanners")
-    initScanners()
-    getLogger().warning("End InitScanners")
-
-    # En mode config on lance le serveur web Scanorhize et on quitte
-    if enable4G():
-        getLogger().warning("4G enabled")
-
-    try:
-        check_connectivity()
-        has_internet = True
-        getLogger().warning("Internet OK !")
-        runTodo()
-
-        # On recupère eventuellement le todo.sh
-        if TodoEnabled():
-            getTodo()
-            setTodo(False)
-
-        Hub = HubData()
-        Hub.read_config()
-        SendParameters(Hub)
-        SendHubConfigToServer()
-        syncLogFiles()
-        Scanner = ScannerData()
-        for CurrentScanner in listConfigScanner():
-            Scanner.ReadScannerConfig(CurrentScanner)
-            SendScannerConfigToServer(Scanner)
-        getLogger().warning("getTokens")
-        getTokens()
-
-    except RuntimeError as exc:
-        getLogger().error("No internet connection: %s", exc)
-
+        
+        
     # A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
-    getLogger().warning("SSID: %s", GetWifiSSID())
-    getLogger().warning("IP: %s", GetIP())
+    getLogger().info("SSID: %s", GetWifiSSID().strip())
+    getLogger().info("IP: %s", GetIP())
 
-    # En principe, on éteint le Raspberry Pi depuis l'application Web Scanorhize.py
-    cmd = "nohup python3 Scanorhize.py >> Log/Scanorhize.log 2>&1"
-    getLogger().warning(cmd)
-    result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
-    if result.returncode == 0:
-        getLogger().warning("Scanorhize.py started successfully")
-    else:
-        getLogger().error("Failed to start Scanorhize.py: %s", result.stderr)
-
-    sys.exit(0)
-
-# Etape 2 #############################################
-# Si on n'est pas en mode config, on lance le scan des images
-# On execute le contenu du fichier ScanorhizeProcess.py
-# On scanne les images et on les envoie à la plateforme Web
-# On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
-# import ScanorhizeProcess
-cmd = "python3 ScanorhizeProcess.py"
-getLogger().warning(cmd)
-try:
-    result = run(
-        cmd, capture_output=True, universal_newlines=True, shell=True, check=True
-    )
-except CalledProcessError as exc:
-    getLogger().error(exc.stderr)
-
-
-# Etape 3 #############################################
-# Mise à jour des paramètres
-Hub = HubData()
-Hub.read_config()
-# Wait 15 seconds for battery voltage to stabilize before reading
-time.sleep(15)
-hub_info = get_hub_info()
-
-getLogger().warning(
-    "Volts: %.2fV  Bat: %d%%  USB: %dMo %d%%  Temp: %.1f°C",
-    hub_info[0],
-    hub_info[1],
-    hub_info[2],
-    hub_info[3],
-    hub_info[4],
-)
-
-if not getOffline():
-    # Transfert des données
+    #Launch server in the background
     try:
-        # On allume la clé 4G et on attend d'avoir le réseau
-        enable4G()
-        # Teste la connectivité
-        check_connectivity()
-        has_internet = True
-        getLogger().warning("Internet OK !")
+        Popen(["python3", "WebServer.py"])
+    except Exception as e:
+        print(f"Error: {e}")
 
-        # Etape 4 #############################################
-        # On lance un sous programme qui met à jour toutes les données sur la plateforme
-        # On échange avec la plateforme Web pour envoyer les images et les paramètres
 
-        runTodo()
-        # On recupère eventuellement le todo.sh
-        if TodoEnabled():
-            getTodo()
-            setTodo(False)
+def takePictures():
+    # Si on n'est pas en mode config, on lance le scan des images
+    # On execute le contenu du fichier TakePictures.py
+    # On scanne les images et on les envoie à la plateforme Web
+    # On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
+    # import TakePictures
+    cmd = "python3 TakePictures.py"
+    getLogger().info(cmd)
+    try:
+        result = run(
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+        )
+    except CalledProcessError as exc:
+        getLogger().error(exc.stderr)
 
-        # On récupère les configs des scanners depuis la plateforme / le S3 ??
-        # selon le flag Scanner.UseServer
-        SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
-        SendHubConfigToServer()
-        if Hub.use_server:
-            ReadHubConfigFromServer()
 
-        # On peut travailler sans synchroniser les images si le réseau est mauvais
-        # ou si les images sont trop grosses pour le réseau
-        if getSyncImages():
-            syncImageFiles(Hub)
-
-        # On recupère les configuration des Scanners en fonction de use_server
-        # sauf qu'on n'écrase pas les 2 attributs LastImgFile et LastImgTime
-        # qui sont déjà présents dans la classe ScannerData
-        Scanner = ScannerData()
-        for CurrentScanner in listConfigScanner():
-            Scanner.ReadScannerConfig(CurrentScanner)
-            if Scanner.UseServer:
-                last_img_file_save = Scanner.LastImgFile
-                last_img_time_save = Scanner.LastImgTime
-                ReadScannerConfigFromServer(Scanner)
-                # Relecture de la nouvelle config
-                Scanner.ReadScannerConfig(CurrentScanner)
-                # On remet les 2 attributs LastImgFile et LastImgTime
-                # à leurs valeurs précédentes
-                Scanner.LastImgFile = last_img_file_save
-                Scanner.LastImgTime = last_img_time_save
-                Scanner.WriteScannerConfig(CurrentScanner)
-
-    except RuntimeError as exc:
-        getLogger().error(exc)
-
-    finally:
-        # On éteint la clé 4G
-        disable4G()
-# fin getOffline()
-
-# Etape 4 #############################################
-# On éteint le Raspberry Pi et le WittyPi
-nextStartDateValue = calculate_next_wakeup_from_crontab()
-if is_debug():  # Debug mode
-    getLogger().warning(
-        "Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé"
+def updateDataFromAndToServer(configMode):
+    # Mise à jour des paramètres
+    Hub = HubData()
+    Hub.read_config()
+    # Wait 15 seconds for battery voltage to stabilize before reading
+    time.sleep(15)
+    hub_info = get_hub_info()
+    
+    getLogger().info(
+        "Volts: %.2fV  Bat: %d%%  USB: %dMo %d%%  Temp: %.1f°C",
+        hub_info[0],
+        hub_info[1],
+        hub_info[2],
+        hub_info[3],
+        hub_info[4],
     )
-    sys.exit(0)
+    
+    if not getOffline():
+        # Transfert des données
+        try:
 
-cmdeject = "sudo eject /dev/sda"
-result = run(
-    cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
-)
-getLogger().warning(cmdeject)
+            # Teste la connectivité
+            check_connectivity()
+            has_internet = True
+            getLogger().info("Internet OK !")
 
-# On fixe l'heure d'arrêt dans 30 secondes,
-# car des fois le Witty ne s'eteint pas sur le doShutdown()
-date_now = GetCurrentDate()
-secs_now = DateToSeconds(date_now)
-date_new = SecondsToDate(secs_now + 30)
-getLogger().warning("Next stop at: %s", date_new)
-setNextShutdownDate(date_new)
+            # On lance un sous programme qui met à jour toutes les données sur la plateforme
+            # On échange avec la plateforme Web pour envoyer les paramètres
 
-# lance le poweroff du Raspberry et éteint le WittyPi
-# en principe le doShutdown() lance le shutdown -h now,
-# sauf s'il y a un fichier /boot/wittypi.lock
-# Donc on ajoute un poweroff en plus...
-getLogger().warning("doShutdown until: %s", nextStartDateValue)
+            runTodo()
+            # On recupère eventuellement le todo.sh
+            if TodoEnabled():
+                getTodo()
+                setTodo(False)
 
-if not is_raspberry_pi():
-    getLogger().warning("Not a Raspberry Pi, so no poweroff")
-    sys.exit(0)
+            # On récupère les configs des scanners depuis la plateforme / le S3 ??
+            # selon le flag Scanner.UseServer
+            SendParameters(Hub)  ## Plutôt envoie les paramètres au S3 ??
+            SendHubConfigToServer()
+            
+            #Synchronize log files with server
+            syncLogFiles()
+            
+            if Hub.use_server:
+                ReadHubConfigFromServer()
 
-doShutdown()
-cmd = "sudo poweroff"
-getLogger().warning(cmd)
-result = run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
-sys.exit(0)
+            # On recupère les configurations des Scanners en fonction de use_server
+            # sauf qu'on n'écrase pas les 2 attributs LastImgFile et LastImgTime
+            # qui sont déjà présents dans la classe ScannerData
+            Scanner = ScannerData()
+            if configMode == True:
+                for CurrentScanner in listConfigScanner():
+                    Scanner.ReadScannerConfig(CurrentScanner)
+                    SendScannerConfigToServer(Scanner)
+                getLogger().info("getTokens")
+                getTokens()
+            
+            else: #If NOT config mode
+                for CurrentScanner in listConfigScanner():
+                    Scanner.ReadScannerConfig(CurrentScanner)
+                    if Scanner.UseServer:
+                        last_img_file_save = Scanner.LastImgFile
+                        last_img_time_save = Scanner.LastImgTime
+                        ReadScannerConfigFromServer(Scanner)
+                        # Relecture de la nouvelle config
+                        Scanner.ReadScannerConfig(CurrentScanner)
+                        # On remet les 2 attributs LastImgFile et LastImgTime
+                        # à leurs valeurs précédentes
+                        Scanner.LastImgFile = last_img_file_save
+                        Scanner.LastImgTime = last_img_time_save
+                        Scanner.WriteScannerConfig(CurrentScanner)
+
+        except RuntimeError as exc:
+            getLogger().error(exc)
+
+    # fin getOffline()
+
+
+def safeShutdown():
+    from datetime import datetime, timedelta
+
+    if is_debug():
+        getLogger().warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
+        sys.exit(0)
+
+    #Ensure mandatory register values before turning off board
+    pre_shutdown_checks()
+
+    cmdeject = "sudo eject /dev/sda"
+    run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)
+    getLogger().info(cmdeject)
+
+    # Force shutdown in 30s as a safety net if doShutdown() doesn't trigger
+    stop_at = datetime.now() + timedelta(seconds=30)
+    set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
+    readback = get_shutdown_time()
+    getLogger().warning("Next stop at: %s (readback: %s)", stop_at.strftime("%d %H:%M:%S"), readback)
+
+    if not is_raspberry_pi():
+        getLogger().warning("Not a Raspberry Pi, so no poweroff")
+        sys.exit(0)
+
+    doShutdown()
+    cmd = "sudo poweroff"
+    getLogger().warning(cmd)
+    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+
+
+def waitingForPicturesToUpload():
+    USBfolder = Path(getUsbDir())
+    print(f"USB folder: {USBfolder}")
+    while True:
+        jsonCount = sum(1 for _ in USBfolder.rglob("*.json"))
+        jpgCount = sum(1 for _ in USBfolder.rglob("*.jpg"))
+        jp2Count = sum(1 for _ in USBfolder.rglob("*.jp2"))
+        print(f".json count: {jsonCount}")
+        print(f".jpg count: {jpgCount}")
+        print(f".jp2 count: {jp2Count}")
+        
+        if jsonCount + jpgCount + jp2Count == 0:
+            break
+                    
+        time.sleep(10)
+
+def main():
+    setShutdownAndWakeUpDates()
+    config = isConfig()
+    
+    if config:
+        getLogger().info("======= CONFIG MODE =======")
+        launchServer()  #Launch web server in the background
+        createRunConfigFile()
+        initScanners()
+    
+    else: #Default mode
+        getLogger().info("======= DEFAULT MODE =======")
+        takePictures()
+        
+    #Update data from and to server
+    #And, if not config mode, wait for pictures to upload
+    if not getOffline():
+        try:
+            getLogger().info("==============")
+            enable4G()
+            getLogger().info("==============")
+            updateDataFromAndToServer(configMode=config)
+            getLogger().info("==============")
+            
+            #In default mode, wait for pictures to upload to server before shutting down
+            if config == False:
+                waitingForPicturesToUpload()
+                safeShutdown()
+        
+        except Exception as e:
+            getLogger().error(e)
+         
+    
+    getLogger().info("End of ScanorhizeStart.py")
+    if config:
+        while True:
+            time.sleep(60)
+    else:
+        sys.exit(0)
+
+
+main()

@@ -22,10 +22,17 @@
          .hub-info span {
             margin: 0 5px;
          }
+         button {
+             margin-bottom: 5px !important;
+         }
+         button[disabled] {
+            background: grey !important;
+            border-color: grey !important;            
+        }
       </style>
    </head>
    <body>         
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
+<nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top shadow">
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
             </button>
@@ -37,7 +44,8 @@
                         <a class="nav-link" href="/Scanner/1"><button type="button" class="btn btn-secondary btn-lg">Scanner-1</button></a>
                         <a class="nav-link" href="/Scanner/2"><button type="button" class="btn btn-secondary btn-lg">Scanner-2</button></a> 
                         <a class="nav-link" href="/Scanner/3"><button type="button" class="btn btn-secondary btn-lg">Scanner-3</button></a>                        
-                        <a class="nav-link" href="/App"><button type="button" class="btn btn-secondary btn-lg">App</button></a> 
+                        <a class="nav-link" href="/App"><button type="button" class="btn btn-secondary btn-lg">App</button></a>
+                        <a class="nav-link" href="/Tests"><button type="button" class="btn btn-secondary btn-lg">Tests</button></a>
                         <a class="nav-link"><button type="button" class="btn btn-danger btn-lg" id="poweroff-btn">Poweroff</button></a> 
                                               
             </div>
@@ -54,6 +62,17 @@
             <span>SSH: {{ SSH_PORT }}</span>
             <span>Version: {{ version }}</span>
          </div>
+         <div class="hub-info-line" id="clock-row">
+            <span id="clock-rtc-cell" style="display:none;"></span>
+            <span id="clock-ntp-cell" style="display:none;"></span>
+         </div>
+         <div class="hub-info-line" id="wittypi-row" style="{{ '' if wittypi.connected else 'display:none;' }}">
+            <span id="wittypi-shutdown-cell" style="{{ '' if wittypi.shutdown else 'display:none;' }}">🔴 OFF: <span id="wittypi-shutdown-label">{{ wittypi.shutdown or '' }}</span> <span id="wittypi-shutdown-countdown" style="color:#aaa;"></span></span>
+            <span id="wittypi-shutdown-warning" style="color:#dc3545;{{ 'display:none;' if (wittypi.shutdown or not wittypi.connected) else '' }}">⚠ OFF not set</span>
+            <span id="wittypi-wakeup-cell" style="{{ '' if wittypi.wakeup else 'display:none;' }}">🟢 ON: <span id="wittypi-wakeup-label">{{ wittypi.wakeup or '' }}</span> <span id="wittypi-wakeup-countdown" style="color:#aaa;"></span></span>
+            <span id="wittypi-wakeup-warning" style="color:#dc3545;{{ 'display:none;' if (wittypi.wakeup or not wittypi.connected) else '' }}">⚠ ON not set</span>
+            <span style="cursor:pointer; color:#aaa;" id="wittypi-refresh-btn" title="Refresh wakeup/shutdown times">↻</span>
+         </div>
       </div>
 </nav>
 
@@ -61,27 +80,255 @@
                   
           
       <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-      
+
+      <!-- Poweroff confirm modal -->
+      <div class="modal fade" id="poweroff-confirm-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Power off</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">Are you sure you want to power off the Hub?</div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-danger" id="poweroff-confirm-btn">Power off</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Poweroff blocked modal -->
+      <div class="modal fade" id="poweroff-blocked-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-warning">
+            <div class="modal-header bg-warning text-dark">
+              <h5 class="modal-title">⚠ Poweroff blocked</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p id="poweroff-blocked-msg"></p>
+              <hr>
+              <p class="mb-1"><strong>Set a wakeup time:</strong></p>
+              <div class="d-flex gap-2 align-items-center">
+                <input type="number" id="wakeup-value" class="form-control" value="1" min="1" style="width:80px;">
+                <select id="wakeup-unit" class="form-select" style="width:110px;">
+                  <option value="1">minutes</option>
+                  <option value="60" selected>hours</option>
+                  <option value="1440">days</option>
+                </select>
+                <button type="button" class="btn btn-success" id="wakeup-set-btn">Set</button>
+              </div>
+              <small id="wakeup-error" class="text-danger d-none mt-1"></small>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-danger d-none" id="poweroff-force-btn">Power off anyway</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wakeup set confirmation modal -->
+      <div class="modal fade" id="poweroff-wakeup-set-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-success">
+            <div class="modal-header bg-success text-white">
+              <h5 class="modal-title">✔ Wakeup time set</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="poweroff-wakeup-set-msg"></div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <script>
-      // Add JavaScript for the Poweroff button
-      document.getElementById('poweroff-btn').addEventListener('click', function() {
-          if (confirm('Are you sure you want to power off the Hub?')) {
-              fetch("{{url_for('stop_server')}}", {
-                  method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json'
-                  }
-              }).then(response => {
-                  if (response.ok) {
-                      alert('Hub is powering off...');
-                  } else {
-                      alert('Error powering off the Hub');
-                  }
-              }).catch(error => {
-                  alert('Error powering off the Hub: ' + error);
-              });
+      (function() {
+          let shutdownIso = {{ wittypi.shutdown_iso | tojson }};
+          let wakeupIso   = {{ wittypi.wakeup_iso   | tojson }};
+
+          function fmtCountdown(isoStr) {
+              if (!isoStr) return '';
+              const diffMin = Math.round((new Date(isoStr) - new Date()) / 60000);
+              if (diffMin <= 0) return '(now)';
+              const d = Math.floor(diffMin / 1440);
+              const h = Math.floor((diffMin % 1440) / 60);
+              const m = diffMin % 60;
+              const parts = [];
+              if (d) parts.push(d + 'd');
+              if (h) parts.push(h + 'h');
+              if (m || parts.length === 0) parts.push(m + 'm');
+              return '(in ' + parts.join(' ') + ')';
           }
+
+          function applyTimes(data) {
+              shutdownIso = data.shutdown_iso;
+              wakeupIso   = data.wakeup_iso;
+
+              const sdCell  = document.getElementById('wittypi-shutdown-cell');
+              const wuCell  = document.getElementById('wittypi-wakeup-cell');
+              const row     = document.getElementById('wittypi-row');
+              const sdWarn  = document.getElementById('wittypi-shutdown-warning');
+              const wuWarn  = document.getElementById('wittypi-wakeup-warning');
+
+              if (sdCell) {
+                  document.getElementById('wittypi-shutdown-label').textContent = data.shutdown || '';
+                  sdCell.style.display = data.shutdown ? '' : 'none';
+              }
+              if (wuCell) {
+                  document.getElementById('wittypi-wakeup-label').textContent = data.wakeup || '';
+                  wuCell.style.display = data.wakeup ? '' : 'none';
+              }
+              if (row) row.style.display = data.connected ? '' : 'none';
+              if (sdWarn) sdWarn.style.display = (data.connected && !data.shutdown) ? '' : 'none';
+              if (wuWarn) wuWarn.style.display = (data.connected && !data.wakeup)   ? '' : 'none';
+
+              document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+              document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+          }
+
+          function refresh() {
+              const btn = document.getElementById('wittypi-refresh-btn');
+              if (btn) btn.style.opacity = '0.4';
+              fetch('/api/wittypi-times')
+                  .then(r => r.json())
+                  .then(data => { applyTimes(data); })
+                  .catch(() => {
+                      document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+                      document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+                  })
+                  .finally(() => { if (btn) btn.style.opacity = ''; });
+          }
+
+          // Initial countdown render without fetch (times already in page)
+          document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+          document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+
+          // Update countdown display every minute
+          setInterval(() => {
+              document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
+              document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
+          }, 60000);
+
+          // Manual refresh button
+          document.getElementById('wittypi-refresh-btn').addEventListener('click', refresh);
+
+          // Expose for Tests.html to call after changing times
+          window.refreshWittypiNavbar = refresh;
+      })();
+      </script>
+
+      <script>
+      (function() {
+          function applyClockStatus(data) {
+              const rtcCell = document.getElementById('clock-rtc-cell');
+              const ntpCell = document.getElementById('clock-ntp-cell');
+
+              if (data.rtc_diff !== null && data.rtc_diff !== undefined) {
+                  const ok = data.rtc_ok;
+                  rtcCell.innerHTML = ok
+                      ? `🕐 RTC clock: <span style="color:#666;">${data.rtc_diff}s drift</span>`
+                      : `🕐 RTC clock: <span style="color:#dc3545;font-weight:bold;">⚠ ${data.rtc_diff}s drift (sync needed)</span>`;
+                  rtcCell.style.display = '';
+              } else {
+                  rtcCell.style.display = 'none';
+              }
+
+              if (data.ntp_diff !== null && data.ntp_diff !== undefined) {
+                  const ok = data.ntp_ok;
+                  ntpCell.innerHTML = ok
+                      ? `🌐 Internet time: <span style="color:#666;">${data.ntp_diff}s drift</span>`
+                      : `🌐 Internet time: <span style="color:#dc3545;font-weight:bold;">⚠ ${data.ntp_diff}s drift (clock off)</span>`;
+                  ntpCell.style.display = '';
+              } else {
+                  ntpCell.style.display = 'none';
+              }
+          }
+
+          function fetchClockStatus() {
+              fetch('/api/clock-status')
+                  .then(r => r.json())
+                  .then(applyClockStatus)
+                  .catch(() => {});
+          }
+
+          fetchClockStatus();
+          window.refreshClockStatus = fetchClockStatus;
+      })();
+      </script>
+
+      <script>
+      const poweroffConfirmModal   = new bootstrap.Modal(document.getElementById('poweroff-confirm-modal'));
+      const poweroffBlockedModal   = new bootstrap.Modal(document.getElementById('poweroff-blocked-modal'));
+      const poweroffWakeupSetModal = new bootstrap.Modal(document.getElementById('poweroff-wakeup-set-modal'));
+
+      function doPoweroff(force) {
+          fetch("{{url_for('stop_server')}}", {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ force: !!force })
+          }).then(response => response.json().then(data => {
+              if (!response.ok) {
+                  document.getElementById('poweroff-blocked-msg').textContent = data.message || 'Unknown error';
+                  document.getElementById('poweroff-force-btn').classList.toggle('d-none', !data.force_allowed);
+                  document.getElementById('wakeup-error').classList.add('d-none');
+                  poweroffBlockedModal.show();
+              }
+          })).catch(error => {
+              document.getElementById('poweroff-blocked-msg').textContent = 'Error: ' + error;
+              document.getElementById('poweroff-force-btn').classList.add('d-none');
+              poweroffBlockedModal.show();
+          });
+      }
+
+      document.getElementById('poweroff-btn').addEventListener('click', function() {
+          poweroffConfirmModal.show();
+      });
+
+      document.getElementById('poweroff-confirm-btn').addEventListener('click', function() {
+          poweroffConfirmModal.hide();
+          doPoweroff(false);
+      });
+
+      document.getElementById('poweroff-force-btn').addEventListener('click', function() {
+          poweroffBlockedModal.hide();
+          doPoweroff(true);
+      });
+
+      document.getElementById('wakeup-set-btn').addEventListener('click', function() {
+          const value = parseInt(document.getElementById('wakeup-value').value);
+          const unit  = parseInt(document.getElementById('wakeup-unit').value);
+          const errEl = document.getElementById('wakeup-error');
+          if (!value || value <= 0) {
+              errEl.textContent = 'Please enter a valid duration.';
+              errEl.classList.remove('d-none');
+              return;
+          }
+          const minutes = value * unit;
+          this.disabled = true;
+          fetch("/set-wakeup", {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ minutes })
+          }).then(r => r.json()).then(data => {
+              this.disabled = false;
+              if (data.ok) {
+                  poweroffBlockedModal.hide();
+                  document.getElementById('poweroff-wakeup-set-msg').textContent = data.message + ' — you can now click Power off.';
+                  poweroffWakeupSetModal.show();
+              } else {
+                  errEl.textContent = data.message || 'Failed to set wakeup time.';
+                  errEl.classList.remove('d-none');
+              }
+          }).catch(err => {
+              this.disabled = false;
+              errEl.textContent = 'Error: ' + err;
+              errEl.classList.remove('d-none');
+          });
       });
       </script>
-   </body>   
+   </body>
 </html>

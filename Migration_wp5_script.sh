@@ -10,7 +10,7 @@ set -e  # Exit on error
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+BLUE='\e[94m'
 NC='\033[0m'
 
 log()     { echo -e "${GREEN}[OK]${NC} $1"; }
@@ -218,8 +218,8 @@ else
     # LED on duration: 100ms
     wp5set 20 100 "LED on duration = 100ms"
 
-    # Startup delay on power connection: 255 = stay off (no auto power-on)
-    wp5set 17 255 "startup delay = 255 (no auto power-on on power connection)"
+    # Startup delay on power connection: 250 seconds
+    wp5set 17 250 "startup delay = 250 seconds"
 
     # Delay between Pi shutdown and power cut: 5 seconds
     wp5set 18 5 "shutdown delay after button = 5s"
@@ -243,6 +243,20 @@ else
     wp5set 30 1 "log to file = enabled"
 
     log "WP5 I2C configuration complete"
+fi
+
+# --- 4c-3. Set I2C baudrate to 50kHz for WP5 reliability ---
+section "4c-3 - I2C baudrate (50kHz)"
+
+CONFIG_FILE="/boot/firmware/config.txt"
+BAUDRATE_LINE="dtparam=i2c_arm_baudrate=50000"
+
+if grep -qF "$BAUDRATE_LINE" "$CONFIG_FILE"; then
+    warn "$BAUDRATE_LINE already set in $CONFIG_FILE"
+else
+    echo "" >> "$CONFIG_FILE"
+    echo "$BAUDRATE_LINE" >> "$CONFIG_FILE"
+    log "Added $BAUDRATE_LINE to $CONFIG_FILE"
 fi
 
 # --- 4d. Create scanorhize-startup service ---
@@ -283,10 +297,46 @@ SVCEOF
     log "scanorhize-startup service created and enabled"
 fi
 
+
 # =============================================================================
-# 5. PYTHON FILES TRANSFER NOTE
+# 5. CREATE UPLOAD-PICTURES SERVICE
 # =============================================================================
-section "5 - Python files transfer (manual step)"
+section "5 - upload-pictures service"
+
+SERVICE_FILE="/etc/systemd/system/upload-pictures.service"
+
+if [ -f "$SERVICE_FILE" ]; then
+    warn "upload-pictures service already exists, overwriting..."
+fi
+info "Creating $SERVICE_FILE..."
+if true; then
+
+    cat > "$SERVICE_FILE" << SVCEOF
+[Unit]
+Description=Upload pictures
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Scanorhize
+ExecStartPre=/bin/chmod +x /home/pi/Scanorhize/upload_pictures_s3.sh
+ExecStart=/bin/bash -c 'sleep 5 && /home/pi/Scanorhize/upload_pictures_s3.sh >> /home/pi/Scanorhize/Log/upload-pictures-$(date +%%Y-%%m-%%d).log 2>&1'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+    systemctl enable upload-pictures.service
+    log "upload-pictures service created and enabled"
+fi
+
+
+# =============================================================================
+# 6. PYTHON FILES TRANSFER NOTE
+# =============================================================================
+section "6 - Python files transfer (manual step)"
 
 echo ""
 info "Python file changes are NOT applied automatically by this script."
@@ -311,8 +361,9 @@ echo "  [OK] wittypi (WP4) service stopped and disabled"
 echo "  [OK] WP4 files removed"
 echo "  [OK] WittyPi 5 installed (wp5d.service running)"
 echo "  [OK] scanorhize-startup service created"
+echo "  [OK] upload-pictures service created"
 echo ""
-warn "Remember to transfer the modified Python files (see section 5)"
+warn "Remember to transfer the modified Python files (see section 6)"
 warn "A reboot is recommended to validate all changes"
 echo ""
 read -p "Reboot now? [y/N] " REBOOT

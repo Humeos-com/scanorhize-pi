@@ -211,7 +211,7 @@ def getTodo():
         # Download todo.sh from s3
         hub_id = getHubId()
         cmd = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/todo.sh ../todo.sh"
-        getLogger().warning(cmd)
+        getLogger().info(cmd)
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=False
         )
@@ -222,7 +222,7 @@ def getTodo():
                 result.stderr,
             )
             return 1
-        getLogger().warning("todo.sh downloaded successfully")
+        getLogger().info("todo.sh downloaded successfully")
     return 0
 
 
@@ -270,7 +270,7 @@ def remove_image_files(folder: str, thumbnails_only: bool = False):
                 file_path = os.path.join(root, name)
                 try:
                     os.remove(file_path)
-                    getLogger().warning("remove_image_files: removed %s", file_path)
+                    getLogger().info("remove_image_files: removed %s", file_path)
                 except (FileNotFoundError, PermissionError) as e:
                     getLogger().error("Error removing file %s: %s", file_path, e)
 
@@ -291,14 +291,14 @@ def syncImageFiles(hub_: HubData):
     else:
         # Sync all files (default behavior)
         cmd = f"s3cmd --no-preserve --no-progress sync {src} {getS3Bucket()}"
-        getLogger().warning("Syncing all files (send_thumbnails_only=False)")
+        getLogger().info("Syncing all files (send_thumbnails_only=False)")
 
-    getLogger().warning(cmd)
+    getLogger().info(cmd)
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
-        getLogger().warning("SyncImageFiles from %s: %s", src, result.stdout)
+        getLogger().info("SyncImageFiles from %s: %s", src, result.stdout)
         # Remove only what was sent: thumbnails only or all files
         remove_image_files(src, thumbnails_only=hub_.send_thumbnails_only)
     except (SubprocessError, CalledProcessError) as e:
@@ -312,13 +312,13 @@ def syncLogFiles():
     s3_log_path = f"s3://hubs/hub-{hub_id}/home/pi/Scanorhize/"
 
     cmd = f"s3cmd --no-preserve --no-progress sync {log_dir} {s3_log_path}"
-    getLogger().warning("Syncing log files: %s", cmd)
+    getLogger().info("Syncing log files: %s", cmd)
 
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
         )
-        getLogger().warning("SyncLogFiles: %s", result.stdout)
+        getLogger().info("SyncLogFiles: %s", result.stdout)
         return 0
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncLogFiles error: %s", e)
@@ -389,7 +389,7 @@ def getTokens():
 -H "accept: */*" -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' """
 
-    getLogger().warning(cmdPost)
+    getLogger().info(cmdPost)
     result = run(
         cmdPost,
         capture_output=True,
@@ -413,7 +413,7 @@ def getTokens():
         status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
-        getLogger().warning("Response status code: %s", status_code)
+        getLogger().info("Response status code: %s", status_code)
 
         if not 200 <= status_code < 300:
             getLogger().error("Error: HTTP %s", status_code)
@@ -447,7 +447,7 @@ def getTokens():
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     hub_id = getHubId()
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
-    getLogger().warning(cmdRead)
+    getLogger().info(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -460,14 +460,14 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
         )
         return 1
 
-    getLogger().warning("%s: ReadScannerConfigFromServer: OK", ScannerObj.ScannerName)
+    getLogger().info("%s: ReadScannerConfigFromServer: OK", ScannerObj.ScannerName)
     return 0
 
 
 def SendScannerConfigToServer(ScannerObj: ScannerData):
     hub_id = getHubId()
     cmdWrite = f"s3cmd --no-preserve sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
-    getLogger().warning(cmdWrite)
+    getLogger().info(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -480,14 +480,14 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
         )
         return 1
 
-    getLogger().warning("%s: SendScannerConfigToServer: OK", ScannerObj.ScannerName)
+    getLogger().info("%s: SendScannerConfigToServer: OK", ScannerObj.ScannerName)
     return 0
 
 
 def ReadHubConfigFromServer():
     hub_id = getHubId()
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
-    getLogger().warning(cmdRead)
+    getLogger().info(cmdRead)
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -500,14 +500,14 @@ def ReadHubConfigFromServer():
         )
         return 1
 
-    getLogger().warning("hub-%s: ReadHubConfigFromServer: OK", hub_id)
+    getLogger().info("hub-%s: ReadHubConfigFromServer: OK", hub_id)
     return 0
 
 
 def SendHubConfigToServer():
     hub_id = getHubId()
     cmdWrite = f"s3cmd --no-preserve sync {getConfigHubFile()} s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
-    getLogger().warning(cmdWrite)
+    getLogger().info(cmdWrite)
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -520,7 +520,7 @@ def SendHubConfigToServer():
         )
         return 1
 
-    getLogger().warning("hub-%s: SendHubConfigToServer: OK", hub_id)
+    getLogger().info("hub-%s: SendHubConfigToServer: OK", hub_id)
     return 0
 
 
@@ -542,7 +542,7 @@ def SendParameters(Hub_: HubData):
 -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' """
 
-    getLogger().warning(cmdPUT)
+    getLogger().info(cmdPUT)
     result = run(
         cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -562,7 +562,7 @@ def SendParameters(Hub_: HubData):
         status_line = headers.split("\n")[0]
         status_code = int(status_line.split()[1])
 
-        getLogger().warning("SendParameters: status: %s", status_code)
+        getLogger().info("SendParameters: status: %s", status_code)
 
         if not 200 <= status_code < 300:
             getLogger().error("SendParameters: error: %s", status_code)
@@ -571,7 +571,7 @@ def SendParameters(Hub_: HubData):
         if body.strip():
             results = json.loads(body)
             if results["message"] == "Status updated":
-                getLogger().warning("SendParameters: OK")
+                getLogger().info("SendParameters: OK")
                 return 0
             getLogger().error("SendParameters: error: %s", results["message"])
             return 1
@@ -582,27 +582,19 @@ def SendParameters(Hub_: HubData):
 
 
 def GetWifiSSID():
-    SSID = "No SSID"
     if not is_raspberry_pi():
-        return SSID
-    cmd = "sudo iwgetid -r"
+        return "No SSID"
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            ["nmcli", "-g", "802-11-wireless.ssid", "connection", "show", "hub_AP"],
+            capture_output=True, universal_newlines=True, check=True,
         )
-        if result.returncode != 0:
-            getLogger().info(
-                "Error GetWifiSSID: return: %s error: %s",
-                result.returncode,
-                result.stderr,
-            )
-            return SSID
-        SSID = result.stdout
-    except (SubprocessError, CalledProcessError) as e:
-        getLogger().error("Error GetWifiSSID: %s", e)
-        return SSID
-
-    return SSID
+        ssid = result.stdout.strip()
+        if ssid:
+            return ssid
+    except (SubprocessError, CalledProcessError, FileNotFoundError) as e:
+        getLogger().error("GetWifiSSID: %s", e)
+    return "No SSID"
 
 
 def GetIP():
@@ -725,7 +717,7 @@ if __name__ == "__main__":
     print(f"macAddress: {Hub.macAddress}, model: {Hub.model}, ssh_port: {Hub.ssh_port}")
     Hub.read_config()
     hub_info_ = get_hub_info()
-    getLogger().warning(
+    getLogger().info(
         "Volts: %.2fV  Bat: %d%%  USB: %dMo %d%%  Temp: %.1f°C",
         hub_info_[0],
         hub_info_[1],

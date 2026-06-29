@@ -11,7 +11,6 @@ On se laisse une marge de delta_time pour considérer qu'il faut lancer l'acquis
 Si on est au delà de delta_time, on ne fait rien, c'est qu'on a allumé le WittyPi à la main.
 
 Les images sont stockées sur le disque USB
-Les images seront envoyées par le processus ScanorhizeStart.py
 """
 
 from time import sleep
@@ -21,12 +20,6 @@ import argparse
 from version import __version__
 
 from ConfigApp import getLogger
-from Hub import (
-    getSyncImages,
-    syncImageFiles,
-    HubData,
-    calculate_next_wakeup_from_crontab,
-)
 from Scanner import listConfigScanner, scanAcq, ScannerData
 
 from Miscellaneous import (
@@ -37,7 +30,7 @@ from Campaign import CopyImageToUSB, CreateFolderOnUSB
 from DateUtils import GetCurrentDate
 
 parser = argparse.ArgumentParser(
-    prog="ScanorhizeProcess.py",
+    prog="TakePictures.py",
     usage="%(prog)s [--force] [--version]",
     epilog="""Lance l'aquisition des images. --force force l'acquisition même si la date de déclenchement n'est pas atteinte""",
 )
@@ -47,6 +40,11 @@ parser.add_argument(
     action="store_true",
     help="Force l'acquisition même si la date de déclenchement n'est pas atteinte",
 )
+parser.add_argument(
+    "--prefix",
+    default="image",
+    help="Prefix for saved image filenames (default: image)",
+)
 # pylint: disable=duplicate-code
 parser.add_argument(
     "-v",
@@ -55,16 +53,18 @@ parser.add_argument(
     help="Affiche la version du programme",
 )
 
+
 args = parser.parse_args()
 if args.version:
-    print(f"ScanorhizeProcess.py version: {__version__}")
+    print(f"TakePictures.py version: {__version__}")
     sys.exit(0)
 
 force = bool(args.force)
+prefix = args.prefix
 
 CurrentDate = GetCurrentDate()
 initDisplayFile()
-getLogger().warning("StartProcess")
+getLogger().info("StartTakePictures")
 res = InitGPIO()
 if res != 0:
     getLogger().error("InitGPIOError")
@@ -73,6 +73,8 @@ if res != 0:
 Scanner = ScannerData()
 listScannerconfigs = listConfigScanner()
 scanning_error = 0
+pictures_taken = 0
+scanner_ids = []
 
 i_scan = 0
 for CurrentScanner in listScannerconfigs:
@@ -82,8 +84,10 @@ for CurrentScanner in listScannerconfigs:
         i_scan = i_scan + 1
         continue
 
+    scanner_ids.append(f"{Scanner.projectId}/{Scanner.sampleId}")
+
     data = "Scanner file: " + CurrentScanner
-    getLogger().warning(data)
+    getLogger().info(data)
 
     # Plus besoin de vérifier NextStartDate pour chaque scanner
     # Si on est réveillé, c'est qu'il faut acquérir (selon crontab Hub)
@@ -91,17 +95,18 @@ for CurrentScanner in listScannerconfigs:
         if force:
             getLogger().warning("Force acquisition")
         # get image from scanner
-        getLogger().warning("Scanner %s: start image acquisition", str(i_scan + 1))
+        getLogger().info("Scanner %s: start image acquisition", str(i_scan + 1))
         Scanner = scanAcq(Scanner, i_scan, CurrentDate)
         Scanner.WriteScannerConfig(CurrentScanner)
         if Scanner.error == 0:
-            getLogger().warning("Image acquisition Ok")
+            getLogger().info("Image acquisition Ok")
             sleep(5)  # Voir si on peut réduire ce timer
             FolderImage = CreateFolderOnUSB(Scanner.projectId)
             FolderImage = CreateFolderOnUSB(path.join(FolderImage, Scanner.sampleId))
-            copyerror = CopyImageToUSB(Scanner, FolderImage)
+            copyerror = CopyImageToUSB(Scanner, FolderImage, prefix=prefix)
             if copyerror == 0:
-                getLogger().warning("Image copied to USB")
+                getLogger().info("Image copied to USB")
+                pictures_taken += 1
             else:
                 getLogger().error("Error in copy to USB")
                 scanning_error = 1
@@ -112,16 +117,6 @@ for CurrentScanner in listScannerconfigs:
     i_scan = i_scan + 1
 # fin for
 
-if force:
-    # On peut travailler sans synchroniser les images si le réseau est mauvais
-    # ou si les images sont trop grosses pour le réseau
-    Hub = HubData()
-    Hub.read_config()
-    if getSyncImages():
-        syncImageFiles(Hub)
-
-# Calculer et configurer le prochain réveil
-next_wakeup = calculate_next_wakeup_from_crontab()
-getLogger().warning("Next scheduled wakeup: %s", next_wakeup)
-
+print(f"PICTURES_TAKEN:{pictures_taken}")
+print(f"SCANNERS:{','.join(scanner_ids)}")
 sys.exit(scanning_error)

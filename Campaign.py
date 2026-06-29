@@ -43,18 +43,18 @@ def CreateFolderOnUSB(directory: str):
         getLogger().error("CreateFolder Error: %s set to backup", err)
         data = "Folder save: " + FOLDER_IMAGE
 
-    getLogger().warning(data)
+    getLogger().info(data)
     return Folder
 
 
-def CopyImageToUSB(Scanner, FolderImage_):
+def CopyImageToUSB(Scanner, FolderImage_, prefix="image"):
     """copie l'image et le fichier JSON sur la clé USB"""
     try:
         date = Scanner.LastImgTime
         fileName = date.replace(":", "-")
-        jp2Path = path.join(FolderImage_, f"image_{fileName}.jp2")
-        jp2JSONPath = path.join(FolderImage_, f"image_{fileName}.json")
-        thumbPath = path.join(FolderImage_, f"image_{fileName}_thumb.jpg")
+        jp2Path = path.join(FolderImage_, f"{prefix}_{fileName}.jp2")
+        jp2JSONPath = path.join(FolderImage_, f"{prefix}_{fileName}.json")
+        thumbPath = path.join(FolderImage_, f"{prefix}_{fileName}_thumb.jpg")
 
         # Check if source file exists
         if not os.path.exists(Scanner.LastImgFile):
@@ -64,12 +64,12 @@ def CopyImageToUSB(Scanner, FolderImage_):
         if Scanner.scanDumpMeta(jp2JSONPath):
             getLogger().error("Error creating JSON file: %s", jp2JSONPath)
             return 1
-        getLogger().warning("Copy %s to %s", Scanner.LastImgFile, jp2Path)
+        getLogger().info("Copy %s to %s", Scanner.LastImgFile, jp2Path)
         shutil.copy2(Scanner.LastImgFile, jp2Path)
 
         # Copy thumbnail if it exists
         if Scanner.LastThumbFile and os.path.exists(Scanner.LastThumbFile):
-            getLogger().warning("Copy %s to %s", Scanner.LastThumbFile, thumbPath)
+            getLogger().info("Copy %s to %s", Scanner.LastThumbFile, thumbPath)
             shutil.copy2(Scanner.LastThumbFile, thumbPath)
         else:
             getLogger().warning("No thumbnail to copy")

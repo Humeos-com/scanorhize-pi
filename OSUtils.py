@@ -22,7 +22,7 @@ def get_MEGA4():
     except usb.core.NoBackendError:
         with_MEGA4 = False
     if with_MEGA4:
-        getLogger().warning("MEGA4 board detected")
+        getLogger().info("MEGA4 board detected")
     else:
         getLogger().warning("No MEGA4 board detected")
     return with_MEGA4

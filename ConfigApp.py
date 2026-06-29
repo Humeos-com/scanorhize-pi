@@ -67,7 +67,7 @@ class ConfigApp:
         self.setup_final_logging()
 
         self.initialized = True  # Mark as initialized
-        self.logger.warning("Read configuration from: %s", self.config_app_file)
+        self.logger.info("Read configuration from: %s", self.config_app_file)
 
     def setup_basic_logging(self):
         """Setup initial basic logging"""
@@ -100,6 +100,11 @@ class ConfigApp:
             os.path.expanduser(self.log_dir),
             f"Scanorhize_{datetime.now():%Y-%m-%d}.log",
         )
+
+        # Create log folder if does not exist        
+        log_dir = os.path.dirname(log_file)
+        os.makedirs(log_dir, exist_ok=True)
+
         fh = logging.FileHandler(log_file)
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
@@ -133,7 +138,7 @@ class ConfigApp:
         else:
             logging.getLogger().setLevel(logging.INFO)
 
-        self.logger.warning("Read configuration from: %s", self.config_app_file)
+        self.logger.info("Read configuration from: %s", self.config_app_file)
         return self
 
     def _setup_logging(self):
@@ -265,5 +270,5 @@ if __name__ == "__main__":
     ConfigApp().print()
     print(f"Dev: {is_dev()}")
     print(f"Debug: {is_debug()}")
-    getLogger().warning("getLogger warning test")
+    getLogger().info("getLogger warning test")
     ConfigApp().save_config()

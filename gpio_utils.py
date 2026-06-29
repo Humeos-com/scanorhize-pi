@@ -174,7 +174,7 @@ def read_gpio_output(pin: int):
         return 0
     try:
         state = GPIO.input(pin)
-        getLogger().warning("GPIO output state pin %d: %d", pin, state)
+        getLogger().info("GPIO output state pin %d: %d", pin, state)
         return state
     except IOError as e:
         getLogger().error("read_gpio_output IOError: %s", e)

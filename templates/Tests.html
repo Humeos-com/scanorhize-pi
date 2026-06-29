@@ -1,0 +1,831 @@
+{% extends "base.html" %}
+{%block content%}
+
+<div class="container">
+    <h1>Tests</h1>
+
+    <!-- =========================
+         SIMPLE START + EXPERT TOGGLE
+    ========================== -->
+    <div class="mb-2">
+        <button class="btn btn-success btn-lg run-test-btn run-all-btn"
+                onclick="runAll()">
+            Démarrer le test de fonctionnalité
+        </button>
+    </div>
+    <div class="mb-4">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="continue-on-failure">
+            <label class="form-check-label" for="continue-on-failure" style="font-size:0.9rem;">
+                Continuer en cas d'échec
+            </label>
+        </div>
+    </div>
+
+    <!-- =========================
+        TEST RESULTS OUTPUT
+    ========================== -->
+    <div class="card mb-4" style="max-height:calc(100dvh - 120px); display:flex; flex-direction:column;">
+        <div class="card-header d-flex justify-content-between align-items-center" style="flex-shrink:0;">
+            <h4 class="mb-0">Results</h4>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-secondary btn-sm"
+                        onclick="document.getElementById('test-output').innerHTML = ''">
+                    Clear
+                </button>
+                <button class="btn btn-danger btn-sm" id="stop-btn"
+                        onclick="stopTests()"
+                        style="display:none;">
+                    Stop
+                </button>
+                <a href="#" id="expert-mode-link" onclick="toggleExpertMode(); return false;"
+                   style="font-size:0.85rem; white-space:nowrap;">
+                    Mode expert ▼
+                </a>
+            </div>
+        </div>
+
+        <!-- Expert mode: individual test links, hidden by default -->
+        <div id="expert-section" style="display:none; padding: 6px 12px; border-bottom: 1px solid #dee2e6; font-size: 0.82rem; line-height: 2; flex-shrink:0;">
+            <span style="color:#888;">Master:</span>
+            <button class="btn btn-link run-test-btn run-all-btn p-0 me-3" onclick="runAll()" style="font-size:0.82rem;">▶ Run all</button>
+            <br>
+            <span style="color:#888;">Power:</span>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('battery', true)" style="font-size:0.82rem;">🔋 Battery</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('mppt', true)" style="font-size:0.82rem;">☀ Solar MPPT</button>
+            <br>
+            <span style="color:#888;">Connectivity:</span>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('hotspot-ssid', true)" style="font-size:0.82rem;">📡 Hotspot SSID</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('4g', true)" style="font-size:0.82rem;">📶 4G Modem</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('internet', true)" style="font-size:0.82rem;">🌐 Internet</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('s3', true)" style="font-size:0.82rem;">☁ S3 Bucket</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('ssh', true)" style="font-size:0.82rem;">🔑 SSH Tunnel</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('upload-pictures-service', true)" style="font-size:0.82rem;">⬆ Upload pictures</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('speed', true)" style="font-size:0.82rem;">⚡ Speed</button>
+            <br>
+            <span style="color:#888;">Scanners:</span>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('scanners-config-files', true)" style="font-size:0.82rem;">🖨 Scanners</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('take-pictures', true)" style="font-size:0.82rem;">📸 Take pictures</button>
+            <br>
+            <span style="color:#888;">Time:</span>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('timezone', true)" style="font-size:0.82rem;">🕐 Timezone (UTC)</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('on-off', true)" style="font-size:0.82rem;">⏻ ON/OFF check</button>
+            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('off-on-cycle', true)" style="font-size:0.82rem; color: #ffc107;">🔄 OFF/ON Cycle</button>
+            <!-- Hidden button triggered programmatically after wakeup during run-all -->
+            <button class="run-test-btn" style="display:none;" onclick="runTest('on-off', true)"></button>
+        </div>
+
+        <div class="card-body" style="padding: 0; flex: 1; min-height: 0; display: flex; flex-direction: column;">
+
+            <!-- Console-like output area -->
+            <pre id="test-output"
+                 class="bg-dark p-3"
+                 style="flex: 1;
+                        min-height: 0;
+                        overflow-y: auto;
+                        white-space: pre-wrap;
+                        color: white;
+                        margin-bottom:0;">
+            </pre>
+
+        </div>
+    </div>
+</div>
+
+<style>
+#test-output.run-all-simple .run-detail { display: none; }
+
+/* run-all summary lines */
+.run-summary-expert { display: inline; }
+.run-summary-line { display: none; }
+#test-output.run-all-simple .run-summary-expert { display: none; }
+#test-output.run-all-simple .run-summary-line { display: inline-flex; align-items: baseline; white-space: nowrap; }
+
+#expert-section button.btn-link {
+    text-decoration: none;
+}
+
+#expert-section button.btn-link:disabled {
+    opacity: 0.45;
+    color: inherit !important;
+    background: none !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    text-decoration: none;
+}
+</style>
+
+<script>
+
+document.getElementById('test-output').innerHTML = ""
+
+let expertMode = false;
+
+function continueOnFailure() {
+    return document.getElementById('continue-on-failure').checked;
+}
+
+function toggleExpertMode() {
+    const section = document.getElementById('expert-section');
+    const link = document.getElementById('expert-mode-link');
+    const visible = section.style.display !== 'none';
+    section.style.display = visible ? 'none' : 'block';
+    link.textContent = visible ? 'Mode expert ▼' : 'Mode expert ▲';
+    expertMode = !visible;
+    document.getElementById('test-output').classList.toggle('run-all-simple', runningAll && !expertMode);
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function fmtUTC(d) {
+    return d.toISOString().slice(11, 19);
+}
+
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
+
+// Task ID of the currently running async backend job
+let currentTaskId = null
+
+// True when "Run all" mode is active
+let runningAll = false
+
+// Currently running button element
+let runningTestBtn
+
+// Progress counter for run-all mode
+let runningTestNumber = 0
+let totalTests = 0
+let runId = 0
+
+// Stores summary results for all tests
+let allTestResults = ""
+let runAllHadFailures = false
+
+// AbortController for cancelling the in-flight fetch request
+let abortController = null
+
+// Interval ID and pending ping timeout for the wittypi-cycle monitor
+let cycleMonitorInterval = null
+let cycleMonitorPingTimeout = null
+let retryTimeout = null
+
+// Polling interval for job status
+let testPollInterval = null
+
+// Live "waiting" span shown while polling, and its accumulated dot count
+let pollWaitingEl = null
+let pollDots = 0
+
+// Last printed IN PROGRESS message — suppresses duplicate lines
+let lastProgressMessage = null
+
+// Timestamp (ms) when the current test started
+let testStartTime = null
+let activeTestName = null
+
+
+/* =========================================================
+   RUN ALL TESTS
+========================================================= */
+
+function runAll() {
+    allTestResults = ""
+    runAllHadFailures = false
+    runningAll = true
+    runningTestNumber = 0
+    totalTests = document.querySelectorAll('.run-test-btn:not(.run-all-btn)').length
+    runId++
+    if (!expertMode) document.getElementById('test-output').classList.add('run-all-simple');
+    runningTestBtn = document.querySelector('.run-test-btn:not(.run-all-btn)');
+    runningTestBtn.click();
+}
+
+
+/* =========================================================
+   RESET BUTTON STATES
+========================================================= */
+
+function initTestButtonStates() {
+    const testButtons = document.querySelectorAll('.run-test-btn');
+    testButtons.forEach(button => { button.disabled = false; });
+    document.getElementById('stop-btn').style.display = 'none';
+    runningTestBtn = null
+    runningAll = false
+}
+
+
+/* =========================================================
+   STOP RUNNING TEST
+========================================================= */
+
+function stopTests() {
+    const output = document.getElementById('test-output');
+    const isCycleRunning = cycleMonitorInterval !== null;
+    const testIsRunning = document.getElementById('stop-btn').style.display !== 'none';
+
+    if (abortController) abortController.abort();
+    if (testPollInterval) { clearInterval(testPollInterval); testPollInterval = null; }
+    if (pollWaitingEl) { pollWaitingEl.remove(); pollWaitingEl = null; }
+
+    // Cancel the backend job so long-running loops (e.g. take-pictures) stop between iterations
+    if (currentTaskId) {
+        fetch('/tests/cancel/' + currentTaskId, { method: 'POST' }).catch(() => {});
+        currentTaskId = null;
+    }
+
+    // Show STOPPED for normal tests — covers all timing cases (in-flight, between ticks, 2s gap)
+    // The cycle monitor shows its own STOPPED message below
+    if (testIsRunning && !isCycleRunning) {
+        const now = fmtUTC(new Date());
+        output.insertAdjacentHTML('beforeend', `<br>[${now}] <b style="color:orange;">⏹ STOPPED</b><hr>`);
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    if (isCycleRunning) {
+        clearInterval(cycleMonitorInterval);
+        cycleMonitorInterval = null;
+        if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+        if (retryTimeout) { clearTimeout(retryTimeout); retryTimeout = null; }
+        const reconnectHint = document.getElementById('cycle-reconnect');
+        if (reconnectHint) reconnectHint.remove();
+        window.retryWittypiCyclePing = null;
+        window.abortWittypiCycle = null;
+        const now = fmtUTC(new Date());
+        output.insertAdjacentHTML('beforeend', `<br>[${now}] <b style="color:orange;">⏹ STOPPED</b>`);
+        // Try to cancel on Pi side; Pi may already be off.
+        // Keep buttons disabled until cancel finishes to prevent concurrent I2C access.
+        fetch('/tests/run/wittypi-cycle-cancel')
+            .then(r => r.json())
+            .then(({ task_id }) => pollForCancel(task_id, output, initTestButtonStates))
+            .catch(() => {
+                const ts = fmtUTC(new Date());
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] Humeos hub already unreachable — cancel skipped.<hr>`);
+                document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                output.scrollTop = output.scrollHeight;
+                initTestButtonStates();
+            });
+        return; // buttons re-enabled by initTestButtonStates callback above
+    }
+
+    initTestButtonStates();
+}
+
+function pollForCancel(taskId, output, onDone) {
+    const interval = setInterval(() => {
+        fetch('/tests/status/' + taskId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'running') return;
+                clearInterval(interval);
+                const ts = fmtUTC(new Date());
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${data.message}<hr>`);
+                document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                output.scrollTop = output.scrollHeight;
+                if (onDone) onDone();
+            })
+            .catch(() => {
+                clearInterval(interval);
+                const ts = fmtUTC(new Date());
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] Humeos hub already unreachable — cancel skipped.<hr>`);
+                document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                output.scrollTop = output.scrollHeight;
+                if (onDone) onDone();
+            });
+    }, 1000);
+}
+
+
+/* =========================================================
+   RUN SINGLE TEST
+========================================================= */
+
+function runTest(testName, showTestName) {
+    activeTestName = testName;
+
+    // Disable all buttons while a test runs
+    const testButtons = document.querySelectorAll('.run-test-btn');
+    testButtons.forEach(button => { button.disabled = true; });
+
+    // Show stop button and arm a fresh AbortController
+    document.getElementById('stop-btn').style.display = 'inline-block';
+    abortController = new AbortController();
+
+    const output = document.getElementById('test-output');
+    const now = fmtUTC(new Date());
+
+    if (!runningAll) output.classList.remove('run-all-simple');
+
+    if (showTestName) {
+        testStartTime = Date.now();
+        const displayName = testName.replace(/-/g, ' ').toUpperCase();
+        if (runningAll) {
+            const n = ++runningTestNumber;
+            const spanId = `run-summary-${runId}-${n}`;
+            output.innerHTML += `<br>[${now}] ` +
+                `<span class="run-summary-expert">${n}/${totalTests} — Running <b>${displayName}</b> test...</span>` +
+                `<span class="run-summary-line" id="${spanId}"><span style="display:inline-block; min-width:50ch; white-space:nowrap;"><b>${n}/${totalTests}</b> — Running <b>${displayName}</b> test...</span></span>`;
+        } else {
+            output.innerHTML += `[${now}] Running <b>${displayName}</b> test...`;
+        }
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    // Ask backend to start the job — returns task_id immediately
+    fetch('/tests/run/' + testName, { signal: abortController.signal })
+        .then(response => {
+            if (response.status === 409) {
+                return response.json().then(data => { throw new Error('already running — wait for it to finish'); });
+            }
+            return response.json();
+        })
+        .then(({ task_id }) => {
+            startPolling(task_id);
+        })
+        .catch(error => {
+            if (error.name !== 'AbortError') {
+                const now = fmtUTC(new Date());
+                output.innerHTML += `<span class="run-detail"><br>[${now}] <b style="color:orange;">⚠ ${error.message || error}</b><hr></span>`;
+                document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                output.scrollTop = output.scrollHeight;
+            }
+            // AbortError: stopTests() already showed STOPPED
+            initTestButtonStates();
+        });
+}
+
+
+/* =========================================================
+   POLL JOB STATUS
+========================================================= */
+
+function startPolling(taskId) {
+    currentTaskId = taskId;
+    let messagesSeen = 0;
+    const output = document.getElementById('test-output');
+
+    // Reuse existing span when chaining processing steps so dots keep accumulating;
+    // create a fresh one only at the start of a new test
+    if (!pollWaitingEl) {
+        output.insertAdjacentHTML('beforeend', '<span></span>');
+        pollWaitingEl = output.lastElementChild;
+        pollDots = 0;
+    }
+
+    if (testPollInterval) clearInterval(testPollInterval);
+    testPollInterval = setInterval(() => {
+        pollDots++;
+        pollWaitingEl.innerHTML = `<br>[${fmtUTC(new Date())}] ${'.'.repeat(pollDots)}`;
+
+        fetch('/tests/status/' + taskId, { signal: abortController.signal })
+            .then(r => r.json())
+            .then(data => {
+                // Insert intermediate messages before the waiting span so it stays last
+                const messages = data.messages || [];
+                for (let i = messagesSeen; i < messages.length; i++) {
+                    const ts = fmtUTC(new Date());
+                    pollWaitingEl.insertAdjacentHTML('beforebegin', `<span class="run-detail"><br>[${ts}] ${messages[i]}</span>`);
+                }
+                if (messages.length > messagesSeen) {
+                    messagesSeen = messages.length;
+                    document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                    output.scrollTop = output.scrollHeight;
+                }
+
+                if (data.status === 'running') return;
+                clearInterval(testPollInterval);
+                testPollInterval = null;
+                handleTestResult(data);
+            })
+            .catch(error => {
+                clearInterval(testPollInterval);
+                testPollInterval = null;
+                if (pollWaitingEl) { pollWaitingEl.remove(); pollWaitingEl = null; }
+                if (error.name !== 'AbortError') {
+                    const now = fmtUTC(new Date());
+                    output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${now}] <b style="color:red;">✘ ERROR</b>: ${error}<hr></span>`);
+                    document.documentElement.scrollTop = document.documentElement.scrollHeight;
+                    output.scrollTop = output.scrollHeight;
+                }
+                // AbortError: stopTests() already showed STOPPED
+                initTestButtonStates();
+            });
+    }, 1000);
+}
+
+
+/* =========================================================
+   HANDLE TEST RESULT
+========================================================= */
+
+function handleTestResult(data) {
+    const output = document.getElementById('test-output');
+    const now = fmtUTC(new Date());
+    let contentInserted = false;
+
+    // Keep the waiting span alive only while chaining through processing steps
+    const keepSpan = data.processing && !!data.next_test;
+    if (!keepSpan && pollWaitingEl) {
+        pollWaitingEl.remove();
+        pollWaitingEl = null;
+    }
+
+    // Helper: insert a line, keeping the waiting span last if still alive
+    function insert(html) {
+        contentInserted = true;
+        const wrapped = `<span class="run-detail">${html}</span>`;
+        if (pollWaitingEl) {
+            pollWaitingEl.insertAdjacentHTML('beforebegin', wrapped);
+        } else {
+            output.insertAdjacentHTML('beforeend', wrapped);
+        }
+    }
+
+    if (data.processing) {
+        if (data.message !== lastProgressMessage) {
+            lastProgressMessage = data.message;
+            insert(`<br>[${now}] <b style="color:orange;">⌛ IN PROGRESS</b>: ${data.message}`);
+        }
+    } else {
+        lastProgressMessage = null;
+        const isFinal = !data.next_test && data.shutdown_in == null;
+        const duration = isFinal && testStartTime
+            ? ` <span style="color:gray;">(${((Date.now() - testStartTime) / 1000).toFixed(1)}s)</span>`
+            : '';
+        if (data.panel_disconnected) {
+            insert(`<br>[${now}] <b style="color:orange;">⌛ PENDING</b>: ${data.message}${duration}`);
+        } else {
+            insert(`<br>[${now}] ${data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>'}: ${data.message}${duration}`);
+        }
+    }
+
+    // WittyPi cycle test — hand off to cycle monitor
+    if (data.shutdown_in != null && data.wakeup_in != null) {
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+        if (window.refreshWittypiNavbar) window.refreshWittypiNavbar();
+        runWittypiCycleMonitor(data.shutdown_in, data.wakeup_in, output, now);
+        return;
+    }
+
+    if (runningAll == true) {
+        if (data.summary) {
+            const line = `<br>         → ${data.summary}`;
+            allTestResults += data.ok ? line : `<br><span style="color:red;">         → ${data.summary}</span>`;
+        }
+    } else if (data.next_test == null) {
+        initTestButtonStates();
+    }
+
+    // Refresh navbar wakeup/shutdown times after tests that update them
+    if (data.ok && window.refreshWittypiNavbar) window.refreshWittypiNavbar();
+
+    // Refresh clock status after on-off test (it may sync RTC)
+    if (!data.processing && activeTestName === 'on-off' && window.refreshClockStatus) window.refreshClockStatus();
+
+    // Multi-step test: chain to next step
+    if (data.next_test) {
+        runTest(data.next_test, false);
+    } else if (data.panel_disconnected) {
+        showPanelDisconnectedPrompt(data, output);
+    } else {
+        if (runningAll) {
+            const summaryEl = document.getElementById(`run-summary-${runId}-${runningTestNumber}`);
+            if (summaryEl) summaryEl.insertAdjacentHTML('beforeend',
+                data.ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERROR</b>');
+        }
+        if (runningAll && !data.ok) runAllHadFailures = true;
+        output.insertAdjacentHTML('beforeend', '<span class="run-detail"><hr></span>');
+
+        if ((data.ok || continueOnFailure()) && runningAll == true && runningTestBtn) {
+            const runTestButtons = [...document.querySelectorAll('.run-test-btn:not(.run-all-btn)')];
+            runningTestBtn = runTestButtons[runTestButtons.indexOf(runningTestBtn) + 1] || null;
+
+            if (runningTestBtn) {
+                setTimeout(() => {
+                    runningTestBtn.disabled = false;
+                    runningTestBtn.click();
+                    runningTestBtn.disabled = true;
+                }, 2000);
+            } else {
+                initTestButtonStates();
+                const endMsg = runAllHadFailures
+                    ? `<b style="color:red;">⚠ FAILED: </b>`
+                    : `<b style="color:green;">🙌 SUCCESS: </b>`;
+                output.insertAdjacentHTML('beforeend', `<br>[${now}] ${endMsg}${allTestResults}`);
+            }
+        } else {
+            initTestButtonStates();
+        }
+    }
+
+    if (contentInserted) {
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+    }
+}
+
+/* =========================================================
+   WITTYPI CYCLE MONITOR
+   Runs entirely in the browser after the backend schedules
+   the WittyPi shutdown/wakeup.  Phases:
+     1. Countdown to shutdown
+     2. Countdown to wakeup  (Pi is off during this phase)
+     3. Ping /tests/run/ping until the server replies. The monitor never
+        times out on its own — the user stops it with the Stop button.
+========================================================= */
+
+function runWittypiCycleMonitor(shutdownIn, wakeupIn, output, startNow) {
+
+    const startedAt    = Date.now();
+    const shutdownTime = new Date(startedAt + shutdownIn * 1000);
+    const wakeupTime   = new Date(startedAt + wakeupIn   * 1000);
+
+    // Live status line — insertAdjacentHTML keeps existing DOM references valid
+    output.insertAdjacentHTML('beforeend', '<br><span id="cycle-status"></span>');
+    const statusEl = document.getElementById('cycle-status');
+
+    // Phase state machine: shutdown → wakeup → booting → pinging-silent → pinging → done
+    let phase = 'shutdown';
+    let bootingEndTime = null;     // when the 15s boot wait ends
+    let silentPingDeadline = null; // deadline for the 'pinging-silent' phase
+    let pingActive = false;        // false when paused waiting for Retry click
+    let retryDeadline = null;      // deadline for user-initiated retry window (1 min)
+
+    // Format milliseconds as "Xm Ys" or "Ys"
+    function fmt(ms) {
+        const s = Math.max(0, Math.ceil(ms / 1000));
+        const m = Math.floor(s / 60);
+        return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+    }
+
+    // 1-second tick: update status line and drive phase transitions
+    cycleMonitorInterval = setInterval(() => {
+
+        const now = new Date();
+
+        // Phase 1: countdown until WittyPi shuts the Pi down
+        if (phase === 'shutdown') {
+            const left = shutdownTime - now;
+            if (left > 0) {
+                statusEl.innerHTML = `⏱ Waiting for shutdown… <b>${fmt(left)}</b> remaining`;
+            } else {
+                phase = 'wakeup';
+            }
+
+        // Phase 2: Pi is off — count down to scheduled wakeup
+        } else if (phase === 'wakeup') {
+            const left = wakeupTime - now;
+            if (left > 0) {
+                statusEl.innerHTML = `🔴 Humeos hub is off. Wakeup in <b>${fmt(left)}</b> - <span style="background: red; color: white; border-radius: 5px; filter: drop-shadow(3px 3px 3px #555); padding: 0px 5px;">DO NOT RELOAD THE PAGE!</span>`;
+            } else {
+                phase = 'booting';
+                bootingEndTime = new Date(wakeupTime.getTime() + 25*1000);
+            }
+
+        // Phase 3: fixed 25s wait for the Pi to finish booting
+        } else if (phase === 'booting') {
+            const bootLeft = Math.max(0, Math.ceil((bootingEndTime - now) / 1000));
+            statusEl.innerHTML = `🟡 Waiting for Humeos hub to boot up… <b>${bootLeft}s</b>`;
+            if (now >= bootingEndTime) {
+                phase = 'pinging-silent';
+                silentPingDeadline = new Date(Date.now() + 20*1000);
+                pingActive = true;
+                doPing();
+            }
+
+        // Phase 4: auto-ping every 5s for 20s — no reconnect prompt yet
+        } else if (phase === 'pinging-silent') {
+            statusEl.innerHTML = `🔍 Pinging server…`;
+            if (now >= silentPingDeadline) {
+                phase = 'pinging';
+                if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+                showLostWifiPrompt(false);
+            }
+
+        // Phase 5: waiting for user to click Retry
+        } else if (phase === 'pinging') {
+            statusEl.innerHTML = `🔍 Waiting for server…`;
+        }
+
+    }, 1000);
+
+    /* -------------------------------------------------
+       PING HELPERS
+    ------------------------------------------------- */
+
+    function scrollToBottom() {
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    // Send one ping; on failure schedule the next one if pingActive
+    function doPing() {
+        const pingStart = new Date();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+        output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${fmtUTC(pingStart)}] 🔍 Ping…</span>`);
+        scrollToBottom();
+        fetch('/tests/ping', { signal: controller.signal })
+            .then(r => { clearTimeout(timeoutId); return r.json(); })
+            .then(d => {
+                const rtt = Math.round(new Date() - pingStart);
+                if (d.ok) {
+                    output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${fmtUTC(new Date())}] 🟢 Ping OK (${rtt}ms)</span>`);
+                    scrollToBottom();
+                    finish(true, "");
+                } else {
+                    output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${fmtUTC(new Date())}] 🔴 Ping failed (${rtt}ms)</span>`);
+                    scrollToBottom();
+                    onPingFailure();
+                }
+            })
+            .catch(() => {
+                clearTimeout(timeoutId);
+                const rtt = Math.round(new Date() - pingStart);
+                output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${fmtUTC(new Date())}] 🔴 Ping unreachable (${rtt}ms)</span>`);
+                scrollToBottom();
+                onPingFailure();
+            });
+    }
+
+    function onPingFailure() {
+        if (phase === 'pinging-silent') {
+            // Auto-retry every 5s until deadline
+            if (pingActive && silentPingDeadline && new Date() < silentPingDeadline) {
+                cycleMonitorPingTimeout = setTimeout(doPing, 5000);
+            }
+            // else: setInterval tick will transition to 'pinging' and show the prompt
+        } else if (phase === 'pinging') {
+            if (retryDeadline && new Date() < retryDeadline) {
+                // Still within retry window — keep pinging every 5s
+                cycleMonitorPingTimeout = setTimeout(doPing, 5000);
+            } else {
+                // Window expired — show prompt again with Abort button
+                retryDeadline = null;
+                showLostWifiPrompt(true);
+            }
+        }
+    }
+
+    function showLostWifiPrompt(isRetry) {
+        const existing = document.getElementById('cycle-reconnect');
+        if (existing) existing.remove();
+        const abortBtn = isRetry
+            ? ` &nbsp;<button class="btn btn-sm btn-outline-danger" onclick="window.abortWittypiCycle()">Abort test</button>`
+            : '';
+        output.insertAdjacentHTML('beforeend',
+            `<br><span id="cycle-reconnect">⚠ Lost WiFi? Reconnect to <b>{{ SSID }}</b>, then click 👉 ` +
+            `<button class="btn btn-sm btn-outline-warning" onclick="window.retryWittypiCyclePing()">Retry ping</button>` +
+            `${abortBtn}</span>`);
+        scrollToBottom();
+        window.retryWittypiCyclePing = function() {
+            if (phase !== 'pinging') return;
+            const hint = document.getElementById('cycle-reconnect');
+            if (hint) hint.remove();
+            if (retryTimeout) { clearTimeout(retryTimeout); retryTimeout = null; }
+            retryDeadline = new Date(Date.now() + 60000); // ping every 5s for 1 minute
+            statusEl.innerHTML = `🔍 Retrying — pinging server…`;
+            doPing();
+        };
+        window.abortWittypiCycle = isRetry ? function() {
+            finish(false, "Test aborted by user");
+        } : null;
+    }
+
+    function finish(ok, msg) {
+        clearInterval(cycleMonitorInterval);
+        cycleMonitorInterval = null;
+        if (cycleMonitorPingTimeout) { clearTimeout(cycleMonitorPingTimeout); cycleMonitorPingTimeout = null; }
+        if (retryTimeout) { clearTimeout(retryTimeout); retryTimeout = null; }
+        phase = 'done';
+        window.retryWittypiCyclePing = null;
+        window.abortWittypiCycle = null;
+
+        const ts = fmtUTC(new Date());
+        statusEl.remove();
+        const reconnectHint = document.getElementById('cycle-reconnect');
+        if (reconnectHint) reconnectHint.remove();
+        if (runningAll && !expertMode) {
+            const summaryEl = document.getElementById(`run-summary-${runId}-${runningTestNumber}`);
+            if (summaryEl) summaryEl.insertAdjacentHTML('beforeend',
+                ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERROR</b>');
+        }
+        output.insertAdjacentHTML('beforeend', `<span class="run-detail"><br>[${ts}] ${ok
+            ? '<b style="color:green;">✔ PASS</b>'
+            : '<b style="color:red;">✘ FAIL</b>: '}${msg}<hr></span>`);
+
+        scrollToBottom();
+
+        if (runningAll && !ok) runAllHadFailures = true;
+        if ((ok || continueOnFailure()) && runningAll && runningTestBtn) {
+            allTestResults += ok ? `<br>         → OFF/ON cycle: PASS` : `<br><span style="color:red;">         → OFF/ON cycle: FAIL</span>`;
+            const runTestButtons = [...document.querySelectorAll('.run-test-btn:not(.run-all-btn)')];
+            runningTestBtn = runTestButtons[runTestButtons.indexOf(runningTestBtn) + 1] || null;
+            if (runningTestBtn) {
+                setTimeout(() => {
+                    runningTestBtn.disabled = false;
+                    runningTestBtn.click();
+                    runningTestBtn.disabled = true;
+                }, 2000);
+            } else {
+                initTestButtonStates();
+                const endMsg = runAllHadFailures
+                    ? `<b style="color:red;">⚠ FAILED: </b>`
+                    : `<b style="color:green;">🙌 SUCCESS: </b>`;
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${endMsg}${allTestResults}`);
+            }
+        } else {
+            initTestButtonStates();
+        }
+    }
+}
+
+/* =========================================================
+   MPPT — PANEL DISCONNECTED PROMPT
+   Shows when VPV = 0. Asks user if panel is connected
+   (e.g. it's night). Auto-passes after 30s with no reply.
+========================================================= */
+
+function showPanelDisconnectedPrompt(data, output) {
+    let countdown = 30;
+
+    output.insertAdjacentHTML('beforeend', `
+        <br><div id="mppt-panel-prompt" style="background:#333;padding:8px;border-radius:4px;margin-top:4px;">
+            <b style="color:orange;">⚠ Panel voltage is 0V — panel may be disconnected.</b><br>
+            Is the solar panel physically connected?
+            <br>
+            <button class="btn btn-sm btn-success me-2" onclick="resolveMpptPrompt(true)">✔ Yes, it's dark outside</button>
+            <button class="btn btn-sm btn-danger  me-2" onclick="resolveMpptPrompt(false)">✘ No, panel is not connected</button>
+            <span style="color:gray;"> — auto-pass in <b id="mppt-timer">${countdown}</b>s</span>
+        </div>`);
+    document.documentElement.scrollTop = document.documentElement.scrollHeight;
+    output.scrollTop = output.scrollHeight;
+
+    const timerInterval = setInterval(() => {
+        countdown--;
+        const el = document.getElementById('mppt-timer');
+        if (el) el.textContent = countdown;
+        if (countdown <= 0) {
+            clearInterval(timerInterval);
+            resolveMpptPrompt(true, true);  // auto-pass: no user response
+        }
+    }, 1000);
+
+    window.resolveMpptPrompt = function(connected, auto = false) {
+        clearInterval(timerInterval);
+        window.resolveMpptPrompt = null;
+        const prompt = document.getElementById('mppt-panel-prompt');
+        if (prompt) prompt.remove();
+
+        const ts  = fmtUTC(new Date());
+        const ok  = connected;
+        const msg = auto ? 'no user response within 30s (auto-pass)' : (connected ? 'panel connected (dark outside)' : 'panel not connected');
+        if (runningAll && !expertMode) {
+            const summaryEl = document.getElementById(`run-summary-${runId}-${runningTestNumber}`);
+            if (summaryEl) summaryEl.insertAdjacentHTML('beforeend',
+                ok ? ' <b style="color:green;">✓ OK</b>' : ' <b style="color:red;">✗ ERROR</b>');
+        }
+        output.insertAdjacentHTML('beforeend',
+            `<span class="run-detail"><br>[${ts}] ${ok
+                ? '<b style="color:green;">✔ PASS</b>'
+                : '<b style="color:red;">✘ FAIL</b>'}: Solar MPPT — ${msg}<hr></span>`);
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        output.scrollTop = output.scrollHeight;
+
+        if (runningAll && data.summary) {
+            const text = `         → ${data.summary} (${msg})`;
+            allTestResults += ok ? `<br>${text}` : `<br><span style="color:red;">${text}</span>`;
+        }
+
+        if (runningAll && !ok) runAllHadFailures = true;
+        if ((ok || continueOnFailure()) && runningAll && runningTestBtn) {
+            const all = [...document.querySelectorAll('.run-test-btn:not(.run-all-btn)')];
+            runningTestBtn = all[all.indexOf(runningTestBtn) + 1] || null;
+            if (runningTestBtn) {
+                setTimeout(() => {
+                    runningTestBtn.disabled = false;
+                    runningTestBtn.click();
+                    runningTestBtn.disabled = true;
+                }, 2000);
+            } else {
+                initTestButtonStates();
+                const endMsg = runAllHadFailures
+                    ? `<b style="color:red;">⚠ FAILED: </b>`
+                    : `<b style="color:green;">🙌 SUCCESS: </b>`;
+                output.insertAdjacentHTML('beforeend', `<br>[${ts}] ${endMsg}${allTestResults}`);
+            }
+        } else {
+            initTestButtonStates();
+        }
+    };
+}
+
+</script>
+
+{%endblock%}

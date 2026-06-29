@@ -78,7 +78,7 @@ Modifier `remove_image_files()` pour la suppression sélective:
 
 ### 6. Interface Web - Logique automatique
 
-**Fichier: `Scanorhize.py`**
+**Fichier: `WebServer.py`**
 
 Modifier `AppPage()`:
 - Ajouter `th_x` et `th_y` au contexte du template (lus depuis ConfigApp)
@@ -126,7 +126,7 @@ Ajouter une checkbox "Send thumbnails only":
 - `Hub.py` - Nouveau champ send_thumbnails_only, envoi sélectif
 - `Scanner.py` - Génération vignettes, nouveau champ LastThumbFile
 - `Campaign.py` - Copie vignettes
-- `Scanorhize.py` - Traitement formulaires App et Hub + logique auto-check
+- `WebServer.py` - Traitement formulaires App et Hub + logique auto-check
 - `templates/App.html` - Interface pour configurer th_x et th_y
 - `templates/Hub.html` - Interface utilisateur avec checkbox send_thumbnails_only auto-cochée
 
