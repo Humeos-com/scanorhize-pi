@@ -219,6 +219,7 @@ function initTestButtonStates() {
 }
 
 window.setTestsBusy = function(busy) {
+    if (!busy && runningAll) return;
     document.querySelectorAll('.run-test-btn').forEach(b => { b.disabled = busy; });
 };
 
