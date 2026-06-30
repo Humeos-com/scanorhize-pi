@@ -25,7 +25,7 @@
     <!-- =========================
         TEST RESULTS OUTPUT
     ========================== -->
-    <div class="card mb-4" style="max-height:calc(100dvh - 120px); display:flex; flex-direction:column;">
+    <div class="card mb-4" style="max-height:calc(100dvh - 160px); display:flex; flex-direction:column;">
         <div class="card-header d-flex justify-content-between align-items-center" style="flex-shrink:0;">
             <h4 class="mb-0">Results</h4>
             <div class="d-flex align-items-center gap-2">
@@ -215,7 +215,12 @@ function initTestButtonStates() {
     document.getElementById('stop-btn').style.display = 'none';
     runningTestBtn = null
     runningAll = false
+    if (window.setNavbarBusy) window.setNavbarBusy(false);
 }
+
+window.setTestsBusy = function(busy) {
+    document.querySelectorAll('.run-test-btn').forEach(b => { b.disabled = busy; });
+};
 
 
 /* =========================================================
@@ -310,6 +315,7 @@ function runTest(testName, showTestName) {
     // Disable all buttons while a test runs
     const testButtons = document.querySelectorAll('.run-test-btn');
     testButtons.forEach(button => { button.disabled = true; });
+    if (window.setNavbarBusy) window.setNavbarBusy(true);
 
     // Show stop button and arm a fresh AbortController
     document.getElementById('stop-btn').style.display = 'inline-block';

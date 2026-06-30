@@ -75,6 +75,8 @@ from WittyPy_utilities import (
     get_rtc_timestamp,
     get_sys_timestamp,
     system_to_rtc,
+    network_to_rtc,
+    wp5_sync,
     set_startup_time,
     set_shutdown_time,
     get_fw_revision,
@@ -638,6 +640,20 @@ def api_clock_status():
     except Exception:
         pass
     return jsonify(result)
+
+
+@app.route("/api/sync-rtc", methods=["POST"])
+def api_sync_rtc():
+    if not is_mc_connected():
+        return jsonify(ok=False, message="WittyPi not connected", detail="")
+    data = request.get_json(silent=True) or {}
+    option = int(data.get("option", 3))
+    if option not in (1, 2, 3):
+        return jsonify(ok=False, message="Invalid option", detail="")
+    labels = {1: "system→RTC", 2: "RTC→system", 3: "network sync"}
+    ok, detail = wp5_sync(option, timeout=10)
+    message = f"Option {option} ({labels[option]}): {'OK' if ok else 'FAILED'}"
+    return jsonify(ok=ok, message=message, detail=detail)
 
 
 @app.route("/tests/cancel/<task_id>", methods=["POST"])
@@ -1204,16 +1220,16 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 time_diff = abs(rtc_ts - sys_ts)
                 rtc_date_str = datetime.fromtimestamp(rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                 if time_diff > 10:
-                    system_to_rtc()
-                    sleep(2)  # wait for WP5 firmware to tick before reading back
+                    sync_ok, sync_detail = system_to_rtc()
+                    sleep(2)
                     new_rtc_ts = get_rtc_timestamp()
-                    new_diff = abs(new_rtc_ts - sys_ts) if new_rtc_ts != -1 else 9999
+                    new_diff = abs(new_rtc_ts - get_sys_timestamp()) if new_rtc_ts != -1 else 9999
                     if new_diff <= 10:
                         rtc_date_str = datetime.fromtimestamp(new_rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-                        rtc_time_str = f"OK <i style='color:orange;'>(was {time_diff}s off, synced from system)</i>"
+                        rtc_time_str = f"<span style='color:green;'>✔ synced (was {time_diff}s off, now {new_diff}s)</span>"
                     else:
-                        rtc_date_str = datetime.fromtimestamp(new_rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-                        rtc_time_str = f"<b style='color:red; font-weight:bold;'>⚠ sync failed — was {time_diff}s off, still {new_diff}s off after write</b>"
+                        rtc_date_str = datetime.fromtimestamp(new_rtc_ts, tz=tz.utc).strftime('%Y-%m-%d %H:%M:%S UTC') if new_rtc_ts != -1 else "N/A"
+                        rtc_time_str = f"<b style='color:red; font-weight:bold;'>⚠ sync {'OK' if sync_ok else 'failed'} — was {time_diff}s off, still {new_diff}s off — {sync_detail}</b>"
                         rtc_warning = True
                 else:
                     rtc_time_str = f"OK ({time_diff}s difference)"

@@ -1282,31 +1282,135 @@ def net_to_system():
         getLogger().warning("  Cannot get legitimate network time.")
 
 
-def system_to_rtc():
-    """Write system time to WittyPi RTC via I2C."""
-    getLogger().warning("  Writing system time to RTC...")
+import threading as _threading
+_wp5_lock = _threading.Lock()
+
+
+def _wp5_select_option(option: int, timeout: float = 45.0) -> tuple:
+    """Spawn wp5 in a pseudo-TTY, select a menu option, then exit cleanly.
+    Returns (ok: bool, detail: str). Serialized by a module-level lock."""
+    import pty
+    import os
+    import select as sel
+    import shutil
+    from subprocess import Popen, TimeoutExpired
+
+    wp5_path = shutil.which("wp5")
+    if not wp5_path:
+        for candidate in ("/usr/bin/wp5", "/usr/local/bin/wp5", "/opt/wp5/wp5"):
+            if os.path.isfile(candidate):
+                wp5_path = candidate
+                break
+    if not wp5_path:
+        return False, "wp5 not found in PATH or common locations"
+
+    with _wp5_lock:
+        # Kill any stale wp5 instance (user terminal left open, previous crash, etc.)
+        run(["pkill", "-x", "wp5"], capture_output=True)
+        time.sleep(0.5)
+
+        master_fd, slave_fd = pty.openpty()
+        buf = b""
+        proc = None
+        try:
+            proc = Popen([wp5_path], stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+                         close_fds=True)
+            os.close(slave_fd)
+            slave_fd = -1
+
+            deadline = time.time() + timeout
+            sent = False
+            prompt_count = 0
+
+            while time.time() < deadline:
+                if proc.poll() is not None:
+                    break
+                r, _, _ = sel.select([master_fd], [], [], 0.3)
+                if r:
+                    try:
+                        chunk = os.read(master_fd, 4096)
+                        if not chunk:
+                            break
+                        buf += chunk
+                        prompt_count = buf.count(b"Please input")
+                        if not sent and prompt_count >= 1:
+                            time.sleep(0.1)
+                            os.write(master_fd, f"{option}\n".encode())
+                            sent = True
+                        elif sent and prompt_count >= 2:
+                            # Operation done, menu reappeared — exit cleanly
+                            time.sleep(0.1)
+                            os.write(master_fd, b"14\n")
+                            break
+                    except OSError:
+                        break
+
+            # Let wp5 exit cleanly so it can remove its lock file.
+            # Killing it immediately leaves a stale lock that blocks the next run.
+            try:
+                proc.wait(timeout=5)
+            except TimeoutExpired:
+                proc.kill()
+                try:
+                    proc.wait(timeout=2)
+                except TimeoutExpired:
+                    pass
+
+            output = buf.decode(errors="replace").strip()
+            if not sent:
+                return False, f"wp5 prompt not seen — output: {output[-300:]!r}"
+            return True, output[-300:]
+        except Exception as e:
+            if proc is not None and proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            return False, f"pty error: {e} — output: {buf.decode(errors='replace')[-200:]!r}"
+        finally:
+            if slave_fd != -1:
+                try:
+                    os.close(slave_fd)
+                except OSError:
+                    pass
+            try:
+                os.close(master_fd)
+            except OSError:
+                pass
+
+
+def wp5_sync(option: int, timeout: float = 10.0) -> tuple:
+    """Run wp5 CLI with the given menu option. Returns (ok: bool, detail: str)."""
+    if not is_WittyPi_5():
+        return False, "not WittyPi 5"
+    return _wp5_select_option(option, timeout=timeout)
+
+
+def network_to_rtc() -> tuple:
+    """Sync system time and RTC from NTP via wp5 option 3. WP5 only.
+    Returns (ok: bool, detail: str)."""
+    if not is_WittyPi_5():
+        return False, "not WittyPi 5"
+    return _wp5_select_option(3, timeout=60)
+
+
+def system_to_rtc() -> tuple:
+    """Write system time to WittyPi RTC. Returns (ok: bool, detail: str).
+    WP5: uses wp5 CLI option 1 via pseudo-TTY.
+    WP3/4: direct I2C register writes."""
+    if is_WittyPi_5():
+        return _wp5_select_option(1, timeout=30)
     try:
         sys_ts = get_sys_timestamp()
         time_struct = time.localtime(sys_ts)
-        if not is_WittyPi_5():
-            WittyPi().i2c_write_byte(I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec), purpose="sync system seconds to RTC")
-            WittyPi().i2c_write_byte(I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min), purpose="sync system minutes to RTC")
-            WittyPi().i2c_write_byte(I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour), purpose="sync system hours to RTC")
-            WittyPi().i2c_write_byte(I2C_RTC_DAYS, dec2bcd(time_struct.tm_mday), purpose="sync system day to RTC")
-            WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS, dec2bcd(time_struct.tm_wday), purpose="sync system weekday to RTC")
-            WittyPi().i2c_write_byte(I2C_RTC_MONTHS, dec2bcd(time_struct.tm_mon), purpose="sync system month to RTC")
-            WittyPi().i2c_write_byte(I2C_RTC_YEARS, dec2bcd(time_struct.tm_year % 100), purpose="sync system year to RTC")
-        else:
-            WittyPi().i2c_write_byte(I2C_RTC_SECONDS_WP5, dec2bcd(time_struct.tm_sec), purpose="sync system seconds to RTC (WP5)")
-            WittyPi().i2c_write_byte(I2C_RTC_MINUTES_WP5, dec2bcd(time_struct.tm_min), purpose="sync system minutes to RTC (WP5)")
-            WittyPi().i2c_write_byte(I2C_RTC_HOURS_WP5, dec2bcd(time_struct.tm_hour), purpose="sync system hours to RTC (WP5)")
-            WittyPi().i2c_write_byte(I2C_RTC_DAYS_WP5, dec2bcd(time_struct.tm_mday), purpose="sync system day to RTC (WP5)")
-            WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS_WP5, dec2bcd(time_struct.tm_wday), purpose="sync system weekday to RTC (WP5)")
-            WittyPi().i2c_write_byte(I2C_RTC_MONTHS_WP5, dec2bcd(time_struct.tm_mon), purpose="sync system month to RTC (WP5)")
-            WittyPi().i2c_write_byte(I2C_RTC_YEARS_WP5, dec2bcd(time_struct.tm_year % 100), purpose="sync system year to RTC (WP5)")
-        getLogger().info("  Done")
+        WittyPi().i2c_write_byte(I2C_RTC_SECONDS, dec2bcd(time_struct.tm_sec), purpose="sync system seconds to RTC")
+        WittyPi().i2c_write_byte(I2C_RTC_MINUTES, dec2bcd(time_struct.tm_min), purpose="sync system minutes to RTC")
+        WittyPi().i2c_write_byte(I2C_RTC_HOURS, dec2bcd(time_struct.tm_hour), purpose="sync system hours to RTC")
+        WittyPi().i2c_write_byte(I2C_RTC_DAYS, dec2bcd(time_struct.tm_mday), purpose="sync system day to RTC")
+        WittyPi().i2c_write_byte(I2C_RTC_WEEKDAYS, dec2bcd(time_struct.tm_wday), purpose="sync system weekday to RTC")
+        WittyPi().i2c_write_byte(I2C_RTC_MONTHS, dec2bcd(time_struct.tm_mon), purpose="sync system month to RTC")
+        WittyPi().i2c_write_byte(I2C_RTC_YEARS, dec2bcd(time_struct.tm_year % 100), purpose="sync system year to RTC")
+        return True, "I2C write done"
     except (OSError, IOError) as e:
-        getLogger().error("  Error writing to RTC: %s", e)
+        return False, f"I2C error: {e}"
 
 
 def rtc_to_system():
@@ -1406,15 +1510,17 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------------------
 
 def _ensure_rtc_synced():
-    for attempt in range(100):
-        system_to_rtc()
+    for attempt in range(5):
+        ok, detail = system_to_rtc()
+        time.sleep(2)
         rtc_ts = get_rtc_timestamp()
-        if rtc_ts != -1:
-            getLogger().info("RTC synced: %s (attempt %d)", datetime.fromtimestamp(rtc_ts), attempt + 1)
+        sys_ts = get_sys_timestamp()
+        if rtc_ts != -1 and abs(rtc_ts - sys_ts) <= 10:
+            getLogger().info("RTC synced OK (attempt %d): %s", attempt + 1, datetime.fromtimestamp(rtc_ts))
             return
-        getLogger().warning("RTC sync failed, retrying (attempt %d)", attempt + 1)
+        getLogger().warning("RTC sync attempt %d/%s: ok=%s detail=%s", attempt + 1, 5, ok, detail)
         time.sleep(1)
-    getLogger().error("Failed to sync RTC after 100 attempts")
+    getLogger().error("Failed to sync RTC after 5 attempts")
 
 
 def _ensure_wakeup_in_future():

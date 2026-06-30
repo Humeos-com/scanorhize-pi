@@ -65,6 +65,7 @@
          <div class="hub-info-line" id="clock-row">
             <span id="clock-rtc-cell" style="display:none;"></span>
             <span id="clock-ntp-cell" style="display:none;"></span>
+            <span id="clock-sync-btn" title="Sync RTC from network" style="cursor:pointer; color:#aaa;">↻</span>
          </div>
          <div class="hub-info-line" id="wittypi-row" style="{{ '' if wittypi.connected else 'display:none;' }}">
             <span id="wittypi-shutdown-cell" style="{{ '' if wittypi.shutdown else 'display:none;' }}">🔴 OFF: <span id="wittypi-shutdown-label">{{ wittypi.shutdown or '' }}</span> <span id="wittypi-shutdown-countdown" style="color:#aaa;"></span></span>
@@ -80,6 +81,27 @@
                   
           
       <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+
+      <!-- RTC sync modal -->
+      <div class="modal fade" id="rtc-sync-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">↻ Sync clock</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-grid gap-2">
+              <button class="btn btn-outline-primary" id="rtc-opt1-btn">1. Write system time to RTC</button>
+              <button class="btn btn-outline-primary" id="rtc-opt2-btn">2. Write RTC time to system</button>
+              <button class="btn btn-outline-success" id="rtc-opt3-btn">3. Synchronize with network time</button>
+              <small id="rtc-sync-status" class="text-center" style="min-height:1.2em;"></small>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="rtc-cancel-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Poweroff confirm modal -->
       <div class="modal fade" id="poweroff-confirm-modal" tabindex="-1">
@@ -193,6 +215,7 @@
           function refresh() {
               const btn = document.getElementById('wittypi-refresh-btn');
               if (btn) btn.style.opacity = '0.4';
+              if (window.setTestsBusy) window.setTestsBusy(true);
               fetch('/api/wittypi-times')
                   .then(r => r.json())
                   .then(data => { applyTimes(data); })
@@ -200,7 +223,10 @@
                       document.getElementById('wittypi-shutdown-countdown').textContent = fmtCountdown(shutdownIso);
                       document.getElementById('wittypi-wakeup-countdown').textContent   = fmtCountdown(wakeupIso);
                   })
-                  .finally(() => { if (btn) btn.style.opacity = ''; });
+                  .finally(() => {
+                      if (btn) btn.style.opacity = '';
+                      if (window.setTestsBusy) window.setTestsBusy(false);
+                  });
           }
 
           // Initial countdown render without fetch (times already in page)
@@ -269,6 +295,90 @@
                   .then(applyClockStatus)
                   .catch(() => {});
           }
+
+          window.setNavbarBusy = function(busy) {
+              const btns = [
+                  document.getElementById('clock-sync-btn'),
+                  document.getElementById('wittypi-refresh-btn'),
+              ];
+              btns.forEach(b => { if (b) b.style.pointerEvents = busy ? 'none' : ''; b && (b.style.opacity = busy ? '0.4' : ''); });
+          };
+
+          const rtcSyncModal = new bootstrap.Modal(document.getElementById('rtc-sync-modal'));
+          const syncBtn = document.getElementById('clock-sync-btn');
+          let rtcSyncLocked = false;
+
+          syncBtn.addEventListener('click', function() {
+              if (rtcSyncLocked) return;
+              document.getElementById('rtc-sync-status').textContent = '';
+              document.getElementById('rtc-cancel-btn').textContent = 'Cancel';
+              [1, 2, 3].forEach(n => { document.getElementById('rtc-opt' + n + '-btn').disabled = false; });
+              rtcSyncModal.show();
+          });
+
+          function doRtcSync(option) {
+              rtcSyncLocked = true;
+              const statusEl = document.getElementById('rtc-sync-status');
+              [1, 2, 3].forEach(n => { document.getElementById('rtc-opt' + n + '-btn').disabled = true; });
+              document.getElementById('rtc-cancel-btn').disabled = true;
+              statusEl.textContent = '⏳ Running…';
+              statusEl.style.color = '#aaa';
+              if (window.setTestsBusy) window.setTestsBusy(true);
+              window.setNavbarBusy(true);
+              const ctrl = new AbortController();
+              const abortTimer = setTimeout(() => ctrl.abort(), 15000);
+              fetch('/api/sync-rtc', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ option }),
+                  signal: ctrl.signal
+              })
+                  .then(r => r.json())
+                  .then(data => {
+                      clearTimeout(abortTimer);
+                      if (data.ok) {
+                          console.log('[sync-rtc]', data.message, '\nwp5 output:', data.detail);
+                      } else {
+                          console.warn('[sync-rtc] FAILED —', data.message, '\nwp5 output:', data.detail);
+                      }
+                      statusEl.textContent = data.ok ? '✔ Done' : '✘ Failed';
+                      statusEl.style.color = data.ok ? 'green' : '#dc3545';
+                  })
+                  .catch(err => {
+                      clearTimeout(abortTimer);
+                      if (err.name === 'AbortError') {
+                          console.warn('[sync-rtc] Timed out after 15s (option ' + option + ')');
+                      } else {
+                          console.error('[sync-rtc] Fetch error (option ' + option + '):', err);
+                      }
+                      statusEl.textContent = err.name === 'AbortError' ? '✘ Timeout' : '✘ Error';
+                      statusEl.style.color = '#dc3545';
+                  })
+                  .finally(() => {
+                      document.getElementById('rtc-cancel-btn').disabled = false;
+                      document.getElementById('rtc-cancel-btn').textContent = 'Close';
+                      fetchClockStatus();
+                      setTimeout(() => {
+                          rtcSyncLocked = false;
+                          if (window.setTestsBusy) window.setTestsBusy(false);
+                          window.setNavbarBusy(false);
+                      }, 5000);
+                  });
+          }
+
+          [1, 2, 3].forEach(n => {
+              document.getElementById('rtc-opt' + n + '-btn').addEventListener('click', () => doRtcSync(n));
+          });
+
+          document.getElementById('rtc-sync-modal').addEventListener('hidden.bs.modal', function() {
+              console.log('[rtc-modal] hidden — hiding sync btn for 5s');
+              const btn = document.getElementById('clock-sync-btn');
+              btn.style.visibility = 'hidden';
+              setTimeout(() => {
+                  console.log('[rtc-modal] 5s elapsed — showing sync btn');
+                  btn.style.visibility = '';
+              }, 5000);
+          });
 
           fetchClockStatus();
           window.refreshClockStatus = fetchClockStatus;
