@@ -48,29 +48,29 @@
         <!-- Expert mode: individual test links, hidden by default -->
         <div id="expert-section" style="display:none; padding: 6px 12px; border-bottom: 1px solid #dee2e6; font-size: 0.82rem; line-height: 2; flex-shrink:0;">
             <span style="color:#888;">Master:</span>
-            <button class="btn btn-link run-test-btn run-all-btn p-0 me-3" onclick="runAll()" style="font-size:0.82rem;">▶ Run all</button>
+            <button class="btn btn-sm btn-secondary run-test-btn run-all-btn me-2" onclick="runAll()">▶ Run all</button>
             <br>
             <span style="color:#888;">Power:</span>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('battery', true)" style="font-size:0.82rem;">🔋 Battery</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('mppt', true)" style="font-size:0.82rem;">☀ Solar MPPT</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('battery', true)">🔋 Battery</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('mppt', true)">☀ Solar MPPT</button>
             <br>
             <span style="color:#888;">Connectivity:</span>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('hotspot-ssid', true)" style="font-size:0.82rem;">📡 Hotspot SSID</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('4g', true)" style="font-size:0.82rem;">📶 4G Modem</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('internet', true)" style="font-size:0.82rem;">🌐 Internet</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('s3', true)" style="font-size:0.82rem;">☁ S3 Bucket</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('ssh', true)" style="font-size:0.82rem;">🔑 SSH Tunnel</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('upload-pictures-service', true)" style="font-size:0.82rem;">⬆ Upload pictures</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('speed', true)" style="font-size:0.82rem;">⚡ Speed</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('hotspot-ssid', true)">📡 Hotspot SSID</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('4g', true)">📶 4G Modem</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('internet', true)">🌐 Internet</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('s3', true)">☁ S3 Bucket</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('ssh', true)">🔑 SSH Tunnel</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('upload-pictures-service', true)">⬆ Upload pictures</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('speed', true)">⚡ Speed</button>
             <br>
             <span style="color:#888;">Scanners:</span>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('scanners-config-files', true)" style="font-size:0.82rem;">🖨 Scanners</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('take-pictures', true)" style="font-size:0.82rem;">📸 Take pictures</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('scanners-config-files', true)">🖨 Scanners</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('take-pictures', true)">📸 Take pictures</button>
             <br>
             <span style="color:#888;">Time:</span>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('timezone', true)" style="font-size:0.82rem;">🕐 Timezone (UTC)</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('on-off', true)" style="font-size:0.82rem;">⏻ ON/OFF check</button>
-            <button class="btn btn-link run-test-btn p-0 me-2" onclick="runTest('off-on-cycle', true)" style="font-size:0.82rem; color: #ffc107;">🔄 OFF/ON Cycle</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('timezone', true)">🕐 Timezone (UTC)</button>
+            <button class="btn btn-sm btn-outline-secondary run-test-btn me-1" onclick="runTest('on-off', true)">⏻ ON/OFF check</button>
+            <button class="btn btn-sm btn-outline-warning run-test-btn me-1" onclick="runTest('off-on-cycle', true)">🔄 OFF/ON Cycle</button>
             <!-- Hidden button triggered programmatically after wakeup during run-all -->
             <button class="run-test-btn" style="display:none;" onclick="runTest('on-off', true)"></button>
         </div>
