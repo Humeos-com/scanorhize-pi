@@ -223,15 +223,29 @@
 
       <script>
       (function() {
+          function fmtDrift(s) {
+              s = Math.round(s);
+              if (s < 120) return s + 's';
+              const d = Math.floor(s / 86400);
+              const h = Math.floor((s % 86400) / 3600);
+              const m = Math.floor((s % 3600) / 60);
+              const parts = [];
+              if (d) parts.push(d + 'd');
+              if (h) parts.push(h + 'h');
+              if (m) parts.push(m + 'm');
+              return parts.join(' ');
+          }
+
           function applyClockStatus(data) {
               const rtcCell = document.getElementById('clock-rtc-cell');
               const ntpCell = document.getElementById('clock-ntp-cell');
 
               if (data.rtc_diff !== null && data.rtc_diff !== undefined) {
                   const ok = data.rtc_ok;
+                  const drift = fmtDrift(data.rtc_diff);
                   rtcCell.innerHTML = ok
-                      ? `🕐 RTC clock: <span style="color:#666;">${data.rtc_diff}s drift</span>`
-                      : `🕐 RTC clock: <span style="color:#dc3545;font-weight:bold;">⚠ ${data.rtc_diff}s drift (sync needed)</span>`;
+                      ? `🕐 RTC clock: <span style="color:#666;">${drift} drift</span>`
+                      : `🕐 RTC clock: <span style="color:#dc3545;font-weight:bold;">⚠ ${drift} drift (sync needed)</span>`;
                   rtcCell.style.display = '';
               } else {
                   rtcCell.style.display = 'none';
@@ -239,9 +253,10 @@
 
               if (data.ntp_diff !== null && data.ntp_diff !== undefined) {
                   const ok = data.ntp_ok;
+                  const drift = fmtDrift(data.ntp_diff);
                   ntpCell.innerHTML = ok
-                      ? `🌐 Internet time: <span style="color:#666;">${data.ntp_diff}s drift</span>`
-                      : `🌐 Internet time: <span style="color:#dc3545;font-weight:bold;">⚠ ${data.ntp_diff}s drift (clock off)</span>`;
+                      ? `🌐 Internet time: <span style="color:#666;">${drift} drift</span>`
+                      : `🌐 Internet time: <span style="color:#dc3545;font-weight:bold;">⚠ ${drift} drift (clock off)</span>`;
                   ntpCell.style.display = '';
               } else {
                   ntpCell.style.display = 'none';
