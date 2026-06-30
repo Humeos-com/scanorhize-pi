@@ -728,18 +728,22 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 return jsonify(ok=True, message=f"S3 bucket s3://humeos-test is accessible using `s3cmd`.", summary=f"S3 OK ({config.s3_bucket} + humeos-test)")
             return jsonify(ok=False, message=result.stderr or "Could not reach s3://humeos-test bucket.", summary="S3 FAIL (humeos-test)")
 
-        # SSH: verify at least one ssh process is running (reverse tunnel)
+        # SSH: verify reverse tunnel process exists and TCP connection is established
         if test_name == "ssh":
             try:
                 check_connectivity(3)
             except RuntimeError as e:
                 return jsonify(ok=False, message=f"No internet connection: {e}", summary="SSH: no internet")
-            result = run(
-                "pgrep -a ssh", shell=True, capture_output=True, text=True, check=False
-            )
-            if result.returncode == 0:
-                return jsonify(ok=True, message=f"Active SSH processes:\n{result.stdout}", summary="SSH tunnel active")
-            return jsonify(ok=False, message="No active SSH tunnel found.", summary="SSH tunnel not found")
+            server = getScanorhizeServer()
+            ssh_port = getSSHPort()
+            procs = run("pgrep -a ssh", shell=True, capture_output=True, text=True, check=False)
+            tunnel_lines = [l for l in procs.stdout.splitlines() if f"-R {ssh_port}" in l or f"-R{ssh_port}" in l]
+            if not tunnel_lines:
+                return jsonify(ok=False, message=f"No SSH reverse tunnel process found (expected -R {ssh_port}).\nAll ssh processes:\n{procs.stdout or '(none)'}", summary="SSH tunnel: no process")
+            ss = run(f"ss -tn state established dst {server}", shell=True, capture_output=True, text=True, check=False)
+            if server not in ss.stdout:
+                return jsonify(ok=False, message=f"Tunnel process exists but TCP connection to {server} is not ESTABLISHED.\nProcess: {tunnel_lines[0]}\nss output:\n{ss.stdout}", summary="SSH tunnel: not connected")
+            return jsonify(ok=True, message=f"Reverse tunnel active and connected to {server}:{ssh_port}\nProcess: {tunnel_lines[0]}", summary="SSH tunnel active")
 
         # Upload-pictures-service: verify the systemd upload-pictures service is running.
         # If active, chains to copy-test-picture to actually exercise the upload pipeline.
