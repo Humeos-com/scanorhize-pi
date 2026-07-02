@@ -91,6 +91,7 @@ from WittyPy_utilities import (
     get_low_voltage_threshold,
     get_recovery_voltage_threshold,
     set_recovery_voltage_threshold,
+    safeShutdown,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -1269,14 +1270,15 @@ def _run_test_impl(test_name: str, task_id: str = None):
             power_priority_warning = False
             if power_priority is None:
                 power_priority_str = "unknown"
-            elif power_priority != 1:  # 1 = Vin first (expected)
-                old_priority = power_priority
-                if set_power_priority(1) and get_power_priority() == 1:
-                    power_priority_warning = False
-                    power_priority_str = f"Vin first <i style='color:orange;'>(was {'Vusb first' if old_priority == 0 else old_priority}, updated)</i>"
+            elif power_priority not in (0, 1):
+                power_priority_warning = True
+                power_priority_str = f"<b style='color:red; font-weight:bold;'>⚠ unexpected value: {power_priority} (expected 0 or 1)</b>"
+            elif power_priority != 1:  # 1 = Vin first (expected), 0 = Vusb first
+                if set_power_priority(1):
+                    power_priority_str = "Vin first <i style='color:orange;'>(was Vusb first, updated)</i>"
                 else:
                     power_priority_warning = True
-                    power_priority_str = f"<b style='color:red; font-weight:bold;'>⚠ {'Vusb first' if power_priority == 0 else power_priority} (expected Vin first — update failed)</b>"
+                    power_priority_str = "<b style='color:red; font-weight:bold;'>⚠ Vusb first (expected Vin first — update failed)</b>"
             else:
                 power_priority_str = "Vin first"
 
@@ -2110,41 +2112,16 @@ def stop_server():
         if startup > datetime.now() + timedelta(days=2):
             return jsonify(ok=False, force_allowed=True, message=f"Wakeup time is too far away ({startup.strftime('%d %H:%M')}) — set a wakeup within the next 2 days, or power off anyway."), 400
 
-    # Before remove the USB key, we need to stop the server
-    cmdeject = "sudo eject /dev/sda"
-    result = run(
-        cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
-    getLogger().info("Eject command: %s", cmdeject)
-    if result.returncode == 0:
-        getLogger().info("SD card ejected successfully")
-    else:
-        getLogger().warning(
-            "SD card eject failed (return code: %d, stderr: %s)",
-            result.returncode,
-            result.stderr,
-        )
-
-    # Reset the verbosity level int the ConfigApp file
-    # otherwise, the Raspberry Pi will not poweroff
-    # if the log level stays to DEBUG
+    # Reset log level — if left at DEBUG the Pi won't power off
     config = ConfigApp()
     config.log_level = "WARNING"
     config.save_config()
-    # On enlève également tout fichier DEBUG
     try:
         os.remove("DEBUG")
-        getLogger().info("remove_image_files: removed DEBUG")
-    except (FileNotFoundError, PermissionError) as e:
-        getLogger().warning("Error removing file DEBUG: %s", e)
+    except (FileNotFoundError, PermissionError):
+        pass
 
-    run(
-        "sudo poweroff",
-        capture_output=True,
-        universal_newlines=True,
-        shell=True,
-        check=False,
-    )
+    safeShutdown()
     return jsonify(ok=True, message="Hub is powering off...")
 
 

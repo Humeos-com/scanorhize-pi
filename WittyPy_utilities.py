@@ -499,6 +499,7 @@ def set_power_priority(value: int) -> bool:
         return False
     wp = WittyPi()
     wp.i2c_write_byte(I2C_CONF_POWER_PRIORITY_WP5, value)
+    time.sleep(0.1)
     return wp.i2c_read_byte(I2C_CONF_POWER_PRIORITY_WP5) == value
 
 
@@ -817,28 +818,6 @@ def clear_alarm_flags(ctrl2_value: Optional[int] = None):
 
     
 
-
-def do_shutdown(halt_pin: int, has_mc: bool):
-    """Perform system shutdown."""
-    # Restore halt pin
-    run_command(["gpio", "-g", "mode", str(halt_pin), "in"])
-    run_command(["gpio", "-g", "mode", str(halt_pin), "up"])
-
-    # Clear alarm flags if microcontroller is present
-    if has_mc:
-        clear_alarm_flags()
-
-    getLogger().warning("Halting all processes and then shutdown Raspberry Pi...")
-
-    # Check for lock file
-    if not os.path.exists("/boot/wittypi.lock"):
-        run_command(["sudo", "shutdown", "-h", "now"])
-    else:
-        os.remove("/boot/wittypi.lock")
-
-
-def doShutdown():
-    return do_shutdown(HALT_PIN, is_mc_connected())
 
 
 def get_default_on() -> bool:
@@ -1545,10 +1524,13 @@ def _ensure_wakeup_in_future():
 def _ensure_power_priority_vin():
     for attempt in range(100):
         priority = get_power_priority()
-        if priority == 1:  # Vin priority
+        if priority == 1:
             getLogger().info("Power priority: Vin OK")
             return
-        getLogger().warning("Power priority is %s (not Vin), fixing (attempt %d)", priority, attempt + 1)
+        if priority not in (0, 1):
+            getLogger().warning("Power priority unexpected value: %s (expected 0 or 1), retrying (attempt %d)", priority, attempt + 1)
+        else:
+            getLogger().warning("Power priority is Vusb first, fixing (attempt %d)", attempt + 1)
         set_power_priority(1)
         time.sleep(1)
     getLogger().error("Failed to set power priority to Vin after 100 attempts")
@@ -1608,3 +1590,45 @@ def pre_shutdown_checks():
     _ensure_power_priority_vin()   # Vin must take priority over USB on next boot
     _ensure_default_on_250()       # WittyPi must auto-start after 250s on power restore
     _ensure_recovery_voltage_set() # don't allow restart below 10V Vin
+
+
+def setShutdownAndWakeUpDates():
+    from Hub import calculate_next_wakeup_from_crontab
+    return calculate_next_wakeup_from_crontab()
+
+
+def safeShutdown():
+    from ConfigApp import is_debug, getLogger as get_app_logger
+    log = get_app_logger()
+
+    if is_debug():
+        log.warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
+        sys.exit(0)
+
+    pre_shutdown_checks()
+
+    cmdeject = "sudo eject /dev/sda"
+    run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)
+    log.info(cmdeject)
+
+    stop_at = datetime.now() + timedelta(seconds=30)
+    set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
+    readback = get_shutdown_time()
+    log.warning("Next stop at: %s (readback: %s)", stop_at.strftime("%d %H:%M:%S"), readback)
+
+    if not is_raspberry_pi():
+        log.warning("Not a Raspberry Pi, so no poweroff")
+        sys.exit(0)
+
+    run_command(["gpio", "-g", "mode", str(HALT_PIN), "in"])
+    run_command(["gpio", "-g", "mode", str(HALT_PIN), "up"])
+    if is_mc_connected():
+        clear_alarm_flags()
+    log.warning("Halting all processes and then shutdown Raspberry Pi...")
+    if not os.path.exists("/boot/wittypi.lock"):
+        run_command(["sudo", "shutdown", "-h", "now"])
+    else:
+        os.remove("/boot/wittypi.lock")
+    cmd = "sudo poweroff"
+    log.warning(cmd)
+    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)

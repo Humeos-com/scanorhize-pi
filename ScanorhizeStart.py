@@ -7,7 +7,7 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 
 import sys
 import time
-from ConfigApp import is_debug, getLogger
+from ConfigApp import getLogger
 from version import __version__
 getLogger().info("============= START =============")
 getLogger().info("ScanorhizeStart.py version: %s", __version__)
@@ -21,9 +21,10 @@ from pathlib import Path
 from OSUtils import is_raspberry_pi
 from WittyPy_utilities import is_reason_click
 from WittyPy_utilities import (
-    doShutdown,
     set_shutdown_time, get_shutdown_time,
     pre_shutdown_checks,
+    setShutdownAndWakeUpDates,
+    safeShutdown,
 )
 from Miscellaneous import (
     EndGPIO,
@@ -55,7 +56,6 @@ from Hub import (
     runTodo,
     GetWifiSSID,
     GetIP,
-    calculate_next_wakeup_from_crontab,
 )
 
 
@@ -96,18 +96,6 @@ def isConfig():
     EndGPIO()
     return config
 
-
-def setShutdownAndWakeUpDates():
-    # Mise à jour des dates de réveil et d'arrêt du WittyPi
-    # Car en développement, on peut dépasser la date de réveil
-    # et dans ce cas, le WittyPi ne se reveille plus !
-    # Idem si on change la batterie et qu'on repart quelques jours plus tard
-    # On fait le calcul de la date de réveil systématiquement
-    # avec la date courante.
-    # Si la batterie est morte, l'heure sera aléatoire, il faut
-    # refaire l'initialisation par le mode config, qui mettra
-    # le boitier à l'heure correcte.
-    return calculate_next_wakeup_from_crontab()
 
 
 def createRunConfigFile():
@@ -243,35 +231,6 @@ def updateDataFromAndToServer(configMode):
 
     # fin getOffline()
 
-
-def safeShutdown():
-    from datetime import datetime, timedelta
-
-    if is_debug():
-        getLogger().warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
-        sys.exit(0)
-
-    #Ensure mandatory register values before turning off board
-    pre_shutdown_checks()
-
-    cmdeject = "sudo eject /dev/sda"
-    run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)
-    getLogger().info(cmdeject)
-
-    # Force shutdown in 30s as a safety net if doShutdown() doesn't trigger
-    stop_at = datetime.now() + timedelta(seconds=30)
-    set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
-    readback = get_shutdown_time()
-    getLogger().warning("Next stop at: %s (readback: %s)", stop_at.strftime("%d %H:%M:%S"), readback)
-
-    if not is_raspberry_pi():
-        getLogger().warning("Not a Raspberry Pi, so no poweroff")
-        sys.exit(0)
-
-    doShutdown()
-    cmd = "sudo poweroff"
-    getLogger().warning(cmd)
-    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
 
 
 def waitingForPicturesToUpload():
