@@ -1610,7 +1610,7 @@ def setShutdownAndWakeUpDates():
     return calculate_next_wakeup_from_crontab()
 
 
-def safeShutdown():
+def safeShutdown(skip_pre_checks=False):
     from ConfigApp import is_debug, getLogger as get_app_logger
     log = get_app_logger()
 
@@ -1618,7 +1618,8 @@ def safeShutdown():
         log.warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
         return
 
-    pre_shutdown_checks()
+    if not skip_pre_checks:
+        pre_shutdown_checks()
 
     cmdeject = "sudo eject /dev/sda"
     run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)

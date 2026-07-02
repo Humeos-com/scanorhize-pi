@@ -2143,11 +2143,13 @@ def stop_server():
         pass
 
     try:
-        safeShutdown()
+        pre_shutdown_checks()
     except Exception as e:
         import traceback
-        getLogger().error("safeShutdown exception: %s\n%s", e, traceback.format_exc())
-        return jsonify(ok=False, force_allowed=False, message=f"safeShutdown failed: {e}"), 500
+        getLogger().error("pre_shutdown_checks exception: %s\n%s", e, traceback.format_exc())
+        return jsonify(ok=False, force_allowed=False, message=f"Pre-shutdown checks failed: {e}"), 500
+
+    safeShutdown(skip_pre_checks=True)
     return jsonify(ok=True, message="Hub is powering off...")
 
 
