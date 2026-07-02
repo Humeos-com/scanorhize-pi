@@ -92,6 +92,7 @@ from WittyPy_utilities import (
     get_recovery_voltage_threshold,
     set_recovery_voltage_threshold,
     safeShutdown,
+    pre_shutdown_checks,
 )
 from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
@@ -2087,6 +2088,26 @@ def set_wakeup():
         return jsonify(ok=False, message=f"Failed to set wakeup time: {e}"), 500
     getLogger().info("Wakeup time set to %s via poweroff modal", target.strftime("%d %H:%M"))
     return jsonify(ok=True, message=f"Wakeup set for day {target.strftime('%d at %H:%M')}")
+
+
+@app.route("/api/pre-shutdown", methods=["POST"])
+def api_pre_shutdown():
+    if not is_mc_connected():
+        return jsonify(ok=True, message="WittyPi not connected — no checks needed")
+    try:
+        pre_shutdown_checks()
+    except Exception as e:
+        return jsonify(ok=False, message=f"Pre-shutdown checks failed: {e}")
+    priority = get_power_priority()
+    wakeup = parse_wittypi_time(get_startup_time())
+    issues = []
+    if priority != 1:
+        issues.append(f"power priority is {priority} (expected 1)")
+    if not wakeup:
+        issues.append("no wakeup time set")
+    if issues:
+        return jsonify(ok=False, message="Issues remain after fixes: " + "; ".join(issues))
+    return jsonify(ok=True, message=f"System ready — wakeup: {wakeup.strftime('%-d %b %H:%M')}, power priority: Vin first")
 
 
 @app.route("/poweroff", methods=["POST"])
