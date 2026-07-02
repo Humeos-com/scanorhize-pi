@@ -2142,7 +2142,12 @@ def stop_server():
     except (FileNotFoundError, PermissionError):
         pass
 
-    safeShutdown()
+    try:
+        safeShutdown()
+    except Exception as e:
+        import traceback
+        getLogger().error("safeShutdown exception: %s\n%s", e, traceback.format_exc())
+        return jsonify(ok=False, force_allowed=False, message=f"safeShutdown failed: {e}"), 500
     return jsonify(ok=True, message="Hub is powering off...")
 
 

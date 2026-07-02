@@ -112,8 +112,8 @@
               <h5 class="modal-title">Power off</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">Are you sure you want to power off the Hub?</div>
-            <div class="modal-footer">
+            <div class="modal-body" id="poweroff-confirm-body">Are you sure you want to power off the Hub?</div>
+            <div class="modal-footer" id="poweroff-confirm-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
               <button type="button" class="btn btn-danger" id="poweroff-confirm-btn">Power off</button>
             </div>
@@ -147,6 +147,22 @@
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
               <button type="button" class="btn btn-danger d-none" id="poweroff-force-btn">Power off anyway</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Poweroff success modal -->
+      <div class="modal fade" id="poweroff-success-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+              <h5 class="modal-title">Hub is powering off…</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">The hub is shutting down. You can close this.</div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">OK</button>
             </div>
           </div>
         </div>
@@ -389,25 +405,54 @@
       <script>
       const poweroffConfirmModal   = new bootstrap.Modal(document.getElementById('poweroff-confirm-modal'));
       const poweroffBlockedModal   = new bootstrap.Modal(document.getElementById('poweroff-blocked-modal'));
+      const poweroffSuccessModal   = new bootstrap.Modal(document.getElementById('poweroff-success-modal'));
       const poweroffWakeupSetModal = new bootstrap.Modal(document.getElementById('poweroff-wakeup-set-modal'));
 
-      function doPoweroff(force) {
-          fetch("{{url_for('stop_server')}}", {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ force: !!force })
-          }).then(response => response.json().then(data => {
-              if (!response.ok) {
-                  document.getElementById('poweroff-blocked-msg').textContent = data.message || 'Unknown error';
-                  document.getElementById('poweroff-force-btn').classList.toggle('d-none', !data.force_allowed);
-                  document.getElementById('wakeup-error').classList.add('d-none');
-                  poweroffBlockedModal.show();
-              }
-          })).catch(error => {
-              document.getElementById('poweroff-blocked-msg').textContent = 'Error: ' + error;
+      async function doPoweroff(force) {
+          const body    = document.getElementById('poweroff-confirm-body');
+          const footer  = document.getElementById('poweroff-confirm-footer');
+          body.innerHTML  = '<div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm"></div><span>Running pre-shutdown checks… this can take up to 1 minute</span></div>';
+          footer.innerHTML = '';
+          console.log('[poweroff] Starting poweroff, force=' + force);
+
+          let response, data;
+          try {
+              console.log('[poweroff] Sending POST /poweroff ...');
+              response = await fetch("{{url_for('stop_server')}}", {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ force: !!force })
+              });
+              console.log('[poweroff] Response status:', response.status);
+              const text = await response.text();
+              console.log('[poweroff] Response body:', text);
+              try { data = JSON.parse(text); } catch (e) { data = {}; console.error('[poweroff] JSON parse error:', e, 'Body was:', text); }
+          } catch (networkErr) {
+              console.error('[poweroff] Network error:', networkErr);
+              body.innerHTML   = 'Are you sure you want to power off the Hub?';
+              footer.innerHTML = '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-danger" id="poweroff-confirm-btn">Power off</button>';
+              document.getElementById('poweroff-confirm-btn').addEventListener('click', () => { poweroffConfirmModal.hide(); doPoweroff(false); });
+              document.getElementById('poweroff-blocked-msg').textContent = 'Network error: ' + networkErr;
               document.getElementById('poweroff-force-btn').classList.add('d-none');
               poweroffBlockedModal.show();
-          });
+              return;
+          }
+
+          if (response.ok) {
+              console.log('[poweroff] Success:', data.message);
+              poweroffConfirmModal.hide();
+              poweroffSuccessModal.show();
+          } else {
+              console.warn('[poweroff] Blocked:', data.message);
+              body.innerHTML   = 'Are you sure you want to power off the Hub?';
+              footer.innerHTML = '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-danger" id="poweroff-confirm-btn">Power off</button>';
+              document.getElementById('poweroff-confirm-btn').addEventListener('click', () => { poweroffConfirmModal.hide(); doPoweroff(false); });
+              poweroffConfirmModal.hide();
+              document.getElementById('poweroff-blocked-msg').textContent = data.message || 'Unknown error';
+              document.getElementById('poweroff-force-btn').classList.toggle('d-none', !data.force_allowed);
+              document.getElementById('wakeup-error').classList.add('d-none');
+              poweroffBlockedModal.show();
+          }
       }
 
       document.getElementById('poweroff-btn').addEventListener('click', function() {

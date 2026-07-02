@@ -1580,16 +1580,29 @@ def _ensure_wakeup_after_shutdown(shutdown_dt: datetime):
     getLogger().error("Failed to set wake-up after shutdown after 100 attempts")
 
 
+def _ensure_power_cut_delay_10():
+    for attempt in range(100):
+        value = get_power_cut_delay()
+        if value == 10:
+            getLogger().info("Power cut delay: 10s OK")
+            return
+        getLogger().warning("Power cut delay is %s (not 10s), fixing (attempt %d)", value, attempt + 1)
+        set_power_cut_delay(10)
+        time.sleep(1)
+    getLogger().error("Failed to set power cut delay to 10s after 100 attempts")
+
+
 def pre_shutdown_checks():
     """Run all mandatory WittyPi register checks before powering off. WittyPi 5 only."""
     if not is_WittyPi_5():
         getLogger().info("pre_shutdown_checks: skipped (not WittyPi 5)")
         return
-    _ensure_rtc_synced()           # sync system clock → RTC before sleep
-    _ensure_wakeup_in_future()     # wake-up alarm must be ≥1min ahead (RTC time)
-    _ensure_power_priority_vin()   # Vin must take priority over USB on next boot
-    _ensure_default_on_250()       # WittyPi must auto-start after 250s on power restore
-    _ensure_recovery_voltage_set() # don't allow restart below 10V Vin
+    _ensure_rtc_synced()              # sync system clock → RTC before sleep
+    _ensure_wakeup_in_future()        # wake-up alarm must be ≥1min ahead (RTC time)
+    _ensure_power_priority_vin()      # Vin must take priority over USB on next boot
+    _ensure_default_on_250()          # WittyPi must auto-start after 250s on power restore
+    _ensure_recovery_voltage_set()    # don't allow restart below 10V Vin
+    _ensure_power_cut_delay_10()      # power cut delay must be 10s
 
 
 def setShutdownAndWakeUpDates():
@@ -1611,6 +1624,7 @@ def safeShutdown():
     run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)
     log.info(cmdeject)
 
+    # Safety fallback: if sudo poweroff doesn't halt the Pi, WP5 cuts power after 30s
     stop_at = datetime.now() + timedelta(seconds=30)
     set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
     readback = get_shutdown_time()
@@ -1620,15 +1634,11 @@ def safeShutdown():
         log.warning("Not a Raspberry Pi, so no poweroff")
         return
 
-    run_command(["gpio", "-g", "mode", str(HALT_PIN), "in"])
-    run_command(["gpio", "-g", "mode", str(HALT_PIN), "up"])
     if is_mc_connected():
         clear_alarm_flags()
-    log.warning("Halting all processes and then shutdown Raspberry Pi...")
-    if not os.path.exists("/boot/wittypi.lock"):
-        run_command(["sudo", "shutdown", "-h", "now"])
-    else:
+
+    if os.path.exists("/boot/wittypi.lock"):
         os.remove("/boot/wittypi.lock")
-    cmd = "sudo poweroff"
-    log.warning(cmd)
-    run(cmd, capture_output=True, universal_newlines=True, shell=True, check=False)
+
+    log.warning("Halting Raspberry Pi now...")
+    run(["sudo", "poweroff"], capture_output=True, text=True, check=False)
