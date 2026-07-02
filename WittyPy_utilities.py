@@ -1603,7 +1603,7 @@ def safeShutdown():
 
     if is_debug():
         log.warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
-        sys.exit(0)
+        return
 
     pre_shutdown_checks()
 
@@ -1618,7 +1618,7 @@ def safeShutdown():
 
     if not is_raspberry_pi():
         log.warning("Not a Raspberry Pi, so no poweroff")
-        sys.exit(0)
+        return
 
     run_command(["gpio", "-g", "mode", str(HALT_PIN), "in"])
     run_command(["gpio", "-g", "mode", str(HALT_PIN), "up"])
