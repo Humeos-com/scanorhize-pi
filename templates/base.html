@@ -428,13 +428,10 @@
               console.log('[poweroff] Response body:', text);
               try { data = JSON.parse(text); } catch (e) { data = {}; console.error('[poweroff] JSON parse error:', e, 'Body was:', text); }
           } catch (networkErr) {
-              console.error('[poweroff] Network error:', networkErr);
-              body.innerHTML   = 'Are you sure you want to power off the Hub?';
-              footer.innerHTML = '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-danger" id="poweroff-confirm-btn">Power off</button>';
-              document.getElementById('poweroff-confirm-btn').addEventListener('click', () => { poweroffConfirmModal.hide(); doPoweroff(false); });
-              document.getElementById('poweroff-blocked-msg').textContent = 'Network error: ' + networkErr;
-              document.getElementById('poweroff-force-btn').classList.add('d-none');
-              poweroffBlockedModal.show();
+              // Pi shut down before Flask could respond — treat as success
+              console.log('[poweroff] Network error (Pi likely powered off):', networkErr);
+              poweroffConfirmModal.hide();
+              poweroffSuccessModal.show();
               return;
           }
 
