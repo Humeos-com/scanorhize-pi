@@ -560,7 +560,7 @@ def run_test(test_name: str):
                 resp = _run_test_impl(test_name, task_id)
                 result = resp.get_json() or {}
             except Exception as e:
-                result = {"ok": False, "message": str(e)}
+                result = {"ok": False, "message": str(e), "summary": f"{test_name}: exception"}
         ok = result.get("ok", False)
         processing = result.get("processing", False)
         msg = result.get("message", "").replace("\n", " ")[:120]
