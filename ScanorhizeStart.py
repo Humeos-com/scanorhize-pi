@@ -121,8 +121,12 @@ def launchServer():
     #Activation de l'AP
     getLogger().info("Lancement du point d'accès (192.168.4.1)")
     try:
-        run("sudo nmcli con up hub_AP", shell=True, check=True)
-        getLogger().info("AP activé")
+        state = run("nmcli -g GENERAL.STATE con show hub_AP", shell=True, capture_output=True, text=True)
+        if "activated" in state.stdout.lower():
+            getLogger().info("AP déjà actif, pas de redémarrage")
+        else:
+            run("sudo nmcli con up hub_AP", shell=True, check=True)
+            getLogger().info("AP activé")
     except Exception as e:
         getLogger().error("Echec activation AP : %s", e)
         
