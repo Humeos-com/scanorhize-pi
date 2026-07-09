@@ -148,9 +148,9 @@ _active_tests: set = set()  # test names currently running
 def get_common_template_vars():
     """Get common variables for templates with fresh hub_info"""
     mc = is_mc_connected()
-    wittypi_times = {"connected": mc, "shutdown": None, "wakeup": None, "shutdown_iso": None, "wakeup_iso": None}
+    from datetime import datetime
+    wittypi_times = {"connected": mc, "shutdown": None, "wakeup": None, "shutdown_iso": None, "wakeup_iso": None, "now_iso": datetime.now().isoformat() + "Z"}
     if mc:
-        from datetime import datetime
         try:
             s = parse_wittypi_time(get_shutdown_time())
             if s:
@@ -595,7 +595,8 @@ def tests_ping():
 @app.route("/api/wittypi-times", methods=["GET"])
 def api_wittypi_times():
     mc = is_mc_connected()
-    result = {"connected": mc, "shutdown": None, "wakeup": None, "shutdown_iso": None, "wakeup_iso": None}
+    from datetime import datetime
+    result = {"connected": mc, "shutdown": None, "wakeup": None, "shutdown_iso": None, "wakeup_iso": None, "now_iso": datetime.now().isoformat() + "Z"}
     if mc:
         try:
             s = parse_wittypi_time(get_shutdown_time())

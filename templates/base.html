@@ -188,10 +188,11 @@
       (function() {
           let shutdownIso = {{ wittypi.shutdown_iso | tojson }};
           let wakeupIso   = {{ wittypi.wakeup_iso   | tojson }};
+          let nowIso      = {{ wittypi.now_iso       | tojson }};
 
           function fmtCountdown(isoStr) {
               if (!isoStr) return '';
-              const diffMin = Math.round((new Date(isoStr) - new Date()) / 60000);
+              const diffMin = Math.round((new Date(isoStr) - new Date(nowIso)) / 60000);
               if (diffMin <= 0) return '(now)';
               const d = Math.floor(diffMin / 1440);
               const h = Math.floor((diffMin % 1440) / 60);
@@ -206,6 +207,7 @@
           function applyTimes(data) {
               shutdownIso = data.shutdown_iso;
               wakeupIso   = data.wakeup_iso;
+              if (data.now_iso) nowIso = data.now_iso;
 
               const sdCell  = document.getElementById('wittypi-shutdown-cell');
               const wuCell  = document.getElementById('wittypi-wakeup-cell');
