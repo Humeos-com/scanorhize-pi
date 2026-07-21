@@ -549,7 +549,7 @@ function handleTestResult(data) {
         } else {
             insert(`<br>[${now}] ${data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>'}: ${data.message}${duration}`);
         }
-        if (data._driftLine) insert(data._driftLine);
+        if (data._driftLine) insert('<br>' + data._driftLine);
     }
 
     // WittyPi cycle test — hand off to cycle monitor
