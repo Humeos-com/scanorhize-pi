@@ -64,8 +64,9 @@
             <span>Version: {{ version }}</span>
          </div>
          <div class="hub-info-line" id="clock-row">
-            <span id="clock-rtc-cell" style="display:none;"></span>
-            <span id="clock-ntp-cell" style="display:none;"></span>
+            <span id="clock-pc-cell">🖥 PC vs Pi: …</span>
+            <span id="clock-rtc-cell">🕐 RTC: …</span>
+            <span id="clock-ntp-cell">🌐 Internet: …</span>
             <span id="clock-sync-btn" title="Sync RTC from network" style="cursor:pointer; color:#aaa;">↻</span>
          </div>
          <div class="hub-info-line" id="wittypi-row" style="{{ '' if wittypi.connected else 'display:none;' }}">
@@ -92,9 +93,9 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body d-grid gap-2">
-              <button class="btn btn-outline-primary" id="rtc-opt1-btn">1. Write system time to RTC</button>
-              <button class="btn btn-outline-primary" id="rtc-opt2-btn">2. Write RTC time to system</button>
-              <button class="btn btn-outline-success" id="rtc-opt3-btn">3. Synchronize with network time</button>
+              <button class="btn btn-outline-primary" id="rtc-opt1-btn">1. Write Raspberry time to RTC</button>
+              <button class="btn btn-outline-primary" id="rtc-opt2-btn">2. Write RTC time to Raspberry</button>
+              <button class="btn btn-outline-success" id="rtc-opt3-btn">3. Synchronize both with network time</button>
               <small id="rtc-sync-status" class="text-center" style="min-height:1.2em;"></small>
             </div>
             <div class="modal-footer">
@@ -282,29 +283,36 @@
           }
 
           function applyClockStatus(data) {
+              const pcCell  = document.getElementById('clock-pc-cell');
               const rtcCell = document.getElementById('clock-rtc-cell');
               const ntpCell = document.getElementById('clock-ntp-cell');
 
-              if (data.rtc_diff !== null && data.rtc_diff !== undefined) {
-                  const ok = data.rtc_ok;
-                  const drift = fmtDrift(data.rtc_diff);
-                  rtcCell.innerHTML = ok
-                      ? `🕐 RTC clock: <span style="color:#666;">${drift} drift</span>`
-                      : `🕐 RTC clock: <span style="color:#dc3545;font-weight:bold;">⚠ ${drift} drift (sync needed)</span>`;
-                  rtcCell.style.display = '';
+              console.log('[clock-status] PC:', new Date(Date.now()).toISOString(), '| Pi sys_iso:', data.sys_iso);
+              if (data.sys_iso) {
+                  const diff  = Math.abs(Date.now() - new Date(data.sys_iso).getTime()) / 1000;
+                  const drift = fmtDrift(diff);
+                  const red   = diff > 600;
+                  pcCell.innerHTML = `🖥 PC vs Pi: <span style="${red ? 'color:#dc3545;font-weight:bold;' : 'color:#666;'}">${red ? '⚠ ' : ''}${drift} drift</span>`;
               } else {
-                  rtcCell.style.display = 'none';
+                  pcCell.innerHTML = '🖥 PC vs Pi: <span style="color:#666;">N/A</span>';
+              }
+
+              if (data.rtc_diff !== null && data.rtc_diff !== undefined) {
+                  const drift = fmtDrift(data.rtc_diff);
+                  rtcCell.innerHTML = data.rtc_ok
+                      ? `🕐 RTC: <span style="color:#666;">${drift} drift</span>`
+                      : `🕐 RTC: <span style="color:#dc3545;font-weight:bold;">⚠ ${drift} drift</span>`;
+              } else {
+                  rtcCell.innerHTML = '🕐 RTC: <span style="color:#666;">N/A</span>';
               }
 
               if (data.ntp_diff !== null && data.ntp_diff !== undefined) {
-                  const ok = data.ntp_ok;
                   const drift = fmtDrift(data.ntp_diff);
-                  ntpCell.innerHTML = ok
-                      ? `🌐 Internet time: <span style="color:#666;">${drift} drift</span>`
-                      : `🌐 Internet time: <span style="color:#dc3545;font-weight:bold;">⚠ ${drift} drift (clock off)</span>`;
-                  ntpCell.style.display = '';
+                  ntpCell.innerHTML = data.ntp_ok
+                      ? `🌐 Internet: <span style="color:#666;">${drift} drift</span>`
+                      : `🌐 Internet: <span style="color:#dc3545;font-weight:bold;">⚠ ${drift} drift</span>`;
               } else {
-                  ntpCell.style.display = 'none';
+                  ntpCell.innerHTML = '🌐 Internet: <span style="color:#666;">N/A</span>';
               }
           }
 
@@ -312,7 +320,7 @@
               fetch('/api/clock-status')
                   .then(r => r.json())
                   .then(applyClockStatus)
-                  .catch(() => {});
+                  .catch(e => console.warn('[clock-status] fetch failed:', e));
           }
 
           window.setNavbarBusy = function(busy) {

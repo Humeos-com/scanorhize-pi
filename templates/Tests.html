@@ -4,6 +4,19 @@
 <div class="container">
     <h1>Tests</h1>
 
+    <!-- Tab navigation -->
+    <ul class="nav nav-tabs mb-3" id="mainTabs">
+        <li class="nav-item">
+            <a class="nav-link active" id="tab-tests" href="#" onclick="switchTab('tests'); return false;">Tests</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="tab-logs" href="#" onclick="switchTab('logs'); return false;">Logs</a>
+        </li>
+    </ul>
+
+    <!-- ========================= TESTS TAB ========================= -->
+    <div id="pane-tests">
+
     <!-- =========================
          SIMPLE START + EXPERT TOGGLE
     ========================== -->
@@ -96,6 +109,30 @@
 
         </div>
     </div>
+
+    </div><!-- end pane-tests -->
+
+    <!-- ========================= LOGS TAB ========================= -->
+    <div id="pane-logs" style="display:none;">
+        <div class="card" style="max-height:calc(100dvh - 350px); display:flex; flex-direction:column;">
+            <div class="card-header d-flex align-items-center gap-2" style="flex-shrink:0;">
+                <select id="log-date-select" class="form-select form-select-sm" style="width:auto;" onchange="loadLogs()"></select>
+                <select id="log-lines-select" class="form-select form-select-sm" style="width:auto;" onchange="loadLogs()">
+                    <option value="100">Last 100 lines</option>
+                    <option value="500" selected>Last 500 lines</option>
+                    <option value="1000">Last 1000 lines</option>
+                    <option value="99999">All</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="loadLogs()">↻ Refresh</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleAutoRefresh()" id="auto-refresh-btn">Auto-refresh: OFF</button>
+                <span id="log-status" style="font-size:0.8rem; color:#888; margin-left:auto;"></span>
+            </div>
+            <pre id="log-output"
+                 class="bg-dark p-3 mb-0"
+                 style="flex:1; min-height:0; overflow-y:auto; white-space:pre-wrap; color:#ccc; font-size:0.78rem; margin:0;"></pre>
+        </div>
+    </div>
+
 </div>
 
 <style>
@@ -486,6 +523,16 @@ function handleTestResult(data) {
         }
     }
 
+    // PC vs Pi drift — computed before insert() so it can influence data.ok
+    if (!data.processing && activeTestName === 'on-off' && data.sys_iso) {
+        const _diff = Math.abs(Date.now() - new Date(data.sys_iso).getTime()) / 1000;
+        const _s = Math.round(_diff);
+        const _driftStr = _s < 120 ? _s + 's' : Math.floor(_s / 3600) + 'h ' + String(Math.floor((_s % 3600) / 60)).padStart(2, '0') + 'm';
+        const _bad = _diff > 60;
+        if (_bad) data.ok = false;
+        data._driftLine = `  → PC vs Pi clock:  <span style="${_bad ? 'color:red;font-weight:bold;' : 'color:green;'}">${_bad ? '⚠ ' : '✔ '}${_driftStr} drift</span>`;
+    }
+
     if (data.processing) {
         if (data.message !== lastProgressMessage) {
             lastProgressMessage = data.message;
@@ -502,6 +549,7 @@ function handleTestResult(data) {
         } else {
             insert(`<br>[${now}] ${data.ok ? '<b style="color:green;">✔ PASS</b>' : '<b style="color:red;">✘ FAIL</b>'}: ${data.message}${duration}`);
         }
+        if (data._driftLine) insert(data._driftLine);
     }
 
     // WittyPi cycle test — hand off to cycle monitor
@@ -864,6 +912,78 @@ function showPanelDisconnectedPrompt(data, output) {
             initTestButtonStates();
         }
     };
+}
+
+
+// ========================= TABS =========================
+function switchTab(name) {
+    document.getElementById('pane-tests').style.display = name === 'tests' ? '' : 'none';
+    document.getElementById('pane-logs').style.display  = name === 'logs'  ? '' : 'none';
+    document.getElementById('tab-tests').classList.toggle('active', name === 'tests');
+    document.getElementById('tab-logs').classList.toggle('active',  name === 'logs');
+    if (name === 'logs') loadLogs();
+}
+
+// ========================= LOGS =========================
+let _autoRefreshTimer = setInterval(loadLogs, 5000);
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('auto-refresh-btn');
+    btn.textContent = 'Auto-refresh: ON';
+    btn.classList.replace('btn-secondary', 'btn-success');
+});
+
+async function loadLogs() {
+    const date  = document.getElementById('log-date-select').value;
+    const lines = document.getElementById('log-lines-select').value;
+    const status = document.getElementById('log-status');
+    status.textContent = 'Loading…';
+    try {
+        const params = new URLSearchParams({ lines });
+        if (date) params.set('date', date);
+        const res = await fetch('/api/logs?' + params);
+        const data = await res.json();
+
+        // Populate date selector
+        const sel = document.getElementById('log-date-select');
+        const current = sel.value || data.date;
+        sel.innerHTML = data.dates.map(d =>
+            `<option value="${d}" ${d === current ? 'selected' : ''}>${d}</option>`
+        ).join('');
+
+        const out = document.getElementById('log-output');
+        const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 32;
+        out.innerHTML = (data.content || '(empty)').split('\n').map(line => {
+            const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            if (/\|\s*ERROR\s*\|/.test(line))              return `<span style="color:#ff6b6b;">${escaped}</span>`;
+            if (/\|\s*WARNING\s*\|/.test(line))            return `<span style="color:#ffa94d;">${escaped}</span>`;
+            if (/={3,}.*START.*={3,}/.test(line))          return `<span style="background:#1a4a1a;color:#6fcf6f;font-weight:bold;">${escaped}</span>`;
+            if (/={3,}.*CONFIG MODE.*={3,}/.test(line))    return `<span style="background:#1a2a4a;color:#6fb0ff;font-weight:bold;">${escaped}</span>`;
+            if (/={3,}.*DEFAULT MODE.*={3,}/.test(line))   return `<span style="background:#2a2a4a;color:#b06fff;font-weight:bold;">${escaped}</span>`;
+            if (/={3,}.*POWER OFF.*={3,}/.test(line))      return `<span style="background:#4a1a1a;color:#ff6b6b;font-weight:bold;">${escaped}</span>`;
+            if (/SIGTERM received/.test(line))             return `<span style="background:#4a3a1a;color:#ffcc66;font-weight:bold;">${escaped}</span>`;
+            if (/POWERING OFF/.test(line))                 return `<span style="background:#4a3a1a;color:#ffcc66;font-weight:bold;">${escaped}</span>`;
+            if (/Startup reason:/.test(line))              return `<span style="color:#a8d8a8;">${escaped}</span>`;
+            return escaped;
+        }).join('\n');
+        if (atBottom) out.scrollTop = out.scrollHeight;
+        status.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    } catch(e) {
+        document.getElementById('log-status').textContent = 'Error: ' + e;
+    }
+}
+
+function toggleAutoRefresh() {
+    const btn = document.getElementById('auto-refresh-btn');
+    if (_autoRefreshTimer) {
+        clearInterval(_autoRefreshTimer);
+        _autoRefreshTimer = null;
+        btn.textContent = 'Auto-refresh: OFF';
+        btn.classList.replace('btn-success', 'btn-secondary');
+    } else {
+        _autoRefreshTimer = setInterval(loadLogs, 5000);
+        btn.textContent = 'Auto-refresh: ON';
+        btn.classList.replace('btn-secondary', 'btn-success');
+    }
 }
 
 </script>
