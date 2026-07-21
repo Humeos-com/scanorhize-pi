@@ -211,7 +211,7 @@ def getTodo():
         # Download todo.sh from s3
         hub_id = getHubId()
         cmd = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/todo.sh ../todo.sh"
-        getLogger().info(cmd)
+        getLogger().info("Download todo.sh from s3")
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=False
         )
@@ -293,7 +293,7 @@ def syncImageFiles(hub_: HubData):
         cmd = f"s3cmd --no-preserve --no-progress sync {src} {getS3Bucket()}"
         getLogger().info("Syncing all files (send_thumbnails_only=False)")
 
-    getLogger().info(cmd)
+
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
@@ -389,7 +389,7 @@ def getTokens():
 -H "accept: */*" -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' """
 
-    getLogger().info(cmdPost)
+    getLogger().info("Send hub MAC address and scanner serial numbers to the server")
     result = run(
         cmdPost,
         capture_output=True,
@@ -447,7 +447,7 @@ def getTokens():
 def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     hub_id = getHubId()
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
-    getLogger().info(cmdRead)
+    getLogger().info("Read scanner config from server")
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -467,7 +467,7 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
 def SendScannerConfigToServer(ScannerObj: ScannerData):
     hub_id = getHubId()
     cmdWrite = f"s3cmd --no-preserve sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
-    getLogger().info(cmdWrite)
+    getLogger().info("Send scanner config to server")
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -487,7 +487,7 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
 def ReadHubConfigFromServer():
     hub_id = getHubId()
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
-    getLogger().info(cmdRead)
+    getLogger().info("Read hub config from server")
     result = run(
         cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -507,7 +507,7 @@ def ReadHubConfigFromServer():
 def SendHubConfigToServer():
     hub_id = getHubId()
     cmdWrite = f"s3cmd --no-preserve sync {getConfigHubFile()} s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
-    getLogger().info(cmdWrite)
+    getLogger().info("Send hub config to server")
     result = run(
         cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -542,7 +542,7 @@ def SendParameters(Hub_: HubData):
 -H "Content-Type: application/json" \
 --data '{json.dumps(json_data)}' """
 
-    getLogger().info(cmdPUT)
+    getLogger().info("Send hub parameters to server")
     result = run(
         cmdPUT, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -673,21 +673,21 @@ def calculate_next_wakeup_from_crontab():
     if battery[0] < 3.5:
         # Stops the hub until battery is charged through the solar panel
         next_date_s = max(next_date_s, current_date_s + (3600 * 24 * 1))
-        getLogger().warning("Low battery, delaying wakeup by 1 day")
+        getLogger().warning("Low battery, delaying wake-up by 1 day")
 
-    # Configurer le WittyPi
+    # Program WittyPi wake-up time
+    # And schedule shutdown 20 minutes after current date
     next_date = SecondsToDate(next_date_s)
-    SetNextStartDate(next_date)
-
-    # Configurer shutdown 20 minutes après le démarrage actuel
     shutdown_time = SecondsToDate(current_date_s + (60 * 20))
-    setNextShutdownDate(shutdown_time)
 
-    getLogger().warning(
-        "Next wakeup scheduled at: %s (from crontab: %s)", next_date, schedule
-    )
-    getLogger().warning(
-        "Next shutdown scheduled at: %s", shutdown_time)
+    wakeup_in   = next_date_s - current_date_s
+    shutdown_in = 60 * 20
+    getLogger().warning("Setting wake-up scheduled at:  %s (in %dh %02dm, from crontab: %s)", next_date, wakeup_in // 3600, (wakeup_in % 3600) // 60, schedule)
+    getLogger().warning("Setting shutdown scheduled at: %s (in %dh %02dm)", shutdown_time, shutdown_in // 3600, (shutdown_in % 3600) // 60)
+
+
+    SetNextStartDate(next_date)
+    setNextShutdownDate(shutdown_time)
 
     return next_date
 

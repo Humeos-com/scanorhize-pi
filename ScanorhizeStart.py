@@ -7,10 +7,11 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 
 import sys
 import time
+import signal
 from ConfigApp import getLogger
+
 from version import __version__
-getLogger().info("============= START =============")
-getLogger().info("ScanorhizeStart.py version: %s", __version__)
+
 
 from subprocess import run, CalledProcessError, Popen
 import argparse
@@ -18,13 +19,13 @@ from ConfigApp import getUsbDir
 from pathlib import Path
 
 
-from OSUtils import is_raspberry_pi
 from WittyPy_utilities import is_reason_click
 from WittyPy_utilities import (
     set_shutdown_time, get_shutdown_time,
     pre_shutdown_checks,
     setShutdownAndWakeUpDates,
     safeShutdown,
+    is_mc_connected, WittyPi,
 )
 from Miscellaneous import (
     EndGPIO,
@@ -77,8 +78,7 @@ if args.version:
     sys.exit(0)
 
 # Etape 0 #############################################
-getLogger().info("2 second delay... (Clock sync)")
-time.sleep(2) # Clock sync
+time.sleep(5) # Clock sync
 
 
 
@@ -92,18 +92,16 @@ def isConfig():
         EndGPIO()
         return True
     # On regarde si on est en mode configuration
-    config = not ReadGPIOConfig() or is_reason_click()  # 0 ou 1
+    config = not ReadGPIOConfig() or is_reason_click(log=False)  # 0 ou 1
     EndGPIO()
     return config
 
 
 
-def createRunConfigFile():
-    getLogger().info("On passe en mode config")    
-    
+def createRunConfigFile():   
     # On cree un fichier /run/config pour indiquer aux shells qu'on est en mode config
     cmd = "sudo touch /run/config >> Log/Scanorhize.log 2>&1"
-    getLogger().info(cmd)
+    getLogger().info("Create run config file")
     result = run(
         cmd, capture_output=True, universal_newlines=True, shell=True, check=False
     )
@@ -119,16 +117,16 @@ def launchServer():
     print("Launching server")
     
     #Activation de l'AP
-    getLogger().info("Lancement du point d'accès (192.168.4.1)")
+    getLogger().info("Starting access point (192.168.4.1)")
     try:
         state = run("nmcli -g GENERAL.STATE con show hub_AP", shell=True, capture_output=True, text=True)
         if "activated" in state.stdout.lower():
-            getLogger().info("AP déjà actif, pas de redémarrage")
+            getLogger().info("AP already active, skipping restart")
         else:
             run("sudo nmcli con up hub_AP", shell=True, check=True)
-            getLogger().info("AP activé")
+            getLogger().info("AP activated")
     except Exception as e:
-        getLogger().error("Echec activation AP : %s", e)
+        getLogger().error("Failed to activate AP: %s", e)
         
         
     # A priori, même sans connectivité, on doit avoir le SSID Scanorhize et une IP
@@ -149,7 +147,7 @@ def takePictures():
     # On ne lance pas avec l'import, car s'il y a une erreur, le programme s'arrête
     # import TakePictures
     cmd = "python3 TakePictures.py"
-    getLogger().info(cmd)
+    getLogger().info("Take pictures")
     try:
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True
@@ -253,40 +251,102 @@ def waitingForPicturesToUpload():
                     
         time.sleep(10)
 
+_pre_shutdown_done = False
+
+
+def _get_shutdown_reason() -> str:
+    """Infer WP5 shutdown reason from I2C registers."""
+    # Reg 14: high nibble = startup reason, low nibble = shutdown reason (WP5 spec)
+    _SHUTDOWN_REASONS = {
+        0x01: "WittyPi startup alarm",
+        0x02: "WittyPi shutdown alarm",
+        0x03: "WittyPi button clicked",
+        0x04: "WittyPi VIN drops (low voltage)",
+        0x05: "WittyPi VIN recovers",
+        0x06: "WittyPi over temperature",
+        0x07: "WittyPi below temperature",
+        0x08: "WittyPi newly powered",
+        0x09: "reboot",
+        0x0A: "missed heartbeat",
+        0x0B: "external shutdown",
+        0x0C: "external reboot",
+    }
+    try:
+        if not is_mc_connected():
+            return "unknown (WP5 not connected)"
+        action_reason = WittyPi().i2c_read_byte(14)  # I2C_ACTION_REASON_WP5
+        shutdown_reason = action_reason & 0x0F        # low nibble
+        return _SHUTDOWN_REASONS.get(shutdown_reason, f"unknown (0x{shutdown_reason:02X})")
+    except Exception as e:
+        return f"unknown (I2C error: {e})"
+
+
+def _on_sigterm(sig, frame):
+    # If systemd is not stopping the whole system, this is just a service restart — exit quietly
+    try:        
+        state = run(["systemctl", "is-system-running"], capture_output=True, text=True)
+        if state.stdout.strip() != "stopping":
+            getLogger().warning("SIGTERM received — Service restart")
+            sys.exit(0)
+    except Exception:
+        pass
+
+    # Actual system shutdown (WP5 alarm, button, low voltage, etc.)
+    reason = _get_shutdown_reason()
+    getLogger().info("POWERING OFF — reason: %s", reason)
+    if not _pre_shutdown_done:
+        try:
+            pre_shutdown_checks()
+        except Exception as e:
+            getLogger().error("pre_shutdown_checks on SIGTERM: %s", e)
+
+    getLogger().info("=========== POWER OFF ===========")
+    sys.exit(0)
+
+# Register before main() so unexpected shutdowns are always caught
+signal.signal(signal.SIGTERM, _on_sigterm)
+
+
 def main():
-    setShutdownAndWakeUpDates()
-    config = isConfig()
+    getLogger().info("Code version: %s", __version__)
+    getLogger().info("Startup reason: %s", WittyPi().startup_reason_str())
     
+    config = isConfig()
+
     if config:
         getLogger().info("======= CONFIG MODE =======")
+    else: #Default mode
+        getLogger().info("======= DEFAULT MODE =======")
+
+    # Set shutdown and wakeup dates
+    setShutdownAndWakeUpDates()
+
+    if config:
         launchServer()  #Launch web server in the background
         createRunConfigFile()
         initScanners()
-    
+
     else: #Default mode
-        getLogger().info("======= DEFAULT MODE =======")
         takePictures()
         
     #Update data from and to server
     #And, if not config mode, wait for pictures to upload
     if not getOffline():
         try:
-            getLogger().info("==============")
             enable4G()
-            getLogger().info("==============")
             updateDataFromAndToServer(configMode=config)
-            getLogger().info("==============")
             
             #In default mode, wait for pictures to upload to server before shutting down
             if config == False:
                 waitingForPicturesToUpload()
+                global _pre_shutdown_done
+                _pre_shutdown_done = True
                 safeShutdown()
         
         except Exception as e:
             getLogger().error(e)
          
     
-    getLogger().info("End of ScanorhizeStart.py")
     if config:
         while True:
             time.sleep(60)

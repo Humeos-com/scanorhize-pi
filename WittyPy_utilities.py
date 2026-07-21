@@ -8,23 +8,12 @@ import os
 import sys
 from subprocess import run, CalledProcessError, CompletedProcess
 import time
-from logging import getLogger
+from ConfigApp import getLogger
 from typing import Optional, Union
 from datetime import datetime, timedelta
 
 from version import __version__
-from OSUtils import is_raspberry_pi
-
-# pylint: disable=ungrouped-imports
-# pylint: disable=import-error
-# Impossible de grouper les imports car les imports conditionnels ne sont pas supportés
-if is_raspberry_pi():
-    from smbus import SMBus
-else:
-    import fake_rpi
-
-    sys.modules["smbus"] = fake_rpi.smbus
-    from smbus import SMBus
+from smbus import SMBus
 
 # Java Zoned Timestamp, with TZ=UTC
 JAVA_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -308,25 +297,26 @@ class WittyPi:
             self.initialized = True
 
     def get_firmware_id(self):
-        # on teste d'abord la carte Witty Pi 3
-        self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_3
-        self.firmware_id = self.i2c_read_byte(0x00, 1)
-        if self.firmware_id is not None:
-            getLogger().warning("Witty Pi 3 board found.")
-            return self.firmware_id
+        # # on teste d'abord la carte Witty Pi 3
+        # self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_3
+        # self.firmware_id = self.i2c_read_byte(0x00, 1)
+        # if self.firmware_id is not None:
+        #     getLogger().info("Witty Pi 3 board found.")
+        #     return self.firmware_id
         
-        getLogger().warning("No Witty Pi 3 board found, trying Witty Pi 4.")
-        self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_4
-        self.firmware_id = self.i2c_read_byte(0x00, 1)
-        if self.firmware_id is not None:
-            getLogger().warning("Witty Pi 4 board found.")
-            return self.firmware_id
+        # getLogger().warning("No Witty Pi 3 board found, trying Witty Pi 4.")
+        # self.i2c_address = I2C_MC_ADDRESS_WITTY_PI_4
+        # self.firmware_id = self.i2c_read_byte(0x00, 1)
+        # if self.firmware_id is not None:
+        #     getLogger().info("Witty Pi 4 board found.")
+        #     return self.firmware_id
         
-        getLogger().warning("No Witty Pi 4 board found, trying Witty Pi 5.")
+        # getLogger().warning("No Witty Pi 4 board found, trying Witty Pi 5.")
+
         self.i2c_address = I2C_MC_ADDRESS_WP5
         self.firmware_id = self.i2c_read_byte(0x00,1)
         if self.firmware_id is not None:
-            getLogger().warning("Witty Pi 5 board found.")
+            getLogger().info("Witty Pi 5 board found.")
             return self.firmware_id
 
         getLogger().error("ERROR: No Witty Pi board found.")
@@ -368,8 +358,27 @@ class WittyPi:
     def is_WittyPi_5(self) -> bool:
         return self.firmware_id == I2C_MC_ADDRESS_WP5
 
-    def is_reason_click(self) -> bool:
-        getLogger().info(f"self.reason_click = {self.reason_click}")
+    def startup_reason_str(self) -> str:
+        # Reason codes per WP5 firmware spec (reg 14 high nibble = startup reason)
+        reasons = {
+            0x01: "WittyPi startup alarm",
+            0x02: "WittyPi shutdown alarm",
+            0x03: "WittyPi button clicked",
+            0x04: "WittyPi VIN drops (low voltage)",
+            0x05: "WittyPi VIN recovers",
+            0x06: "WittyPi over temperature",
+            0x07: "WittyPi below temperature",
+            0x08: "WittyPi newly powered",
+            0x09: "reboot",
+            0x0A: "missed heartbeat",
+            0x0B: "external shutdown",
+            0x0C: "external reboot",
+        }
+        return reasons.get(self.reason_click, f"unknown (0x{self.reason_click:02X})")
+
+    def is_reason_click(self, log: bool = True) -> bool:
+        if log:
+            getLogger().info("Startup reason: %s", self.startup_reason_str())
         return self.reason_click == REASON_CLICK
 
     def i2c_read_byte(self, register: int, retry: int = 3) -> Optional[int]:
@@ -587,8 +596,8 @@ def is_WittyPi_5() -> bool:
     return WittyPi().is_WittyPi_5()
 
 
-def is_reason_click() -> bool:
-    return WittyPi().is_reason_click()
+def is_reason_click(log: bool = True) -> bool:
+    return WittyPi().is_reason_click(log=log)
 
 
 def init_i2c_bus() -> bool:
@@ -805,16 +814,19 @@ def get_temperature() -> float:
 def clear_alarm_flags(ctrl2_value: Optional[int] = None):
     """Clear alarm flags using direct I2C access."""
 
-    if not is_WittyPi_5() : #no need to clear registers on wp5
-        if ctrl2_value is None:
-            ctrl2_value = WittyPi().i2c_read_byte(I2C_RTC_CTRL2)
+    if is_WittyPi_5():
+        # WP5 has no separate alarm flag registers — action reason (reg 14) is read-only
+        return
 
-        if ctrl2_value is not None:
-            ctrl2_value &= 0xBF  # Clear bit 6 of CTRL2 - PCF85063 (wp4)
-            WittyPi().i2c_write_byte(I2C_RTC_CTRL2, ctrl2_value, purpose="clear alarm flag bit in RTC CTRL2 (PCF85063)")
+    if ctrl2_value is None:
+        ctrl2_value = WittyPi().i2c_read_byte(I2C_RTC_CTRL2)
 
-        WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM1, 0, purpose="clear startup alarm flag")
-        WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM2, 0, purpose="clear shutdown alarm flag")
+    if ctrl2_value is not None:
+        ctrl2_value &= 0xBF  # Clear bit 6 of CTRL2 - PCF85063 (wp4)
+        WittyPi().i2c_write_byte(I2C_RTC_CTRL2, ctrl2_value, purpose="clear alarm flag bit in RTC CTRL2 (PCF85063)")
+
+    WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM1, 0, purpose="clear startup alarm flag")
+    WittyPi().i2c_write_byte(I2C_CONF_FLAG_ALARM2, 0, purpose="clear shutdown alarm flag")
 
     
 
@@ -1057,8 +1069,10 @@ def get_shutdown_time() -> str:
 
 def set_startup_time(date: int, hour: int, minute: int, second: int):
     """Set startup time using direct I2C access. Retries up to 5 times with readback verification."""
+    getLogger().info("Set wake-up time")
+    
     expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
-    for attempt in range(20):
+    for attempt in range(100):
         try:
             if not is_WittyPi_5():
                 WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second), purpose="set startup alarm seconds")
@@ -1071,16 +1085,16 @@ def set_startup_time(date: int, hour: int, minute: int, second: int):
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour), purpose="set startup hours (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date), purpose="set startup day (WP5)")
         except (OSError, IOError) as e:
-            getLogger().error("Error setting startup time (attempt %d/5): %s", attempt + 1, e)
+            getLogger().error("Error setting startup time (attempt %d/100): %s", attempt + 1, e)
             time.sleep(1)
             continue
         readback = get_startup_time()
         if readback == expected:
-            getLogger().info("Startup time set: %s (attempt %d)", expected, attempt + 1)
+            getLogger().info("    ↳ Startup time set: %s (attempt %d)", expected, attempt + 1)
             return
-        getLogger().warning("Startup time readback mismatch (attempt %d/5): expected %s got %s", attempt + 1, expected, readback)
+        getLogger().warning("    ↳ Startup time readback mismatch (attempt %d/100): expected %s got %s", attempt + 1, expected, readback)
         time.sleep(1)
-    getLogger().error("Failed to set startup time to %s after 5 attempts", expected)
+    getLogger().error("    ↳ Failed to set startup time to %s after 5 attempts", expected)
 
 
 def SetNextStartDate(date):  # date en UTC!!
@@ -1092,8 +1106,6 @@ def SetNextStartDate(date):  # date en UTC!!
         int: Result of set_startup_time call, or 0 if not on Raspberry Pi
     """
 
-    if not is_raspberry_pi():
-        return 0
     # Get current date plus one day for defaults
     tomorrow = datetime.utcnow() + timedelta(days=1)
     defaults = {
@@ -1128,9 +1140,10 @@ def SetNextStartDate(date):  # date en UTC!!
 
 def set_shutdown_time(date: int, hour: int, minute: int, second: int):
     """Set shutdown time using direct I2C access. Retries up to 5 times with readback verification."""
-    pre_shutdown_checks()
+    getLogger().info("Set shutdown time")
+
     expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
-    for attempt in range(20):
+    for attempt in range(100):
         try:
             if not is_WittyPi_5():
                 WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
@@ -1143,30 +1156,31 @@ def set_shutdown_time(date: int, hour: int, minute: int, second: int):
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, dec2bcd(hour), purpose="set shutdown hours (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, dec2bcd(date), purpose="set shutdown day (WP5)")
         except (OSError, IOError) as e:
-            getLogger().error("Error setting shutdown time (attempt %d/5): %s", attempt + 1, e)
+            getLogger().error("    ↳ Error setting shutdown time (attempt %d/100): %s", attempt + 1, e)
             time.sleep(1)
             continue
         readback = get_shutdown_time()
         if readback == expected:
-            getLogger().info("Shutdown time set: %s (attempt %d)", expected, attempt + 1)
+            getLogger().info("    ↳ Shutdown time set: %s (attempt %d)", expected, attempt + 1)
             break
-        getLogger().warning("Shutdown time readback mismatch (attempt %d/5): expected %s got %s", attempt + 1, expected, readback)
+        getLogger().warning("    ↳ Shutdown time readback mismatch (attempt %d/100): expected %s got %s", attempt + 1, expected, readback)
         time.sleep(1)
     else:
-        getLogger().error("Failed to set shutdown time to %s after 5 attempts", expected)
+        getLogger().error("    ↳ Failed to set shutdown time to %s after 5 attempts", expected)
 
-    for attempt in range(20):
+    for attempt in range(100):
         rtc_ts = get_rtc_timestamp()
         rtc_now = datetime.fromtimestamp(rtc_ts) if rtc_ts != -1 else datetime.now()
         shutdown_dt = parse_wittypi_time(expected, reference=rtc_now)
         if shutdown_dt is not None:
             _ensure_wakeup_after_shutdown(shutdown_dt)
             break
-        getLogger().warning("set_shutdown_time: could not parse %r with reference %s (attempt %d/10)", expected, rtc_now, attempt + 1)
+        getLogger().warning("    ↳ set_shutdown_time: could not parse %r with reference %s (attempt %d/100)", expected, rtc_now, attempt + 1)
         time.sleep(1)
     else:
-        getLogger().error("set_shutdown_time: failed to parse shutdown datetime from %r after 10 attempts, skipping wakeup check", expected)
+        getLogger().error("    ↳ set_shutdown_time: failed to parse shutdown datetime from %r after 100 attempts, skipping wake-up check", expected)
 
+    pre_shutdown_checks()
 
 # pylint: disable=duplicate-code
 def setNextShutdownDate(date: str):
@@ -1176,8 +1190,6 @@ def setNextShutdownDate(date: str):
     Returns:
         result: Date in WittyPi format "DD HH MM SS"
     """
-    if not is_raspberry_pi():
-        return 0
     try:
         date_obj = datetime.strptime(date, JAVA_FORMAT)
         date = date_obj.strftime("%d %H %M %S")
@@ -1495,11 +1507,11 @@ def _ensure_rtc_synced():
         rtc_ts = get_rtc_timestamp()
         sys_ts = get_sys_timestamp()
         if rtc_ts != -1 and abs(rtc_ts - sys_ts) <= 10:
-            getLogger().info("RTC synced OK (attempt %d): %s", attempt + 1, datetime.fromtimestamp(rtc_ts))
+            getLogger().info("    ↳ RTC synced OK (attempt %d): %s", attempt + 1, datetime.fromtimestamp(rtc_ts))
             return
-        getLogger().warning("RTC sync attempt %d/%s: ok=%s detail=%s", attempt + 1, 5, ok, detail)
+        getLogger().warning("    ↳ RTC sync attempt %d/%s: ok=%s detail=%s", attempt + 1, 5, ok, detail)
         time.sleep(1)
-    getLogger().error("Failed to sync RTC after 5 attempts")
+    getLogger().error("    ↳ Failed to sync RTC after 5 attempts")
 
 
 def _ensure_wakeup_in_future():
@@ -1509,55 +1521,55 @@ def _ensure_wakeup_in_future():
         startup_str = get_startup_time()
         startup_dt = parse_wittypi_time(startup_str, reference=rtc_now)
         if startup_dt is not None and startup_dt > rtc_now + timedelta(minutes=1):
-            getLogger().info("Wake-up OK: %s → %s (RTC: %s)", startup_str, startup_dt, rtc_now)
+            getLogger().info("    ↳ Wake-up OK: %s → %s (RTC: %s)", startup_str, startup_dt, rtc_now)
             return
         wakeup = rtc_now + timedelta(hours=1)
         getLogger().warning(
-            "Wake-up %s is not 1min+ in the future, setting to +1h: %s (attempt %d, RTC: %s)",
+            "    ↳ Wake-up %s is not 1min+ in the future, setting to +1h: %s (attempt %d, RTC: %s)",
             startup_str, wakeup.strftime("%d %H:%M:%S"), attempt + 1, rtc_now
         )
         set_startup_time(wakeup.day, wakeup.hour, wakeup.minute, wakeup.second)
         time.sleep(1)
-    getLogger().error("Failed to set a future wake-up time after 100 attempts")
+    getLogger().error("    ↳ Failed to set a future wake-up time after 100 attempts")
 
 
 def _ensure_power_priority_vin():
     for attempt in range(100):
         priority = get_power_priority()
         if priority == 1:
-            getLogger().info("Power priority: Vin OK")
+            getLogger().info("    ↳ Power priority: Vin OK")
             return
         if priority not in (0, 1):
-            getLogger().warning("Power priority unexpected value: %s (expected 0 or 1), retrying (attempt %d)", priority, attempt + 1)
+            getLogger().warning("    ↳ Power priority unexpected value: %s (expected 0 or 1), retrying (attempt %d)", priority, attempt + 1)
         else:
-            getLogger().warning("Power priority is Vusb first, fixing (attempt %d)", attempt + 1)
+            getLogger().warning("    ↳ Power priority is Vusb first, fixing (attempt %d)", attempt + 1)
         set_power_priority(1)
         time.sleep(1)
-    getLogger().error("Failed to set power priority to Vin after 100 attempts")
+    getLogger().error("    ↳ Failed to set power priority to Vin after 100 attempts")
 
 
 def _ensure_default_on_250():
     for attempt in range(100):
         value = get_default_on()
         if value == 250:
-            getLogger().info("Default on: 250s OK")
+            getLogger().info("    ↳ Default on: 250s OK")
             return
-        getLogger().warning("Default on is %s (not 250), fixing (attempt %d)", value, attempt + 1)
+        getLogger().warning("    ↳ Default on is %s (not 250), fixing (attempt %d)", value, attempt + 1)
         set_default_on(250)
         time.sleep(1)
-    getLogger().error("Failed to set default_on to 250 after 100 attempts")
+    getLogger().error("    ↳ Failed to set default_on to 250 after 100 attempts")
 
 
 def _ensure_recovery_voltage_set():
     for attempt in range(100):
         value = get_recovery_voltage_threshold()
         if value > 0:
-            getLogger().info("Recovery voltage threshold: %.1fV OK", value)
+            getLogger().info("    ↳ Recovery voltage threshold: %.1fV OK", value)
             return
-        getLogger().warning("Recovery voltage threshold is 0, setting to 10.0V (attempt %d)", attempt + 1)
+        getLogger().warning("    ↳ Recovery voltage threshold is 0, setting to 10.0V (attempt %d)", attempt + 1)
         set_recovery_voltage_threshold(100)  # 100 = 10.0V
         time.sleep(1)
-    getLogger().error("Failed to set recovery voltage threshold after 100 attempts")
+    getLogger().error("    ↳ Failed to set recovery voltage threshold after 100 attempts")
 
 
 def _ensure_wakeup_after_shutdown(shutdown_dt: datetime):
@@ -1568,28 +1580,28 @@ def _ensure_wakeup_after_shutdown(shutdown_dt: datetime):
         startup_str = get_startup_time()
         startup_dt = parse_wittypi_time(startup_str, reference=rtc_now)
         if startup_dt is not None and startup_dt > shutdown_dt + timedelta(minutes=1):
-            getLogger().info("Wake-up %s is after shutdown %s OK", startup_dt, shutdown_dt)
+            getLogger().info("    ↳ Wake-up %s is after shutdown %s OK", startup_dt, shutdown_dt)
             return
         wakeup = shutdown_dt + timedelta(hours=1)
         getLogger().warning(
-            "Wake-up %s is not 1min+ after shutdown %s, setting to +1h: %s (attempt %d)",
+            "    ↳ Wake-up %s is not 1min+ after shutdown %s, setting to +1h: %s (attempt %d)",
             startup_str, shutdown_dt, wakeup.strftime("%d %H:%M:%S"), attempt + 1
         )
         set_startup_time(wakeup.day, wakeup.hour, wakeup.minute, wakeup.second)
         time.sleep(1)
-    getLogger().error("Failed to set wake-up after shutdown after 100 attempts")
+    getLogger().error("    ↳ Failed to set wake-up after shutdown after 100 attempts")
 
 
 def _ensure_power_cut_delay_10():
     for attempt in range(100):
         value = get_power_cut_delay()
         if value == 10:
-            getLogger().info("Power cut delay: 10s OK")
+            getLogger().info("    ↳ Power cut delay: 10s OK")
             return
-        getLogger().warning("Power cut delay is %s (not 10s), fixing (attempt %d)", value, attempt + 1)
+        getLogger().warning("    ↳ Power cut delay is %s (not 10s), fixing (attempt %d)", value, attempt + 1)
         set_power_cut_delay(10)
         time.sleep(1)
-    getLogger().error("Failed to set power cut delay to 10s after 100 attempts")
+    getLogger().error("    ↳ Failed to set power cut delay to 10s after 100 attempts")
 
 
 def pre_shutdown_checks():
@@ -1597,6 +1609,8 @@ def pre_shutdown_checks():
     if not is_WittyPi_5():
         getLogger().info("pre_shutdown_checks: skipped (not WittyPi 5)")
         return
+
+    getLogger().info("Pre shutdown checks")
     _ensure_rtc_synced()              # sync system clock → RTC before sleep
     _ensure_wakeup_in_future()        # wake-up alarm must be ≥1min ahead (RTC time)
     _ensure_power_priority_vin()      # Vin must take priority over USB on next boot
@@ -1606,34 +1620,42 @@ def pre_shutdown_checks():
 
 
 def setShutdownAndWakeUpDates():
+    # Clear stale alarm flags from previous boot before programming new times.
+    # Without this, the WP5 may re-trigger a shutdown immediately on reboot
+    # if a scheduled alarm fired last cycle and the flags were never cleared.
+    getLogger().info("Setting shutdown and wake-up dates")
+
+    clear_alarm_flags()
     from Hub import calculate_next_wakeup_from_crontab
     return calculate_next_wakeup_from_crontab()
 
 
 def safeShutdown(skip_pre_checks=False):
-    from ConfigApp import is_debug, getLogger as get_app_logger
-    log = get_app_logger()
+    from ConfigApp import is_debug
+    log = getLogger()
+
+    log.info("Safe shutdown")
 
     if is_debug():
         log.warning("Dev mode: on ne lance pas le shutdown et on n'ejecte pas la clé")
         return
 
     if not skip_pre_checks:
-        pre_shutdown_checks()
+        try:
+            pre_shutdown_checks()
+        except Exception as e:
+            log.error("Pre shutdown checks failed: %s", e)
 
+    # Unmount the USB drive before poweroff to avoid filesystem corruption
     cmdeject = "sudo eject /dev/sda"
     run(cmdeject, capture_output=True, universal_newlines=True, shell=True, check=False)
-    log.info(cmdeject)
+    log.info("Unmount USB drive")
 
-    # Safety fallback: if sudo poweroff doesn't halt the Pi, WP5 cuts power after 30s
-    stop_at = datetime.now() + timedelta(seconds=30)
-    set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
-    readback = get_shutdown_time()
-    log.warning("Next stop at: %s (readback: %s)", stop_at.strftime("%d %H:%M:%S"), readback)
-
-    if not is_raspberry_pi():
-        log.warning("Not a Raspberry Pi, so no poweroff")
-        return
+    # # Safety fallback: if sudo poweroff doesn't halt the Pi, WP5 cuts power after 90s
+    # stop_at = datetime.now() + timedelta(seconds=90)
+    # set_shutdown_time(stop_at.day, stop_at.hour, stop_at.minute, stop_at.second)
+    # readback = get_shutdown_time()
+    # log.info("Safety fallback: next stop at %s (readback: %s)", stop_at.strftime("%d %H:%M:%S"), readback)
 
     if is_mc_connected():
         clear_alarm_flags()
@@ -1641,5 +1663,5 @@ def safeShutdown(skip_pre_checks=False):
     if os.path.exists("/boot/wittypi.lock"):
         os.remove("/boot/wittypi.lock")
 
-    log.warning("Halting Raspberry Pi now...")
+    log.info("Halting Raspberry Pi now...")
     run(["sudo", "poweroff"], capture_output=True, text=True, check=False)
