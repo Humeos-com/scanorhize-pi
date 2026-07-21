@@ -473,7 +473,10 @@ def initScanners():
 
     # Récupère tous les devices connectés en une seule passe
     devices_found = ScannerData().scanSearchAll()
-    getLogger().info("initScanners: %d scanner(s) détecté(s)", len(devices_found))
+    if devices_found:
+        getLogger().info("initScanners: %d scanner(s) detected", len(devices_found))
+    else:
+        getLogger().error("initScanners: no scanner detected")
 
     for i, current_file in enumerate(listfile):
         scanner = ScannerData()  # objet neuf à chaque itération — pas de fuite entre scanners
@@ -494,7 +497,7 @@ def initScanners():
             scanner.device = "NoScannerDetected"
             scanner.enable = 0
             scanner.error = 0
-            getLogger().info("initScanners: %s — aucun scanner physique", current_file)
+            getLogger().warning("initScanners: %s — no physical scanner detected", current_file)
 
         scanner.WriteScannerConfig(current_file)
         

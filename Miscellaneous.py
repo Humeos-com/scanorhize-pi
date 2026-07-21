@@ -248,8 +248,8 @@ def check_connectivity(max_attempts=25, min_number_of_successes=1):
 
 
     # Failes to get Internet connection
-    getLogger().error("Impossible d'avoir de la connectivité, on arrête !")
-    raise RuntimeError("Pas de connectivité !")
+    getLogger().error("No internet connectivity")
+    raise RuntimeError("No connectivity!")
 
 
 def InitGPIO():

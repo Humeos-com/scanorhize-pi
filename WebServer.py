@@ -94,7 +94,6 @@ from WittyPy_utilities import (
     safeShutdown,
     pre_shutdown_checks,
 )
-from OSUtils import is_raspberry_pi
 from pin_config import get_pin_array
 
 parser = argparse.ArgumentParser(
@@ -115,7 +114,7 @@ if args.version:
     sys.exit(0)
 
 initDisplayFile()
-getLogger().info("Start WebServer.py version: %s", __version__)
+getLogger().info("Start WebServer.py")
 Hub = HubData()
 
 try:
@@ -126,14 +125,14 @@ try:
     cmd = f"ssh -fN -R {getSSHPort()}:localhost:22 pi@{getScanorhizeServer()} -E Log/ssh.log"
     run(cmd, shell=True, capture_output=True, text=True, check=False)
     getLogger().info(
-        "Tunnel SSH inverse créé sur le port %d pour le serveur %s",
+        "Reverse SSH tunnel created on port %d for server %s",
         getSSHPort(),
         getScanorhizeServer(),
     )
 except RuntimeError as e:
     has_internet = False
     getLogger().error(
-        "Error pas de connectivité internet: %s, on ne lance pas le tunnel SSH", e
+        "No internet connectivity: %s, skipping SSH tunnel", e
     )
 
 getLogger().info("Launch Web app")
@@ -485,11 +484,6 @@ def HubPage():
 @app.route("/update_version", methods=["POST", "GET"])
 def update_version():
 
-    if not is_raspberry_pi():
-        return redirect(
-            url_for("HubPage", output=sanitize_output("No update, not on Raspberry Pi"))
-        )
-
     try:
         cmd_update = "s3cmd --no-preserve sync --delete-removed --exclude-from Scanorhize/s3exclude.txt s3://hubs/hub-master/home/pi/Scanorhize/ /home/pi/Scanorhize/"
         getLogger().info("Update version: %s", cmd_update)
@@ -592,6 +586,36 @@ def tests_ping():
     return jsonify(ok=True)
 
 
+@app.route("/api/logs", methods=["GET"])
+def api_logs():
+    import glob
+    log_dir = os.path.join(os.getcwd(), "Log")
+    date = request.args.get("date")
+    lines = int(request.args.get("lines", 500))
+
+    # List available log dates
+    pattern = os.path.join(log_dir, "Scanorhize_*.log")
+    dates = sorted(
+        os.path.basename(f).replace("Scanorhize_", "").replace(".log", "")
+        for f in glob.glob(pattern)
+    )
+
+    if not date and dates:
+        date = dates[-1]
+
+    content = ""
+    if date:
+        log_file = os.path.join(log_dir, f"Scanorhize_{date}.log")
+        try:
+            with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+                all_lines = f.readlines()
+                content = "".join(all_lines[-lines:])
+        except OSError:
+            content = f"(log file not found: {log_file})"
+
+    return jsonify(dates=dates, date=date, content=content)
+
+
 @app.route("/api/wittypi-times", methods=["GET"])
 def api_wittypi_times():
     mc = is_mc_connected()
@@ -618,7 +642,9 @@ def api_wittypi_times():
 @app.route("/api/clock-status", methods=["GET"])
 def api_clock_status():
     import socket, struct, time as time_mod
-    result = {"rtc_diff": None, "rtc_ok": None, "ntp_diff": None, "ntp_ok": None}
+    from datetime import datetime, timezone
+    result = {"rtc_diff": None, "rtc_ok": None, "ntp_diff": None, "ntp_ok": None,
+              "sys_iso": datetime.now(timezone.utc).isoformat()}
     try:
         rtc_ts = get_rtc_timestamp()
         sys_ts = get_sys_timestamp()
@@ -757,7 +783,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 return jsonify(ok=False, message=f"No internet connection: {e}", summary="Upload service: no internet")
             from Campaign import getUsbDir
             usb_dir = getUsbDir()
-            if is_raspberry_pi() and not os.path.ismount(usb_dir):
+            if not os.path.ismount(usb_dir):
                 return jsonify(
                     ok=False,
                     message=f"USB drive not found at {usb_dir} — insert the USB drive and retry",
@@ -1309,8 +1335,12 @@ def _run_test_impl(test_name: str, task_id: str = None):
                 f"Vin {vin:.2f}V"
             )
 
+            from datetime import datetime, timezone
+            sys_iso = datetime.now(timezone.utc).isoformat()
+            pc_pi_drift = None  # computed client-side; server records sys_iso for that purpose
             ok = bool(startup and shutdown and not startup_warning and default_on_raw != 255 and not rtc_warning and not power_cut_delay_warning and not fw_too_old and not power_priority_warning and not recovery_v_warning)
             return jsonify(
+                sys_iso=sys_iso,
                 ok=ok,
                 summary=f"{model} {'OK' if ok else 'FAIL'}",
                 message=(
@@ -1394,8 +1424,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             configs = listConfigScanner()
             if not configs:
                 return jsonify(ok=False, message="No scanner config files found.")
-            # Query live SANE device list once; skip on non-Pi (dev/test environment)
-            connected_devices = ScannerData().scanSearchAll() if is_raspberry_pi() else None
+            connected_devices = ScannerData().scanSearchAll()
             lines = []
             configuredScanners = 0  # scanners with projectId/sampleId AND device plugged in
             expectedScanners = 0    # scanners with projectId or sampleId (intended to be active)
@@ -1461,7 +1490,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             from DateUtils import GetCurrentDate
 
             usb_dir = getUsbDir()
-            if is_raspberry_pi() and not os.path.ismount(usb_dir):
+            if not os.path.ismount(usb_dir):
                 return jsonify(
                     ok=False,
                     message=f"USB drive not found at {usb_dir} — insert the USB drive and retry",
@@ -1504,15 +1533,14 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     return jsonify(ok=False, message="Test stopped by user", summary="Take pictures: stopped")
                 # Fresh SANE device list before each scan to catch scanners unplugged mid-test.
                 # sleep(5) gives the scanner time to recover after the SANE query before scanimage runs.
-                if is_raspberry_pi():
-                    live_devices = ScannerData().scanSearchAll()
-                    if scanner.device not in live_devices:
-                        return jsonify(
-                            ok=False,
-                            message=f"Scanner {idx + 1}/{total} not plugged in ({scanner.device})",
-                            summary=f"Take pictures: scanner {idx + 1} not plugged in",
-                        )
-                    sleep(5)
+                live_devices = ScannerData().scanSearchAll()
+                if scanner.device not in live_devices:
+                    return jsonify(
+                        ok=False,
+                        message=f"Scanner {idx + 1}/{total} not plugged in ({scanner.device})",
+                        summary=f"Take pictures: scanner {idx + 1} not plugged in",
+                    )
+                sleep(5)
                 _task_log(task_id, f"📷 Taking picture {idx + 1}/{total}…")
                 scanner_ids.append(f"{scanner.projectId}/{scanner.sampleId}")
                 scanner = scanAcq(scanner, i_scan, current_date)
@@ -2091,35 +2119,8 @@ def set_wakeup():
     return jsonify(ok=True, message=f"Wakeup set for day {target.strftime('%d at %H:%M')}")
 
 
-@app.route("/api/pre-shutdown", methods=["POST"])
-def api_pre_shutdown():
-    if not is_mc_connected():
-        return jsonify(ok=True, message="WittyPi not connected — no checks needed")
-    try:
-        pre_shutdown_checks()
-    except Exception as e:
-        return jsonify(ok=False, message=f"Pre-shutdown checks failed: {e}")
-    priority = get_power_priority()
-    wakeup = parse_wittypi_time(get_startup_time())
-    issues = []
-    if priority != 1:
-        issues.append(f"power priority is {priority} (expected 1)")
-    if not wakeup:
-        issues.append("no wakeup time set")
-    if issues:
-        return jsonify(ok=False, message="Issues remain after fixes: " + "; ".join(issues))
-    return jsonify(ok=True, message=f"System ready — wakeup: {wakeup.strftime('%-d %b %H:%M')}, power priority: Vin first")
-
-
 @app.route("/poweroff", methods=["POST"])
 def stop_server():
-
-    if not is_raspberry_pi():
-        return render_template(
-            "Hub.html",
-            output=sanitize_output("Not on Raspberry Pi"),
-            **get_common_template_vars(),
-        )
 
     # Block shutdown if no wakeup is set or is more than 2 days away
     force = (request.get_json(silent=True) or {}).get("force", False)
@@ -2144,6 +2145,7 @@ def stop_server():
         pass
 
     try:
+        getLogger().info("Check pre shutdown values. Call from /poweroff")
         pre_shutdown_checks()
     except Exception as e:
         import traceback
