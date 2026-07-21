@@ -6,7 +6,6 @@ Utility functions shared across modules
 # import json
 # import os
 import html
-from logging import getLogger
 
 
 def write_json_to_file(file_path: str, json_data: str) -> int:
@@ -24,6 +23,7 @@ def write_json_to_file(file_path: str, json_data: str) -> int:
             outfile.write(json_data)
         return 0
     except OSError as e:
+        from ConfigApp import getLogger
         getLogger().error("write_json_to_file: OSError: %s", e)
         return 1
 
@@ -50,6 +50,7 @@ def sanitize_output(output: str) -> str:
     max_length = 10000  # Reasonable limit for output messages
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length] + "... [truncated]"
+        from ConfigApp import getLogger
         getLogger().warning(
             "Output message truncated due to length: %d chars", len(output)
         )

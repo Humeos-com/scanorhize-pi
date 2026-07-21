@@ -7,7 +7,6 @@ Utilise le pattern Singleton pour stocker la configuration
 import os
 import json
 import logging
-import logging.config
 from datetime import datetime
 from utils import write_json_to_file
 
@@ -58,97 +57,42 @@ class ConfigApp:
         self.offline: bool = False
         self.th_x: int = 512
         self.th_y: int = 704
-        # Initialize logger
-        self.logger = logging.getLogger("ConfigApp")
-
-        # Setup logging and load config
-        self.setup_basic_logging()
         self.load_config()
-        self.setup_final_logging()
+        self._setup_logging()
 
-        self.initialized = True  # Mark as initialized
-        self.logger.info("Read configuration from: %s", self.config_app_file)
+        self.initialized = True
+        
+        import sys
+        if os.path.basename(sys.argv[0]).startswith("ScanorhizeStart"):
+            self.logger.info("============= START =============")
+            self.logger.info("Read configuration from %s", self.config_app_file)
 
-    def setup_basic_logging(self):
-        """Setup initial basic logging"""
-        logging.basicConfig(
-            level=self.log_level,
-            format="%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-        self.logger = logging.getLogger("MainLogger")
-
-    def setup_final_logging(self):
-        """Setup final logging configuration"""
-        # Clear existing handlers
-        logging.getLogger().handlers.clear()
-
-        # Check for logging.conf
-        logging_conf = os.path.join(self.config_dir, "logging.conf")
-        if os.path.exists(logging_conf):
-            logging.config.fileConfig(logging_conf)
-            self.logger = logging.getLogger("MainLogger")
-        # Remove existing FileHandler(s)
-        for handler in self.logger.handlers[:]:
-            if (
-                isinstance(handler, logging.FileHandler)
-                and handler.name == "fileHandler"
-            ):
-                self.logger.removeHandler(handler)
-        # Setup file handler with timestamp
+    def _setup_logging(self):
         log_file = os.path.join(
             os.path.expanduser(self.log_dir),
             f"Scanorhize_{datetime.now():%Y-%m-%d}.log",
         )
-
-        # Create log folder if does not exist        
-        log_dir = os.path.dirname(log_file)
-        os.makedirs(log_dir, exist_ok=True)
-
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        self.logger = logging.getLogger("MainLogger")
+        self.logger.setLevel(logging.DEBUG if self.log_level.upper() == "DEBUG" else logging.INFO)
         fh = logging.FileHandler(log_file)
-        formatter = logging.Formatter(
+        fh.setFormatter(logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
-        )
-        fh.setFormatter(formatter)
+        ))
         self.logger.addHandler(fh)
-
-        # Set final log level
-        log_level = logging.DEBUG if self.log_level.upper() == "DEBUG" else logging.INFO
-        self.logger.setLevel(log_level)
 
     def load_config(self):
         """Load config and update attributes dynamically"""
         if not os.path.exists(self.config_app_file):
-            self.logger.error("No file: %s", self.config_app_file)
-            return self
-
+            return
         try:
             with open(self.config_app_file, "r", encoding="utf-8") as openfile:
-                data = json.load(openfile)
-                # Update attributes from JSON, including any new ones
-                for key, value in data.items():
-                    if key != "logger":  # Skip logger to maintain logging setup
+                for key, value in json.load(openfile).items():
+                    if key != "logger":
                         setattr(self, key, value)
         except (FileNotFoundError, ValueError):
-            self.logger.error("Problem with config file: %s", self.config_app_file)
-
-        if self.log_level.upper() == "DEBUG":
-            logging.getLogger().setLevel(logging.DEBUG)
-        else:
-            logging.getLogger().setLevel(logging.INFO)
-
-        self.logger.info("Read configuration from: %s", self.config_app_file)
-        return self
-
-    def _setup_logging(self):
-        """Configure logging based on environment"""
-        log_level = logging.DEBUG if self.log_level.upper() == "DEBUG" else logging.INFO
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-        )
-        logging.info("Logging initialized at level: %s", self.log_level)
+            pass
 
     def json(self):
         """Convert object to JSON, excluding special attributes"""
