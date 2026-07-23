@@ -5,6 +5,7 @@ C'est le Hub qui synchronise les fichiers images et JSON sur le serveur
 """
 
 import os
+import re
 import sys
 from os import path
 from subprocess import run, SubprocessError, CalledProcessError, TimeoutExpired
@@ -292,7 +293,19 @@ def syncLogFiles():
         result = run(
             cmd, capture_output=True, universal_newlines=True, shell=True, check=True, timeout=180
         )
-        getLogger().info("%s", result.stdout)
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                m = re.match(r"upload: '([^']+)' -> '[^']+' \((.+?)\)(?: \[(\d+) of (\d+)\])?", line)
+                if m:
+                    filename = m.group(1).split("/")[-1]
+                    getLogger().info("  ↑ %s — %s [%s/%s]", filename, m.group(2), m.group(3), m.group(4))
+                else:
+                    getLogger().info("  %s", line)
+            except Exception:
+                getLogger().info("  %s", line)
         return 0
     except TimeoutExpired:
         getLogger().error("SyncLogFiles error: timed out after 3 minutes")
