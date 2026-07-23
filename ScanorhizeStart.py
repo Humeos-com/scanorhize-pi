@@ -7,6 +7,9 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 
 import sys
 import time
+
+time.sleep(5)  # Wait for wp5d to sync the RTC to the system clock before anything else
+
 import signal
 from ConfigApp import getLogger
 
@@ -76,11 +79,6 @@ args = parser.parse_args()
 if args.version:
     print(f"ScanorhizeStart.py version: {__version__}")
     sys.exit(0)
-
-# Etape 0 #############################################
-time.sleep(5) # Clock sync
-
-
 
 WITTYPI_TEST_FLAG = Path("wittypi_test_mode")
 
