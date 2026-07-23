@@ -320,20 +320,25 @@ def main():
 
     mode = get_startup_mode()  # "config", "default", or "newly_powered"
 
+    if mode == "default":
+        getLogger().info("======= DEFAULT MODE =======")
+    elif mode == "config":
+        getLogger().info("======= CONFIG MODE =======")
+    else:
+        getLogger().info("======= %s MODE =======", mode.upper())
+
+    #Set shutdown and wake-up dates
     setShutdownAndWakeUpDates()
 
     if mode == "default":
-        getLogger().info("======= DEFAULT MODE =======")
         takePictures()
 
     elif mode == "config":
-        getLogger().info("======= CONFIG MODE =======")
         launchServer()
         createRunConfigFile()
         initScanners()
 
     else:
-        getLogger().info("======= %s MODE =======", mode.upper())
         wakeup = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z")
         getLogger().warning("Unexpected startup reason — setting next wake-up in 1 day: %s", wakeup)
         SetNextStartDate(wakeup)
