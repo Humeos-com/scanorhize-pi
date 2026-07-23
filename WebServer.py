@@ -1165,7 +1165,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     reschedule_reason = "too far"
             if reschedule:
                 new_wakeup = now + timedelta(minutes=22)
-                set_startup_time(new_wakeup.day, new_wakeup.hour, new_wakeup.minute, 0)
+                set_startup_time(new_wakeup.day, new_wakeup.hour, new_wakeup.minute)
                 expected_str = f"{new_wakeup.day:02d} {new_wakeup.hour:02d}:{new_wakeup.minute:02d}:00"
                 readback_str = get_startup_time()
                 if readback_str == expected_str:
@@ -1204,7 +1204,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                     sd_reschedule_reason = "too far"
             if sd_reschedule:
                 new_shutdown = now + timedelta(minutes=20)
-                set_shutdown_time(new_shutdown.day, new_shutdown.hour, new_shutdown.minute, 0)
+                set_shutdown_time(new_shutdown.day, new_shutdown.hour, new_shutdown.minute)
                 sd_expected_str = f"{new_shutdown.day:02d} {new_shutdown.hour:02d}:{new_shutdown.minute:02d}:00"
                 sd_readback_str = get_shutdown_time()
                 if sd_readback_str == sd_expected_str:
@@ -1380,8 +1380,8 @@ def _run_test_impl(test_name: str, task_id: str = None):
             # Flag file presence tells the boot sequence to stay in test/config mode
             Path("wittypi_test_mode").write_text("")
 
-            set_shutdown_time(shutdown.day, shutdown.hour, shutdown.minute, 0)
-            set_startup_time(wakeup.day,   wakeup.hour,   wakeup.minute,   0)
+            set_shutdown_time(shutdown.day, shutdown.hour, shutdown.minute)
+            set_startup_time(wakeup.day,   wakeup.hour,   wakeup.minute)
 
             # Verify the values were actually stored in I2C registers
             shutdown_expected = f"{shutdown.day:02d} {shutdown.hour:02d}:{shutdown.minute:02d}:00"
@@ -1583,7 +1583,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
             from datetime import datetime, timedelta
             now = datetime.now()
             safety = now.replace(second=0, microsecond=0) + timedelta(minutes=20)
-            set_shutdown_time(safety.day, safety.hour, safety.minute, 0)
+            set_shutdown_time(safety.day, safety.hour, safety.minute)
 
             if flag.exists():
                 flag.unlink()
@@ -2112,7 +2112,7 @@ def set_wakeup():
     from datetime import datetime, timedelta
     target = datetime.now() + timedelta(minutes=int(minutes))
     try:
-        set_startup_time(target.day, target.hour, target.minute, 0)
+        set_startup_time(target.day, target.hour, target.minute)
     except Exception as e:
         return jsonify(ok=False, message=f"Failed to set wakeup time: {e}"), 500
     getLogger().info("Wakeup time set to %s via poweroff modal", target.strftime("%d %H:%M"))

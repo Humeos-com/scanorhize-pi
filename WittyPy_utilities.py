@@ -361,7 +361,7 @@ class WittyPi:
     def startup_reason_str(self) -> str:
         # Reason codes per WP5 firmware spec (reg 14 high nibble = startup reason)
         reasons = {
-            0x01: "WittyPi startup alarm",
+            0x01: "WittyPi wake-up alarm",
             0x02: "WittyPi shutdown alarm",
             0x03: "WittyPi button clicked",
             0x04: "WittyPi VIN drops (low voltage)",
@@ -1067,20 +1067,20 @@ def get_shutdown_time() -> str:
     return "00 00:00:00"
 
 
-def set_startup_time(date: int, hour: int, minute: int, second: int):
+def set_startup_time(date: int, hour: int, minute: int):
     """Set startup time using direct I2C access. Retries up to 5 times with readback verification."""
     getLogger().info("Set wake-up time")
-    
-    expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
+
+    expected = f"{date:02d} {hour:02d}:{minute:02d}:00"
     for attempt in range(100):
         try:
             if not is_WittyPi_5():
-                WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(second), purpose="set startup alarm seconds")
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM1, dec2bcd(0), purpose="set startup alarm seconds")
                 WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM1, dec2bcd(minute), purpose="set startup alarm minutes")
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM1, dec2bcd(hour), purpose="set startup alarm hours")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM1, dec2bcd(date), purpose="set startup alarm day")
             else:
-                WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, dec2bcd(second), purpose="set startup seconds (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_STARTUP_WP5, dec2bcd(0), purpose="set startup seconds (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_MINUTE_STARTUP_WP5, dec2bcd(minute), purpose="set startup minutes (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour), purpose="set startup hours (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date), purpose="set startup day (WP5)")
@@ -1134,24 +1134,24 @@ def SetNextStartDate(date):  # date en UTC!!
         getLogger().error("Error parsing date: %s", e)
 
     return set_startup_time(
-        components["day"], components["hour"], components["mins"], components["secs"]
+        components["day"], components["hour"], components["mins"]
     )
 
 
-def set_shutdown_time(date: int, hour: int, minute: int, second: int):
+def set_shutdown_time(date: int, hour: int, minute: int):
     """Set shutdown time using direct I2C access. Retries up to 5 times with readback verification."""
     getLogger().info("Set shutdown time")
 
-    expected = f"{date:02d} {hour:02d}:{minute:02d}:{second:02d}"
+    expected = f"{date:02d} {hour:02d}:{minute:02d}:00"
     for attempt in range(100):
         try:
             if not is_WittyPi_5():
-                WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(second), purpose="set shutdown alarm seconds")
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_ALARM2, dec2bcd(0), purpose="set shutdown alarm seconds")
                 WittyPi().i2c_write_byte(I2C_CONF_MINUTE_ALARM2, dec2bcd(minute), purpose="set shutdown alarm minutes")
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_ALARM2, dec2bcd(hour), purpose="set shutdown alarm hours")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_ALARM2, dec2bcd(date), purpose="set shutdown alarm day")
             else:
-                WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, dec2bcd(second), purpose="set shutdown seconds (WP5)")
+                WittyPi().i2c_write_byte(I2C_CONF_SECOND_SHUTDOWN_WP5, dec2bcd(0), purpose="set shutdown seconds (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_MINUTE_SHUTDOWN_WP5, dec2bcd(minute), purpose="set shutdown minutes (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_SHUTDOWN_WP5, dec2bcd(hour), purpose="set shutdown hours (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_SHUTDOWN_WP5, dec2bcd(date), purpose="set shutdown day (WP5)")
@@ -1196,7 +1196,7 @@ def setNextShutdownDate(date: str):
     except ValueError:
         date = "01 06 25 00"
     datew = date.split(" ")
-    return set_shutdown_time(int(datew[0]), int(datew[1]), int(datew[2]), int(datew[3]))
+    return set_shutdown_time(int(datew[0]), int(datew[1]), int(datew[2]))
 
 
 def clear_startup_time():
@@ -1526,9 +1526,9 @@ def _ensure_wakeup_in_future():
         wakeup = rtc_now + timedelta(hours=1)
         getLogger().warning(
             "    ↳ Wake-up %s is not 1min+ in the future, setting to +1h: %s (attempt %d, RTC: %s)",
-            startup_str, wakeup.strftime("%d %H:%M:%S"), attempt + 1, rtc_now
+            startup_str, wakeup.strftime("%d %H:%M:00"), attempt + 1, rtc_now
         )
-        set_startup_time(wakeup.day, wakeup.hour, wakeup.minute, wakeup.second)
+        set_startup_time(wakeup.day, wakeup.hour, wakeup.minute)
         time.sleep(1)
     getLogger().error("    ↳ Failed to set a future wake-up time after 100 attempts")
 
@@ -1585,9 +1585,9 @@ def _ensure_wakeup_after_shutdown(shutdown_dt: datetime):
         wakeup = shutdown_dt + timedelta(hours=1)
         getLogger().warning(
             "    ↳ Wake-up %s is not 1min+ after shutdown %s, setting to +1h: %s (attempt %d)",
-            startup_str, shutdown_dt, wakeup.strftime("%d %H:%M:%S"), attempt + 1
+            startup_str, shutdown_dt, wakeup.strftime("%d %H:%M:00"), attempt + 1
         )
-        set_startup_time(wakeup.day, wakeup.hour, wakeup.minute, wakeup.second)
+        set_startup_time(wakeup.day, wakeup.hour, wakeup.minute)
         time.sleep(1)
     getLogger().error("    ↳ Failed to set wake-up after shutdown after 100 attempts")
 
