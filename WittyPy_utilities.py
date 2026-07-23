@@ -1024,17 +1024,17 @@ def get_startup_time() -> str:
                 hour = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_HOUR_STARTUP_WP5) or 0)
                 date = bcd2dec(WittyPi().i2c_read_byte(I2C_CONF_DAY_STARTUP_WP5) or 0)
         except (OSError, IOError, ValueError, IndexError) as e:
-            getLogger().error("Error reading startup time (attempt %d/10): %s", attempt + 1, e)
+            getLogger().error("Error reading Wake-up time (attempt %d/10): %s", attempt + 1, e)
             time.sleep(1)
             continue
         if hour < 24 and minutes < 60 and sec < 60:
             return f"{date:02d} {hour:02d}:{minutes:02d}:{sec:02d}"
         getLogger().warning(
-            "Startup time has invalid values (attempt %d/10): %02d %02d:%02d:%02d",
+            "Wake-up time has invalid values (attempt %d/10): %02d %02d:%02d:%02d",
             attempt + 1, date, hour, minutes, sec,
         )
         time.sleep(1)
-    getLogger().error("Failed to read valid startup time after 10 attempts")
+    getLogger().error("Failed to read valid Wake-up time after 10 attempts")
     return "00 00:00:00"
 
 
@@ -1085,16 +1085,16 @@ def set_startup_time(date: int, hour: int, minute: int, second: int):
                 WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, dec2bcd(hour), purpose="set startup hours (WP5)")
                 WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, dec2bcd(date), purpose="set startup day (WP5)")
         except (OSError, IOError) as e:
-            getLogger().error("Error setting startup time (attempt %d/100): %s", attempt + 1, e)
+            getLogger().error("Error setting wake-up time (attempt %d/100): %s", attempt + 1, e)
             time.sleep(1)
             continue
         readback = get_startup_time()
         if readback == expected:
-            getLogger().info("    ↳ Startup time set: %s (attempt %d)", expected, attempt + 1)
+            getLogger().info("    ↳ Wake-up time set: %s (attempt %d)", expected, attempt + 1)
             return
-        getLogger().warning("    ↳ Startup time readback mismatch (attempt %d/100): expected %s got %s", attempt + 1, expected, readback)
+        getLogger().warning("    ↳ Wake-up time readback mismatch (attempt %d/100): expected %s got %s", attempt + 1, expected, readback)
         time.sleep(1)
-    getLogger().error("    ↳ Failed to set startup time to %s after 5 attempts", expected)
+    getLogger().error("    ↳ Failed to set wake-up time to %s after 5 attempts", expected)
 
 
 def SetNextStartDate(date):  # date en UTC!!
@@ -1213,7 +1213,7 @@ def clear_startup_time():
             WittyPi().i2c_write_byte(I2C_CONF_HOUR_STARTUP_WP5, 0x00, purpose="clear startup hours (WP5)")
             WittyPi().i2c_write_byte(I2C_CONF_DAY_STARTUP_WP5, 0x00, purpose="clear startup day (WP5)")
     except (OSError, IOError) as e:
-        getLogger().error("Error clearing startup time: %s", e)
+        getLogger().error("Error clearing wake-up time: %s", e)
 
 
 def clear_shutdown_time():
@@ -1486,7 +1486,7 @@ if __name__ == "__main__":
             print(f"Temperature: {get_temperature()}")
             print(f"Low Voltage Threshold: {get_low_voltage_threshold()}")
             print(f"Recovery Voltage Threshold: {get_recovery_voltage_threshold()}")
-            print(f"Startup Time: {get_startup_time()}")
+            print(f"Wake-up Time: {get_startup_time()}")
             print(f"Shutdown Time: {get_shutdown_time()}")
             print(f"RTC Timestamp: {get_rtc_timestamp()}")
     else:

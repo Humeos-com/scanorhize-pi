@@ -132,7 +132,7 @@ try:
 except RuntimeError as e:
     has_internet = False
     getLogger().error(
-        "No internet connectivity: %s, skipping SSH tunnel", e
+        "%s. Skipping SSH tunnel", e
     )
 
 getLogger().info("Launch Web app")
@@ -186,7 +186,7 @@ Temperature: {hub_info[4]:.1f}°C
 Over Temperature Action: {Hub.over_temperature_action}
 Over Temperature Point: {Hub.over_temperature_point}°C
 Get Shutdown Time: {get_shutdown_time()}
-Get Startup Time: {get_startup_time()}"""
+Get Wake-up Time: {get_startup_time()}"""
 
     if is_debug():
         hub_config += f"\nToken: {Hub.token}"
@@ -1179,7 +1179,7 @@ def _run_test_impl(test_name: str, task_id: str = None):
                         ok=False,
                         summary=f"{model} FAIL",
                         message=(
-                            f"\n  ⚠ Startup time was {reschedule_reason} and reschedule to "
+                            f"\n  ⚠ Wake-up time was {reschedule_reason} and reschedule to "
                             f"{new_wakeup.strftime('%H:%M')} failed.\n"
                             f"  → Expected: {expected_str}\n"
                             f"  → Readback: {readback_str}"
