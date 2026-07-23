@@ -170,11 +170,9 @@ def updateDataFromAndToServer(configMode):
         hub_info[3],
         hub_info[4],
     )
-    
     if not getOffline():
         # Transfert des données
         try:
-
             # Teste la connectivité
             check_connectivity()
             has_internet = True

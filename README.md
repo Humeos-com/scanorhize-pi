@@ -2,15 +2,15 @@
 
 ## Description
 Dans le projet Scanorhize, les Hubs sont les boîtiers qui contrôlent les scanners et qui transmettent les images à la plateforme Web.<br/>
-Ils sont composés d'un Raspberry Pi, d'une une carte Witty Pi pour l'horloge temps réel, d'une carte relais et d'une carte Big 7 pour avoir des ports USB additionnels.<br/>
+Ils sont composés d'un Raspberry Pi, d'une carte WittyPi 5 pour la gestion de l'alimentation et l'horloge temps réel, d'une carte relais et d'une carte Big 7 pour avoir des ports USB additionnels.<br/>
 La contrainte essentielle des Hubs est la gestion de l'alimentation qui doit être minimale afin qu'ils puissent fonctionner en autonomie le plus longtemps possible.<br/>
-A cette fin on utilise une carte horloge temps réel, la carte Witty Pi, qui est programmée pour des réveils périodiques. Au réveil, le Raspberry démarre, sans alimenter aucun port USB des scanners ni de la clé 4G pour la communication Internet.<br/>
-Le Raspberry va faire ses acquisition en allumant les scanners un par un grâce à la carte relai. Une fois les acquisitions terminées, le Raspberry allume la clé 4G pour envoyer des données et récupérer certains éléments selon la configuration du Hub.
+A cette fin on utilise la carte WittyPi 5, qui est programmée pour des réveils périodiques. Au réveil, le Raspberry démarre, sans alimenter aucun port USB des scanners ni de la clé 4G pour la communication Internet.<br/>
+Le Raspberry fait ses acquisitions en allumant les scanners un par un grâce à la carte relai. Une fois les acquisitions terminées, le Raspberry allume la clé 4G pour envoyer des données et récupérer certains éléments selon la configuration du Hub.
 
 
 ## Premiers pas
 La première étape consiste à mettre le Hub en mode configuration afin de contrôler ou modifier son paramétrage. Lorsque le Hub est éteint, il faut appuyer sur le bouton qui se trouve près des connecteurs USB, pour démarrer le Hub en mode configuration.<br/>
-Le Hub va essayer de détecter les scanners qui sont branchés sur ses ports USB, puis va lancer une application Web pour sa configuration. Cette application est accessible par le Wifi "Scanorhize" sur l'Url: http://192.168.1.42:8080/ <br/>
+Le Hub va essayer de détecter les scanners qui sont branchés sur ses ports USB, puis va lancer une application Web pour sa configuration. Cette application est accessible par le Wifi "Scanorhize" sur l'URL: http://192.168.4.1:8080/<br/>
 Saisir les périodes de réveils pour chacun des scanners, enregistrer les configurations sur le serveur.<br/>
 Une fois tous les paramètres saisis, les scanners et le Hub en place, on peut aller sur le menu "Hub", pour lancer une acquisition afin de s'assurer que tout fonctionne bien.<br/>
 Enfin, il faut éteindre le Hub afin de préserver la batterie. Cliquer sur le bouton rouge "Power off". On ne doit plus voir aucune led allumée sur le Hub après quelques secondes.<br/>
@@ -18,13 +18,17 @@ Par la suite, le Hub va se réveiller selon sa programmation, faire des acquisit
 
 
 ## Détail du fonctionnement
-Au démarrage du Raspberry, on lance la commande `/home/pi/Scanorhize/StartScanorhize.sh`<br/>
-Ce shell lance ScanorhizeStart.py qui gère les heures de réveil et d'endormissement du Hub et qui selon le mode de démarrage (appui sur le bouton ON/OFF ou réveil programmé) va lancer l'acquisition des images par le scanner ou le serveur Web en mode configuration.<br/>
-Le serveur Flask est lancé par la commande WebServer.py et l'acquisition par TakePictures.py
+Au démarrage du Raspberry, le service systemd `scanorhize-startup` lance `ScanorhizeStart.py`.<br/>
+Ce programme gère les heures de réveil et d'endormissement du Hub et, selon le mode de démarrage (appui sur le bouton ON/OFF ou réveil programmé), lance l'acquisition des images ou le serveur Web en mode configuration.<br/>
+Le serveur Flask est lancé par `WebServer.py` et l'acquisition par `TakePictures.py`.
+
+Au démarrage, le programme attend 5 secondes pour laisser le service `wp5d` synchroniser l'horloge RTC de la WittyPi 5 avec l'horloge système avant d'initialiser les logs.
+
+Les logs sont écrits dans `Log/Scanorhize_<date>.log`.
 
 
 #### Mode Configuration
-Le fait d'allumer le boîtier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte Witty Pi.<br/>
+Le fait d'allumer le boîtier avec le bouton ON/OFF active le mode configuration automatiquement. On détecte au démarrage du Raspberry qu'il a été allumé par appui sur le bouton d'allumage de la carte WittyPi 5.<br/>
 En mode configuration, le relai de chaque scanner s'allume afin de détecter les scanners branchés sur le Hub. En dernier lieu, c'est le relai de la clé 4G qui s'allume.
 
 > [!WARNING]
@@ -47,28 +51,33 @@ Cette méthode permet de faire évoluer les composants, les configurations et as
 Ansible permet également la mise à jour d'un Hub sans recopier toute la carte SD. On conserve ainsi la configuration des scanners et les logs tout en faisant évoluer le système.
 A la base, on part d'une image Debian Bookworm (raspios-bookworm-armhf-lite) sur la SD Card du Raspberry, en 32 bits pour les drivers Epson.
 
+### Déploiement rapide (depuis le PC de développement)
+```bash
+scp *.py pi@192.168.4.1:/home/pi/Scanorhize/ && scp templates/*.html pi@192.168.4.1:/home/pi/Scanorhize/templates/ && ssh pi@192.168.4.1 "sudo systemctl restart scanorhize-startup"
+```
+
 
 ## Configuration matérielle
 
 ### Composants matériels
 Les programmes gèrent différentes configurations matérielles parmi les suivantes:
 - Raspberry Pi 4 ou Pi 5 en Debian 12 32 bits pour les drivers Epson ou 64 bits si on n'utilise que des scanners Canon
-- Carte RTC WittyPi 3, 4 ou 4L3V7
-- carte d'extension de ports USB UUGEAR Big 7
+- Carte RTC WittyPi 5 (gestion alimentation + horloge temps réel, service `wp5d`)
+- Carte d'extension de ports USB UUGEAR Big 7
 - Carte relai RPi Relay Board ou SBComponent PiRelay-V2
+- Chargeur solaire Victron BlueSolar MPPT 75/10 (optionnel, via câble VE.Direct USB)
+- Modem Quectel EC25/EG25-G (optionnel, via AT commands sur port série)
 
-Lorsqu'un Hub est endormi, sa consommation est de l'ordre de 1mA (c'est la consommation de la carte Witty Pi). Selon le modèle de carte Witty Pi on a, pour le standby mode:  
-- Witty Pi 4: 0,5 mA
-- Witty Pi 4 L3V7: 0,3 mA
-On obtient ces valeurs quand seule la batterie est branchée. Si on est sur l'alimentation 5V (powerbank ou alimentation externe) on passe à 1mA 
-
-> [!NOTE]
-> Le Raspberry Pi 5 a dispose d'une horloge temps réel. On peut donc l'activer, à condition de ne pas utiliser le réveil profond (`POWER_OFF_ON_HALT=1`). Mais dans ce cas la consommation du Raspberry est de l'ordre de 1W (200mA), ce qui rédhibitoire pour notre projet.  
+Lorsqu'un Hub est endormi, sa consommation est de l'ordre de 1mA (c'est la consommation de la carte WittyPi). Pour la WittyPi 5, la consommation en standby est de 0,3 mA environ.
+On obtient ces valeurs quand seule la batterie est branchée. Si on est sur l'alimentation 5V (powerbank ou alimentation externe) on passe à 1mA.
 
 > [!NOTE]
-> La carte UUGEAR Mega 4 dispose de 4 ports PPPS dont l'alimentation peut être gérée par le bus USB (Per-Port Power Switching). Malheureusement, pour que le driver de la carte fonctionne, il faut que les ports soient allumés au boot du Raspberry (mode impossible à modifier selon UUGEAR). L'appel de courant au démarrage des 3 scanners et de la clé 4G est alors beaucoup trop élevé pour les batteries, donc le Raspberry ne démarre pas. 
+> Le Raspberry Pi 5 dispose d'une horloge temps réel. On peut donc l'activer, à condition de ne pas utiliser le réveil profond (`POWER_OFF_ON_HALT=1`). Mais dans ce cas la consommation du Raspberry est de l'ordre de 1W (200mA), ce qui est rédhibitoire pour notre projet.
 
-La carte relai permet de couper l'alimentation des ports USB de la carte Big 7. Ainsi, au démarrage du Raspberry, aucun port USB de la carte Big 7 n'est alimenté. Le Raspberry démarre sans aucun périphérique, hormis sa carte SD externe, et la consommation est minimal au boot. La valeurs de consommation restent sous 2A en pic et arrivent à 0,8/0,9A pour un Raspberry Pi 4 et 0,6/0,7A pour un Raspberry Pi 5 sans charge.
+> [!NOTE]
+> La carte UUGEAR Mega 4 dispose de 4 ports PPPS dont l'alimentation peut être gérée par le bus USB (Per-Port Power Switching). Malheureusement, pour que le driver de la carte fonctionne, il faut que les ports soient allumés au boot du Raspberry (mode impossible à modifier selon UUGEAR). L'appel de courant au démarrage des 3 scanners et de la clé 4G est alors beaucoup trop élevé pour les batteries, donc le Raspberry ne démarre pas.
+
+La carte relai permet de couper l'alimentation des ports USB de la carte Big 7. Ainsi, au démarrage du Raspberry, aucun port USB de la carte Big 7 n'est alimenté. Le Raspberry démarre sans aucun périphérique, hormis sa carte SD externe, et la consommation est minimale au boot. Les valeurs de consommation restent sous 2A en pic et arrivent à 0,8/0,9A pour un Raspberry Pi 4 et 0,6/0,7A pour un Raspberry Pi 5 sans charge.
 Lorsqu'on active les relais 1 par 1, on ne dépasse jamais 2A en pic.
 
 
@@ -141,9 +150,16 @@ Pour activer le mode configuration il faut appuyer sur le bouton lorsque le Hub 
 
 #### Interface Web
 Le mode configuration permet de configurer le Hub directement à travers une interface Web.
-Pour se connecter au Raspberry quand il est en  mode configuration, il faut se connecter à son Wifi: Scanorhize.
+Pour se connecter au Raspberry quand il est en mode configuration, il faut se connecter à son Wifi: Scanorhize.
 On accède à l'interface d'Administration locale du Hub par l'URL:<br>
-http://192.168.1.42:8080
+http://192.168.4.1:8080
+
+Pages disponibles:
+- `/` — Accueil, état du Hub
+- `/Hub` — Configuration du Hub (réveil, extinction, paramètres)
+- `/Scanner/<n>` — Configuration de chaque scanner
+- `/App` — Configuration de l'application
+- `/Tests` — Tests de connectivité, horloge, cycle on/off WittyPi, logs en temps réel
 
 #### Accès SSH
 On peut aussi accéder au Raspberry depuis le serveur `backend-prod.humeos.com` si on connaît le port utilisé par le Raspberry. Le port est affiché sur l'interface Web en haut à droite dans toutes les pages. Si on n'a pas accès à l'interface Web, on peut découvrir le port avec la commande suivante sur le serveur `backend-prod.humeos.com`:
@@ -158,7 +174,7 @@ Pour se connecter au Raspberry, on peut lancer un SSH de la forme:
 ```
 debian@d2-2-gra11:~$ ssh pi@localhost -p 2269
 ```
-Les clés d'accès sont configurées sur le compte de l'utilisateur debian sur le serveur backend-prod.humeos.com et permettent d’accéder au Hub sans mot de passe.
+Les clés d'accès sont configurées sur le compte de l'utilisateur debian sur le serveur backend-prod.humeos.com et permettent d'accéder au Hub sans mot de passe.
 Par ailleurs, comme les clés des Raspberry Pi sont différentes, afin d'éviter le message d'alerte du "Man in the middle", on ignore volontairement leurs clés avec le fichier de configuration du client SSH:
 ```
 debian@d2-2-gra11:~$ cat .ssh/config 
@@ -191,8 +207,8 @@ Les résolutions possible avec le Hub, sont 300, 600, 1200, 2400.
 La résolution 4800 n'a pas été retenue car produisant des images trop lourdes.  
 En 2400 dpi, une image au format TIFF pèse 1,6Go, l'image au format JP2 avec une compression de facteur 10 pèse 160Mo.  
 Il n'est pas possible en pratique de transférer de tels fichiers avec une clé 4G.  
-Au delà de 600 dpi,le mode de fonctionnement recommandé et de stocker les JP2 sur la SD Card USB et d'envoyer les vignettes pour avoir un retour sur le fonctionnement du système.  
-A noter que l'image TIFF est stockée dans un RAM disque de 2Go, d'où l'impossibilité d'utiliser la résolution 4800 dpi qui ne pourrait pas y être stockée. La conversion TIFF vers JP2 est effectuée dans le RAM disque par gdal_translate. La vignette est créé à partir du JP2.  
+Au delà de 600 dpi, le mode de fonctionnement recommandé est de stocker les JP2 sur la SD Card USB et d'envoyer les vignettes pour avoir un retour sur le fonctionnement du système.  
+A noter que l'image TIFF est stockée dans un RAM disque de 2Go, d'où l'impossibilité d'utiliser la résolution 4800 dpi qui ne pourrait pas y être stockée. La conversion TIFF vers JP2 est effectuée dans le RAM disque par gdal_translate. La vignette est créée à partir du JP2.  
 Une fois le fichier JP2 obtenu, il est copié avec sa vignette dans la SD Card USB.
 
 Tableau indiquant le nombre d'images qu'on peut stocker selon la résolution et l'espace de stockage disponible.  
@@ -222,14 +238,14 @@ On utilise un câble USB avec les fils data pour connecter la clé. La clé cré
 usb0 contient une IP fournie par la clé dans le même subnet que wlan0 pour la Wifi. Néanmoins les métriques des 2 interfaces sont différentes et la priorité est donnée à usb0. Dans ce mode, le Hub utilise le port USB pour communiquer avec l'Internet, ce qui est beaucoup plus efficace que de passer par le Wifi de la clé.  
 Comme les 2 interfaces du hub sont dans le même subnet, on ne voit pas le hub à travers le Wifi. On ne peut donc pas configurer le Hub à travers son interface Web par le Wifi.  
 Afin de contourner ce problème, en mode configuration on désactive l'interface USB. Le Hub communique ainsi à travers le Wifi. C'est bien l'objectif souhaité.  
-Sauf ce certaines clés Wifi/4G, et en particulier la clé Zunate LTE 4G (à base de Qualcomm), ne font pas "switch" entre les équipements qui y sont connectés !  
+Sauf que certaines clés Wifi/4G, et en particulier la clé Zunate LTE 4G (à base de Qualcomm), ne font pas "switch" entre les équipements qui y sont connectés !  
 Donc il n'y a pas de communication entre le Hub et un téléphone mobile qui seraient sur le même Wifi Scanorhize !  
 On ne peut donc pas configurer le Hub dans l'état à partir d'un téléphone.  
-La solution mise en place est que le Hub fasse un "nmap" pour découvrir les équipements connectés et en particulier les téléphones et les ordinateur, puis qu'il lance un ping sur ces IP afin de fournir ses informations ARP. Le téléphone connaît ainsi l'adresse ARP et l'IP du Hub et peut donc communiquer avec lui !  
+La solution mise en place est que le Hub fasse un "nmap" pour découvrir les équipements connectés et en particulier les téléphones et les ordinateurs, puis qu'il lance un ping sur ces IP afin de fournir ses informations ARP. Le téléphone connaît ainsi l'adresse ARP et l'IP du Hub et peut donc communiquer avec lui !  
 Le programme `/usr/local/bin/scanorhize-watch.sh` est chargé de balayer la plage `192.168.1.0/24` et de faire les ping sur les IP alive.
 
 1. Fonctionnement futur.  
-On pourrait très bien n'utiliser que des clé 4G sans Wifi, c'est typiquement le fonctionnement des cartes LTE avec antennes pour Raspberry, comme la carte Clipper HAT Mini (LTE 4G pour Raspberry Pi PIM717), qui ne fait que de la 4G.  
+On pourrait très bien n'utiliser que des clés 4G sans Wifi, c'est typiquement le fonctionnement des cartes LTE avec antennes pour Raspberry, comme la carte Clipper HAT Mini (LTE 4G pour Raspberry Pi PIM717), qui ne fait que de la 4G.  
 Dans ce cas, on activerait l'AP du Raspberry en mode configuration uniquement.  
 Ca permet de limiter la consommation et d'autre part, on élimine le passage du Hub par le Wifi de la clé et enfin, on peut supposer que ces cartes ont de meilleurs performances sur la 4G.
 
@@ -259,15 +275,15 @@ Les causes les plus courantes sont :
 ### Diagnostics
 
 #### Les leds
-- Lorsque le bloc de batteries est en charge par la powerbank, la led bleue s'allume de manière fixe sur la carte Witty Pi
-- Lorsque la led bleue de la carte Witty Pi clignote, c'est que la batterie est déconnectée
-- Lorsque la led verte de la carte Witty Pi est allumée, c'est que le 5V est branché (powerbank ou alimentation externe)
-- La diode blanche à coté du bouton de la carte Witty Pi, clignote lorsque le Hub est endormi.
+- Lorsque le bloc de batteries est en charge par la powerbank, la led bleue s'allume de manière fixe sur la carte WittyPi
+- Lorsque la led bleue de la carte WittyPi clignote, c'est que la batterie est déconnectée
+- Lorsque la led verte de la carte WittyPi est allumée, c'est que le 5V est branché (powerbank ou alimentation externe)
+- La diode blanche à coté du bouton de la carte WittyPi, clignote lorsque le Hub est endormi.
 - Lorsque le Hub est réveillé, on voit des led rouges sur les cartes Relais, Raspberry et Big 7. La led verte sur le Raspberry indique les lectures/écritures sur le stockage.
 - La led de la clé 4G est verte lorsqu'elle est connectée à l'Internet
 - Si les voyants du Hub restent rouges mais qu'il ne se passe rien ou que le Hub s'éteint quelques secondes après l'allumage, c'est qu'il n'a plus assez de batterie. Pour forcer l'extinction du Hub, appuyer sur le bouton plus de 10 secondes.
 - Si on ne voit que les 3 leds rouges d'alimentation, c'est que le Hub est sous tension mais que le Raspberry ne fonctionne pas ou qu'il est planté par un arrêt du programme. S'il ne répond pas sur le réseau, il faut forcer l'arrêt en appuyant plus de 10 s sur le bouton.  
-Si le Hub répond sur le réseau, il faut regarder la log Log/ScanorhizeStart.log qui doit détailler l'incident.
+Si le Hub répond sur le réseau, consulter le log `Log/Scanorhize_<date>.log` qui doit détailler l'incident.
 - Si on voit les leds rouges et la led verte fixes dans les 10 secondes suivant le démarrage, c'est probablement un kernel panic.
 
 #### La connectivité
@@ -276,18 +292,30 @@ Si le Hub répond sur le réseau, il faut regarder la log Log/ScanorhizeStart.lo
 `$ nmap -sn 192.168.1.0/24`  
 ou mieux, si on a un accès sudo:  
 `$ sudo nmap -sP 192.168.1.0/24`  
-qui affiche des informations supplémentaires comme le propriétaire de la MAC Address. A noter que pour le Raspberry ci dessous, la MAC Address Wifi (wlan0) est égale à la MAC Address eth0 + 1. Dans le cas ce dessous, le nom du Hub serait: `hub-2ccf676a4d5f`
+qui affiche des informations supplémentaires comme le propriétaire de la MAC Address. A noter que pour le Raspberry ci dessous, la MAC Address Wifi (wlan0) est égale à la MAC Address eth0 + 1. Dans le cas ci dessous, le nom du Hub serait: `hub-2ccf676a4d5f`
 ```
-Nmap scan report for 192.168.1.42
+Nmap scan report for 192.168.4.1
 Host is up (3.31s latency).
 MAC Address: 2C:CF:67:6A:4D:60 (Raspberry Pi (Trading))
 ```
 - Un autre outil, sur les mobiles Android permet d'avoir les matériels connectés: Network Scanner
 
+#### La page Tests
+La page `/Tests` de l'interface Web permet de diagnostiquer le Hub sans SSH:
+- **Internet** — teste la connectivité Internet
+- **S3** — teste l'accès au bucket S3
+- **SSH** — vérifie le tunnel SSH vers le serveur
+- **Scanner config** — vérifie les fichiers de configuration des scanners
+- **On/Off WittyPi** — cycle complet extinction/réveil pour valider la programmation de la WittyPi, avec vérification du décalage d'horloge PC/Pi
+- **Logs** — visualisation des logs en temps réel avec filtrage par date
+
 #### La synchronisation d'un Hub
-Si on débranche la batterie et l'alimentation d'un Hub, il perd l'heure. Lorsque la désynchronisation est importante l'utilitaire s3cmd refuse de fonctionner. On ne peut donc par recevoir les images.  
+Si on débranche la batterie et l'alimentation d'un Hub, il perd l'heure. Lorsque la désynchronisation est importante l'utilitaire s3cmd refuse de fonctionner. On ne peut donc pas recevoir les images.  
 Il faut absolument avoir un Hub synchronisé pour que les programmes fonctionnent.  
 La seule manière pour qu'un Hub se synchronise est qu'il puisse se connecter à Internet. Lorsqu'on met le Hub en mode configuration et qu'il y a de la connectivité, il va se synchroniser avec la commande `/usr/local/bin/network-timesync.sh`. En fait cette commande est lancée par NetworkManager lorsqu'une interface réseau se met à l'état "up".
+
+> [!NOTE]
+> La WittyPi 5 maintient l'heure via son RTC même sans alimentation. Au démarrage, le service `wp5d` synchronise l'horloge système depuis le RTC en environ 1 seconde. Le programme attend donc 5 secondes au démarrage avant d'initialiser les logs pour garantir la bonne date dans les noms de fichiers.
 
 
 
