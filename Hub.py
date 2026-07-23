@@ -365,11 +365,16 @@ def getTokens():
     # Get list of scanner serials
     scanner_serials = listScannerSerials()
 
-    # Create dictionary with port entries dynamically
+    # Create dictionary with port entries dynamically (skip empty serials)
     serial_dict = {}
     num_scan = 0
     for num_scan, serial in enumerate(scanner_serials, 1):
-        serial_dict[f"port{num_scan}"] = serial
+        if serial:
+            serial_dict[f"port{num_scan}"] = serial
+
+    if not serial_dict:
+        getLogger().info("getTokens: no scanner serials found, skipping")
+        return 0
 
     Hub_ = HubData()
     json_data = {"macAddress": Hub_.macAddress, "serialNumbers": serial_dict}
