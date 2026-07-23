@@ -7,7 +7,7 @@ C'est le Hub qui synchronise les fichiers images et JSON sur le serveur
 import os
 import sys
 from os import path
-from subprocess import run, SubprocessError, CalledProcessError
+from subprocess import run, SubprocessError, CalledProcessError, TimeoutExpired
 import json
 import random
 import argparse
@@ -212,9 +212,13 @@ def getTodo():
         hub_id = getHubId()
         cmd = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/todo.sh ../todo.sh"
         getLogger().info("Download todo.sh from s3")
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=False
-        )
+        try:
+            result = run(
+                cmd, capture_output=True, universal_newlines=True, shell=True, check=False, timeout=300
+            )
+        except TimeoutExpired:
+            getLogger().error("Failed to download todo.sh: timed out after 5 minutes")
+            return 1
         if result.returncode != 0:
             getLogger().error(
                 "Failed to download todo.sh: return code: %s, %s",
@@ -275,36 +279,6 @@ def remove_image_files(folder: str, thumbnails_only: bool = False):
                     getLogger().error("Error removing file %s: %s", file_path, e)
 
 
-def syncImageFiles(hub_: HubData):
-    """Synchronise les fichiers images et JSON sur le serveur"""
-    src = path.join(getUsbDir(), hub_.projectId)
-
-    # Build s3cmd command with optional filters for thumbnails only mode
-    if hub_.send_thumbnails_only:
-        # Only sync thumbnails (no JP2, no JSON)
-        # JSON files stay with their JP2 on USB to maintain data consistency
-        cmd = (
-            f"s3cmd --include '*thumb*' --exclude '*' "
-            f"--no-preserve --no-progress sync {src} {getS3Bucket()}"
-        )
-        getLogger().warning("Syncing thumbnails only (send_thumbnails_only=True)")
-    else:
-        # Sync all files (default behavior)
-        cmd = f"s3cmd --no-preserve --no-progress sync {src} {getS3Bucket()}"
-        getLogger().info("Syncing all files (send_thumbnails_only=False)")
-
-
-    try:
-        result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
-        )
-        getLogger().info("SyncImageFiles from %s: %s", src, result.stdout)
-        # Remove only what was sent: thumbnails only or all files
-        remove_image_files(src, thumbnails_only=hub_.send_thumbnails_only)
-    except (SubprocessError, CalledProcessError) as e:
-        getLogger().error("SyncImageFiles from %s: %s", src, e)
-
-
 def syncLogFiles():
     """Synchronise les fichiers de logs sur S3"""
     log_dir = getLogDir()
@@ -312,14 +286,17 @@ def syncLogFiles():
     s3_log_path = f"s3://hubs/hub-{hub_id}/home/pi/Scanorhize/"
 
     cmd = f"s3cmd --no-preserve --no-progress sync {log_dir} {s3_log_path}"
-    getLogger().info("Syncing log files: %s", cmd)
+    getLogger().info("Syncing log files to %s", s3_log_path)
 
     try:
         result = run(
-            cmd, capture_output=True, universal_newlines=True, shell=True, check=True
+            cmd, capture_output=True, universal_newlines=True, shell=True, check=True, timeout=180
         )
-        getLogger().info("SyncLogFiles: %s", result.stdout)
+        getLogger().info("%s", result.stdout)
         return 0
+    except TimeoutExpired:
+        getLogger().error("SyncLogFiles error: timed out after 3 minutes")
+        return 1
     except (SubprocessError, CalledProcessError) as e:
         getLogger().error("SyncLogFiles error: %s", e)
         return 1
@@ -448,9 +425,13 @@ def ReadScannerConfigFromServer(ScannerObj: ScannerData):
     hub_id = getHubId()
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json {getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().info("Read scanner config from server")
-    result = run(
-        cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
+    try:
+        result = run(
+            cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False, timeout=300
+        )
+    except TimeoutExpired:
+        getLogger().error("ReadScannerConfigFromServer: timed out after 5 minutes")
+        return 1
 
     if result.returncode != 0:
         getLogger().error(
@@ -468,9 +449,13 @@ def SendScannerConfigToServer(ScannerObj: ScannerData):
     hub_id = getHubId()
     cmdWrite = f"s3cmd --no-preserve sync {getConfigDir()}/{ScannerObj.ScannerName}.json s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigDir()}/{ScannerObj.ScannerName}.json"
     getLogger().info("Send scanner config to server")
-    result = run(
-        cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
+    try:
+        result = run(
+            cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False, timeout=300
+        )
+    except TimeoutExpired:
+        getLogger().error("SendScannerConfigToServer: timed out after 5 minutes")
+        return 1
 
     if result.returncode != 0:
         getLogger().error(
@@ -488,9 +473,13 @@ def ReadHubConfigFromServer():
     hub_id = getHubId()
     cmdRead = f"s3cmd --no-preserve sync s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} {getConfigHubFile()}"
     getLogger().info("Read hub config from server")
-    result = run(
-        cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
+    try:
+        result = run(
+            cmdRead, capture_output=True, universal_newlines=True, shell=True, check=False, timeout=300
+        )
+    except TimeoutExpired:
+        getLogger().error("ReadHubConfigFromServer: timed out after 5 minutes")
+        return 1
 
     if result.returncode != 0:
         getLogger().error(
@@ -508,9 +497,13 @@ def SendHubConfigToServer():
     hub_id = getHubId()
     cmdWrite = f"s3cmd --no-preserve sync {getConfigHubFile()} s3://hubs/hub-{hub_id}/home/pi/Scanorhize/{getConfigHubFile()} "
     getLogger().info("Send hub config to server")
-    result = run(
-        cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False
-    )
+    try:
+        result = run(
+            cmdWrite, capture_output=True, universal_newlines=True, shell=True, check=False, timeout=300
+        )
+    except TimeoutExpired:
+        getLogger().error("SendHubConfigToServer: timed out after 5 minutes")
+        return 1
 
     if result.returncode != 0:
         getLogger().error(
@@ -712,7 +705,8 @@ if __name__ == "__main__":
 
     # pylint: disable=duplicate-code
     getTokens()
-    # syncImageFiles()
+
+
     Hub = HubData()
     print(f"macAddress: {Hub.macAddress}, model: {Hub.model}, ssh_port: {Hub.ssh_port}")
     Hub.read_config()
