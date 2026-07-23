@@ -19,7 +19,12 @@ Par la suite, le Hub va se réveiller selon sa programmation, faire des acquisit
 
 ## Détail du fonctionnement
 Au démarrage du Raspberry, le service systemd `scanorhize-startup` lance `ScanorhizeStart.py`.<br/>
-Ce programme gère les heures de réveil et d'endormissement du Hub et, selon le mode de démarrage (appui sur le bouton ON/OFF ou réveil programmé), lance l'acquisition des images ou le serveur Web en mode configuration.<br/>
+Ce programme lit la raison du démarrage depuis la carte WittyPi 5 (via `get_startup_mode()`) et choisit l'un des trois modes suivants :
+
+- **Mode nominal** (`default`) — réveil programmé par alarme WittyPi : lance les acquisitions puis s'éteint.
+- **Mode configuration** (`config`) — bouton ON/OFF pressé, ou aucun scanner détecté sur les GPIO : lance le serveur Web.
+- **Mode inattendu** (`else`) — toute autre raison (ex. première mise sous tension) : programme le prochain réveil dans 24h et s'éteint sans acquisition ni serveur.
+
 Le serveur Flask est lancé par `WebServer.py` et l'acquisition par `TakePictures.py`.
 
 Au démarrage, le programme attend 5 secondes pour laisser le service `wp5d` synchroniser l'horloge RTC de la WittyPi 5 avec l'horloge système avant d'initialiser les logs.
@@ -201,6 +206,9 @@ $
 
 ### Mode nominal
 En mode nominal, le Hub se réveille, lance les acquisitions une par une, allume sa clé 4G, envoie son état, envoie ses images, supprime ses images localement, met à jour son prochain réveil et s'endort.<br/>
+
+### Mode inattendu
+Si le Hub démarre pour une raison non reconnue (par exemple une première mise sous tension après installation), `get_startup_mode()` retourne la chaîne de raison brute de la WittyPi 5. Le programme programme alors un réveil dans 24h via `SetNextStartDate()` et s'éteint immédiatement, sans lancer d'acquisition ni de serveur Web. Ce comportement évite de rester allumé indéfiniment dans un état indéterminé.
 
 ### A propos des résolutions et des tailles d'images
 Les résolutions possible avec le Hub, sont 300, 600, 1200, 2400.  
