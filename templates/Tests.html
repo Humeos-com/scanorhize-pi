@@ -127,6 +127,7 @@
                 <button class="btn btn-secondary btn-sm" onclick="toggleAutoRefresh()" id="auto-refresh-btn">Auto-refresh: OFF</button>
                 <span id="log-status" style="font-size:0.8rem; color:#888; margin-left:auto;"></span>
             </div>
+            <div id="log-sticky-header" style="display:none; background:#1a2a1a; color:#6fcf6f; font-size:0.78rem; padding:4px 12px; border-bottom:1px solid #2a4a2a; flex-shrink:0; font-family:monospace; white-space:pre-wrap;"></div>
             <pre id="log-output"
                  class="bg-dark p-3 mb-0"
                  style="flex:1; min-height:0; overflow-y:auto; white-space:pre-wrap; color:#ccc; font-size:0.78rem; margin:0;"></pre>
@@ -932,6 +933,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.classList.replace('btn-secondary', 'btn-success');
 });
 
+let _lastLogDate = null;
+let _logScrollHandler = null;
 async function loadLogs() {
     const date  = document.getElementById('log-date-select').value;
     const lines = document.getElementById('log-lines-select').value;
@@ -950,21 +953,54 @@ async function loadLogs() {
             `<option value="${d}" ${d === current ? 'selected' : ''}>${d}</option>`
         ).join('');
 
+        const rawLines = (data.content || '').split('\n');
+        const stickyEl = document.getElementById('log-sticky-header');
+
         const out = document.getElementById('log-output');
-        const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 32;
-        out.innerHTML = (data.content || '(empty)').split('\n').map(line => {
+        const dateChanged = _lastLogDate !== null && _lastLogDate !== data.date;
+        const atBottom = dateChanged || out.scrollHeight - out.scrollTop - out.clientHeight < 32;
+        _lastLogDate = data.date;
+
+        let startBlockIndices = [];
+        out.innerHTML = rawLines.map((line, i) => {
             const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             if (/\|\s*ERROR\s*\|/.test(line))              return `<span style="color:#ff6b6b;">${escaped}</span>`;
             if (/\|\s*WARNING\s*\|/.test(line))            return `<span style="color:#ffa94d;">${escaped}</span>`;
-            if (/={3,}.*START.*={3,}/.test(line))          return `<span style="background:#1a4a1a;color:#6fcf6f;font-weight:bold;">${escaped}</span>`;
+            if (/={3,}.*START.*={3,}/.test(line))          { startBlockIndices.push(i); return `<span data-start="${i}" style="background:#1a4a1a;color:#6fcf6f;font-weight:bold;">${escaped}</span>`; }
             if (/={3,}.*CONFIG MODE.*={3,}/.test(line))    return `<span style="background:#1a2a4a;color:#6fb0ff;font-weight:bold;">${escaped}</span>`;
             if (/={3,}.*DEFAULT MODE.*={3,}/.test(line))   return `<span style="background:#2a2a4a;color:#b06fff;font-weight:bold;">${escaped}</span>`;
             if (/={3,}.*POWER OFF.*={3,}/.test(line))      return `<span style="background:#4a1a1a;color:#ff6b6b;font-weight:bold;">${escaped}</span>`;
             if (/SIGTERM received/.test(line))             return `<span style="background:#4a3a1a;color:#ffcc66;font-weight:bold;">${escaped}</span>`;
             if (/POWERING OFF/.test(line))                 return `<span style="background:#4a3a1a;color:#ffcc66;font-weight:bold;">${escaped}</span>`;
             if (/Startup reason:/.test(line))              return `<span style="color:#a8d8a8;">${escaped}</span>`;
+            if (/\|\s*Test\s+\S+:\s+PASS\b/.test(line))    return escaped.replace('PASS', '✅ PASS');
+            if (/\|\s*Test\s+\S+:\s+FAIL\b/.test(line))    return escaped.replace('FAIL', '❌ FAIL');
             return escaped;
         }).join('\n');
+
+        function updateStickyHeader() {
+            if (!startBlockIndices.length) { stickyEl.style.display = 'none'; return; }
+            const spans = [...out.querySelectorAll('[data-start]')];
+            const outTop = out.getBoundingClientRect().top;
+            const visible = spans.filter(s => s.getBoundingClientRect().top <= outTop + 2);
+            const current = visible.length ? visible[visible.length - 1] : null;
+            const idx = current ? parseInt(current.dataset.start) : startBlockIndices[0];
+            const block = rawLines.slice(idx, idx + 20);
+            const picked = [
+                block.find(l => /={3,}.*START.*={3,}/.test(l)),
+                block.find(l => /Startup reason:/.test(l)),
+                block.find(l => /={3,}.*(CONFIG MODE|DEFAULT MODE).*={3,}/.test(l)),
+            ].filter(Boolean);
+            stickyEl.innerHTML = picked
+                .map(l => l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('\n');
+            stickyEl.style.display = 'block';
+        }
+
+        if (_logScrollHandler) out.removeEventListener('scroll', _logScrollHandler);
+        _logScrollHandler = updateStickyHeader;
+        out.addEventListener('scroll', _logScrollHandler);
+        updateStickyHeader();
+
         if (atBottom) out.scrollTop = out.scrollHeight;
         status.textContent = `Updated ${new Date().toLocaleTimeString()}`;
     } catch(e) {
