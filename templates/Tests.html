@@ -969,6 +969,7 @@ async function loadLogs() {
             if (/={3,}.*START.*={3,}/.test(line))          { startBlockIndices.push(i); return `<span data-start="${i}" style="background:#1a4a1a;color:#6fcf6f;font-weight:bold;">${escaped}</span>`; }
             if (/={3,}.*CONFIG MODE.*={3,}/.test(line))    return `<span style="background:#1a2a4a;color:#6fb0ff;font-weight:bold;">${escaped}</span>`;
             if (/={3,}.*DEFAULT MODE.*={3,}/.test(line))   return `<span style="background:#2a2a4a;color:#b06fff;font-weight:bold;">${escaped}</span>`;
+            if (/={3,}.*WITTYPI NEWLY POWERED MODE.*={3,}/.test(line))   return `<span style="background:#2a2a4a;color:#b06fff;font-weight:bold;">${escaped}</span>`;            
             if (/={3,}.*POWER OFF.*={3,}/.test(line))      return `<span style="background:#4a1a1a;color:#ff6b6b;font-weight:bold;">${escaped}</span>`;
             if (/SIGTERM received/.test(line))             return `<span style="background:#4a3a1a;color:#ffcc66;font-weight:bold;">${escaped}</span>`;
             if (/POWERING OFF/.test(line))                 return `<span style="background:#4a3a1a;color:#ffcc66;font-weight:bold;">${escaped}</span>`;
@@ -989,7 +990,7 @@ async function loadLogs() {
             const picked = [
                 block.find(l => /={3,}.*START.*={3,}/.test(l)),
                 block.find(l => /Startup reason:/.test(l)),
-                block.find(l => /={3,}.*(CONFIG MODE|DEFAULT MODE).*={3,}/.test(l)),
+                block.find(l => /={3,}.*(CONFIG MODE|DEFAULT MODE|WITTYPI NEWLY POWERED MODE).*={3,}/.test(l)),
             ].filter(Boolean);
             stickyEl.innerHTML = picked
                 .map(l => l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('\n');
