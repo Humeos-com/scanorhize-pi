@@ -373,7 +373,7 @@ def getTokens():
             serial_dict[f"port{num_scan}"] = serial
 
     if not serial_dict:
-        getLogger().info("getTokens: no scanner serials found, skipping")
+        getLogger().warning("getTokens: no scanner serials found, skipping")
         return 0
 
     Hub_ = HubData()
