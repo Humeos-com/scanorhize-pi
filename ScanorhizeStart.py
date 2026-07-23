@@ -7,6 +7,7 @@ ce programme garde la main et éteint la clé 4G et le Raspberry Pi
 
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 time.sleep(5)  # Wait for wp5d to sync the RTC to the system clock before anything else
 
@@ -22,13 +23,14 @@ from ConfigApp import getUsbDir
 from pathlib import Path
 
 
-from WittyPy_utilities import is_reason_click
 from WittyPy_utilities import (
     set_shutdown_time, get_shutdown_time,
     pre_shutdown_checks,
     setShutdownAndWakeUpDates,
     safeShutdown,
     is_mc_connected, WittyPi,
+    REASON_CLICK_WP5, REASON_ALARM1_WP5, REASON_ALARM2_WP5,
+    SetNextStartDate,
 )
 from Miscellaneous import (
     EndGPIO,
@@ -82,17 +84,27 @@ if args.version:
 
 WITTYPI_TEST_FLAG = Path("wittypi_test_mode")
 
-def isConfig():
-    # WittyPi cycle test: flag file forces config mode for exactly one boot
+def get_startup_mode() -> str:
+    """Returns 'config', 'default', or the startup reason string."""
     if WITTYPI_TEST_FLAG.exists():
         WITTYPI_TEST_FLAG.unlink()
         getLogger().warning("WITTYPI CYCLE TEST FLAG FOUND — STARTING IN CONFIG MODE")
         EndGPIO()
-        return True
-    # On regarde si on est en mode configuration
-    config = not ReadGPIOConfig() or is_reason_click(log=False)  # 0 ou 1
+        return "config"
+
+    wp = WittyPi()
+    reason = wp.reason_click
+    getLogger().info("Startup reason: %s", wp.startup_reason_str())
+
+    if reason == REASON_CLICK_WP5 or not ReadGPIOConfig():
+        mode = "config"
+    elif reason in (REASON_ALARM1_WP5, REASON_ALARM2_WP5):
+        mode = "default"
+    else:
+        mode = wp.startup_reason_str()
+
     EndGPIO()
-    return config
+    return mode
 
 
 
@@ -254,7 +266,7 @@ def _get_shutdown_reason() -> str:
     """Infer WP5 shutdown reason from I2C registers."""
     # Reg 14: high nibble = startup reason, low nibble = shutdown reason (WP5 spec)
     _SHUTDOWN_REASONS = {
-        0x01: "WittyPi startup alarm",
+        0x01: "WittyPi wake-up alarm",
         0x02: "WittyPi shutdown alarm",
         0x03: "WittyPi button clicked",
         0x04: "WittyPi VIN drops (low voltage)",
@@ -305,45 +317,46 @@ signal.signal(signal.SIGTERM, _on_sigterm)
 
 def main():
     getLogger().info("Code version: %s", __version__)
-    getLogger().info("Startup reason: %s", WittyPi().startup_reason_str())
-    
-    config = isConfig()
 
-    if config:
-        getLogger().info("======= CONFIG MODE =======")
-    else: #Default mode
-        getLogger().info("======= DEFAULT MODE =======")
+    mode = get_startup_mode()  # "config", "default", or "newly_powered"
 
-    # Set shutdown and wakeup dates
     setShutdownAndWakeUpDates()
 
-    if config:
-        launchServer()  #Launch web server in the background
+    if mode == "default":
+        getLogger().info("======= DEFAULT MODE =======")
+        takePictures()
+
+    elif mode == "config":
+        getLogger().info("======= CONFIG MODE =======")
+        launchServer()
         createRunConfigFile()
         initScanners()
 
-    else: #Default mode
-        takePictures()
-        
+    else:
+        getLogger().info("======= %s MODE =======", mode.upper())
+        wakeup = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z")
+        getLogger().warning("Unexpected startup reason — setting next wake-up in 1 day: %s", wakeup)
+        SetNextStartDate(wakeup)
+        safeShutdown()
+        return
+
     #Update data from and to server
-    #And, if not config mode, wait for pictures to upload
     if not getOffline():
         try:
             enable4G()
-            updateDataFromAndToServer(configMode=config)
-            
-            #In default mode, wait for pictures to upload to server before shutting down
-            if config == False:
+            updateDataFromAndToServer(configMode=(mode == "config"))
+
+            #In default mode, wait for pictures to be uploaded (by another service) before shutting down
+            if mode == "default":
                 waitingForPicturesToUpload()
                 global _pre_shutdown_done
                 _pre_shutdown_done = True
                 safeShutdown()
-        
+
         except Exception as e:
             getLogger().error(e)
-         
-    
-    if config:
+
+    if mode == "config":
         while True:
             time.sleep(60)
     else:
