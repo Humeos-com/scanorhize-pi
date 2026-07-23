@@ -326,6 +326,12 @@ def main():
         getLogger().info("======= CONFIG MODE =======")
     else:
         getLogger().info("======= %s MODE =======", mode.upper())
+        wakeup = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z")
+        getLogger().warning("Unexpected startup reason — setting next wake-up in 1 day: %s", wakeup)
+        SetNextStartDate(wakeup)
+        safeShutdown()
+        return
+
 
     #Set shutdown and wake-up dates
     setShutdownAndWakeUpDates()
@@ -338,12 +344,6 @@ def main():
         createRunConfigFile()
         initScanners()
 
-    else:
-        wakeup = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z")
-        getLogger().warning("Unexpected startup reason — setting next wake-up in 1 day: %s", wakeup)
-        SetNextStartDate(wakeup)
-        safeShutdown()
-        return
 
     #Update data from and to server
     if not getOffline():
